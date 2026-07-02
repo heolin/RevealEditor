@@ -61,6 +61,23 @@ describe('parseDeck', () => {
     expect(info.config).toEqual({ width: 1280, height: 720, center: false, margin: 0.025 });
   });
 
+  it('collects user <style> blocks so custom designs reach canvas/preview', () => {
+    const bench = parseDeck(fixture('benchmarks.html'));
+    expect(bench.headStyles).toHaveLength(1);
+    expect(bench.headStyles[0]).toContain('--paper');
+    const demo = parseDeck(fixture('demo.html'));
+    expect(demo.headStyles).toHaveLength(1);
+    expect(demo.headStyles[0]).toContain('.brand');
+  });
+
+  it('excludes the managed style block from headStyles', () => {
+    const src = updateDeck(fixture('demo.html'), { managedCss: '.re-x { color: red; }' });
+    const info = parseDeck(src);
+    expect(info.headStyles).toHaveLength(1);
+    expect(info.headStyles[0]).not.toContain('.re-x');
+    expect(info.managedCss).toContain('.re-x');
+  });
+
   it('rejects non-reveal HTML', () => {
     expect(() => parseDeck('<html><body><p>hi</p></body></html>')).toThrow();
   });

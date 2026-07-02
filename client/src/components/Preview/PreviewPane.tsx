@@ -36,6 +36,7 @@ export function PreviewPane() {
         {
           type: 'sync',
           slidesHtml: composeSlides(s.columns, s.meta.layout),
+          headStyles: s.meta.headStyles,
           managedCss: s.meta.managedCss,
           themeHref: themeUrl(s.meta.path, s.meta.theme, s.meta.themeHref),
           baseHref: `${location.origin}/files/${dir}`,

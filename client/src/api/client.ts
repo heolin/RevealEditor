@@ -20,6 +20,7 @@ export interface DeckData {
   theme: string | null;
   themeHref: string | null;
   stylesheets: string[];
+  headStyles: string[];
   managedCss: string;
   config: { width: number; height: number; center: boolean; margin: number };
   sections: SectionInfo[];

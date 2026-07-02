@@ -63,6 +63,7 @@ export function decksRouter(ws: Workspace): Router {
         theme: info.theme,
         themeHref: info.themeHref,
         stylesheets: info.stylesheets,
+        headStyles: info.headStyles,
         managedCss: info.managedCss,
         config: info.config,
         sections: info.sections,

@@ -9,6 +9,7 @@ function fakeDeck(): DeckData {
     theme: 'black',
     themeHref: 'theme/black.css',
     stylesheets: [],
+    headStyles: [],
     managedCss: '',
     config: { width: 960, height: 700, center: true, margin: 0.04 },
     sections: [

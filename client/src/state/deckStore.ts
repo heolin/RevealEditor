@@ -19,6 +19,7 @@ export interface DeckMeta {
   theme: string | null;
   themeHref: string | null;
   stylesheets: string[];
+  headStyles: string[];
   managedCss: string;
   config: { width: number; height: number; center: boolean; margin: number };
   layout: SlidesLayout;
@@ -124,6 +125,7 @@ export const useDeckStore = create<DeckState>()(
             theme: deck.theme,
             themeHref: deck.themeHref,
             stylesheets: deck.stylesheets,
+            headStyles: deck.headStyles,
             managedCss: deck.managedCss,
             config: deck.config,
             layout: {

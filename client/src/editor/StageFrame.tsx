@@ -52,6 +52,8 @@ export function StageFrame({ slide, meta }: { slide: Slide | null; meta: DeckMet
       .filter((href) => !REVEAL_CSS_RE.test(href))
       .map((href) => `<link rel="stylesheet" href="${resolveDeckUrl(meta.path, href)}">`)
       .join('\n');
+    // The deck's own <style> blocks — custom decks carry their design here.
+    const userStyles = meta.headStyles.map((css) => `<style>${css}</style>`).join('\n');
     const theme = themeUrl(meta.path, meta.theme, meta.themeHref);
     return `<!doctype html>
 <html>
@@ -62,6 +64,7 @@ export function StageFrame({ slide, meta }: { slide: Slide | null; meta: DeckMet
 ${theme ? `<link rel="stylesheet" href="${theme}">` : '<!-- custom-styled deck: no theme injected -->'}
 <link rel="stylesheet" href="/vendor/reveal.js/plugin/highlight/monokai.css">
 ${userSheets}
+${userStyles}
 ${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}
 <style>
   html, body { margin: 0; overflow: hidden; width: 100%; height: 100%; }
@@ -89,7 +92,7 @@ ${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}
 <div class="reveal"><div class="slides"><section class="present" id="re-stage"></section></div></div>
 </body>
 </html>`;
-  }, [meta.path, meta.theme, meta.themeHref, meta.stylesheets, meta.managedCss, width, height, center]);
+  }, [meta.path, meta.theme, meta.themeHref, meta.stylesheets, meta.headStyles, meta.managedCss, width, height, center]);
 
   function endSession(commitFirst: boolean) {
     const session = sessionRef.current;

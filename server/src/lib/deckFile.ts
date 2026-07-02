@@ -52,6 +52,12 @@ export interface DeckInfo {
   headInsertOffset: number | null;
   /** All stylesheet link hrefs, in order. */
   stylesheets: string[];
+  /**
+   * Contents of the deck's own <style> blocks outside the slides region
+   * (excluding the editor-managed block). Custom-styled decks carry their
+   * whole design here — the canvas and preview must load these.
+   */
+  headStyles: string[];
   managedCss: string;
   managedCssRange: Region | null;
   config: { width: number; height: number; center: boolean; margin: number };
@@ -165,6 +171,7 @@ export function parseDeck(src: string): DeckInfo {
   let headEl: Element | null = null;
   let managedStyle: Element | null = null;
   const stylesheets: string[] = [];
+  const styleEls: Element[] = [];
 
   for (const el of walk(doc)) {
     if (el.tagName === 'div' && hasClass(el, 'slides') && !slidesEl) {
@@ -173,12 +180,12 @@ export function parseDeck(src: string): DeckInfo {
       titleEl = el;
     } else if (el.tagName === 'head') {
       headEl = el;
-    } else if (
-      el.tagName === 'style' &&
-      attr(el, 'data-revealeditor') !== null &&
-      !managedStyle
-    ) {
-      managedStyle = el;
+    } else if (el.tagName === 'style') {
+      if (attr(el, 'data-revealeditor') !== null && !managedStyle) {
+        managedStyle = el;
+      } else {
+        styleEls.push(el);
+      }
     } else if (el.tagName === 'link' && attr(el, 'rel') === 'stylesheet') {
       const href = attr(el, 'href');
       if (href) {
@@ -243,6 +250,18 @@ export function parseDeck(src: string): DeckInfo {
     ? src.slice(managedCssRange.start, managedCssRange.end)
     : '';
 
+  // User style blocks outside the slides region, in document order. Styles
+  // inside slide content belong to the slides and travel with them instead.
+  const headStyles = styleEls
+    .filter((el) => {
+      const loc = el.sourceCodeLocation!;
+      return loc.endOffset <= slidesRange.start || loc.startOffset >= slidesRange.end;
+    })
+    .map((el) => {
+      const inner = innerRegion(el);
+      return src.slice(inner.start, inner.end);
+    });
+
   // Best-effort read of layout-relevant options from Reveal.initialize({...}).
   // The config script is opaque to the editor and is never rewritten.
   const config = { width: 960, height: 700, center: true, margin: 0.04 };
@@ -269,6 +288,7 @@ export function parseDeck(src: string): DeckInfo {
     sectionIndent,
     headInsertOffset,
     stylesheets,
+    headStyles,
     managedCss,
     managedCssRange,
     config,

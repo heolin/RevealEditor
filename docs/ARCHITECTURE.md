@@ -67,11 +67,14 @@ type Slide = {
   originalSource?: string;            // pristine outerHTML from load; dropped on first edit
 };
 type DeckHead = {
-  theme: string;                      // located theme <link>
+  theme: string | null;               // located theme <link>; null = fully custom-styled deck
   title: string;
   stylesheets: string[];              // ALL stylesheet URLs (user CSS + design system later)
+  headStyles: string[];               // the deck's own <style> blocks outside .slides —
+                                      // custom decks carry their entire design here; canvas
+                                      // and preview MUST inject these
   managedCss: string;                 // contents of <style data-revealeditor> ('' if absent)
-  config: RevealConfigView;           // read-only parse of Reveal.initialize (width/height/center/…)
+  config: RevealConfigView;           // read-only parse of Reveal.initialize (width/height/center/margin/…)
 };
 ```
 
@@ -342,6 +345,33 @@ If a planned feature fits none of these, the architecture is wrong — fix it be
 | Slide numbering toggle | isolated config-write in `deckFile.ts` (§3) |
 | Zip export, PDF, publish | new server endpoints |
 | Team hosting | API-only I/O + reverse proxy; no client changes |
+
+## 12b. Real-deck compatibility learnings (2026-07-02, presentation-benchmarks)
+
+First test against a real, fully custom-styled deck (own design system in one
+`<style>` block, Google Fonts, no theme link, reveal 4.6.1 CDN, `center:false`,
+1280×720, colgroup tables, data-auto-animate). The splice engine passed
+byte-identical untouched; every gap was in the rendering layer. The deck is a
+permanent round-trip fixture (`server/test/fixtures/benchmarks.html`).
+
+**Resolved (now invariants):**
+- Inline `<style>` blocks outside `.slides` are first-class deck design
+  (`DeckHead.headStyles`) and are injected into canvas + preview. A custom deck
+  without them renders unstyled — this was the single biggest fidelity gap.
+- `theme: null` means *inject no theme anywhere* (canvas, preview) and disable
+  theme switching; a default theme pollutes custom designs.
+- The reveal-css filter must catch `.min` variants (`reveal.min.css`).
+- `center:false` decks use block layout in the canvas (no flex centering), and
+  free-layout pinning must not impose centering on them; preview passes
+  center/margin to the runtime.
+
+**Open gaps (tiered):**
+- Sorter thumbnails use generic colors for custom decks (theme map only) — T2:
+  theme-faithful thumbnails (likely a shared offscreen render).
+- Preview harness runs the vendored reveal 5.x regardless of the deck's own
+  runtime version; Present mode remains ground truth. Document, don't chase.
+- Table column ops don't update `<colgroup>` widths — T2 alongside merges.
+- `data-auto-animate` preserved but not editable (already T2 in FEATURES).
 
 ## 13. Testing strategy
 
