@@ -12,6 +12,16 @@ export interface DeckSummary {
   title: string;
   mtime: number;
   slideCount: number;
+  /** Everything the deck-grid needs to render a first-slide miniature. */
+  preview: {
+    firstSlide: string | null;
+    theme: string | null;
+    themeHref: string | null;
+    stylesheets: string[];
+    headStyles: string[];
+    managedCss: string;
+    config: { width: number; height: number; center: boolean; margin: number };
+  };
 }
 
 const IGNORED_DIRS = new Set(['node_modules', '.git', 'dist', '.cache']);
@@ -76,11 +86,21 @@ export class Workspace {
         (n, s) => n + (s.children ? s.children.length : 1),
         0,
       );
+      const first = info.sections[0];
       return {
         path: this.relative(abs),
         title: info.title || path.basename(abs, '.html'),
         mtime: Math.round(stat.mtimeMs),
         slideCount,
+        preview: {
+          firstSlide: first ? (first.children?.[0] ?? first).source : null,
+          theme: info.theme,
+          themeHref: info.themeHref,
+          stylesheets: info.stylesheets,
+          headStyles: info.headStyles,
+          managedCss: info.managedCss,
+          config: info.config,
+        },
       };
     } catch {
       return null;

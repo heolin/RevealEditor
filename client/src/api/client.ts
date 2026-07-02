@@ -12,6 +12,15 @@ export interface DeckSummary {
   title: string;
   mtime: number;
   slideCount: number;
+  preview: {
+    firstSlide: string | null;
+    theme: string | null;
+    themeHref: string | null;
+    stylesheets: string[];
+    headStyles: string[];
+    managedCss: string;
+    config: { width: number; height: number; center: boolean; margin: number };
+  };
 }
 
 export interface DeckData {

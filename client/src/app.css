@@ -24,6 +24,62 @@ html, body, #root { height: 100%; margin: 0; }
 .deck-item { cursor: pointer; }
 .deck-item:hover { border-color: var(--re-accent); }
 
+/* ---------- Deck grid ---------- */
+
+.deck-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+.deck-tile {
+  background: var(--re-panel);
+  border: 1px solid var(--re-border);
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.deck-tile:hover {
+  border-color: var(--re-accent);
+  box-shadow: 0 2px 12px var(--re-shadow);
+}
+.new-deck-tile {
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-style: dashed;
+  border-width: 2px;
+  color: var(--mantine-color-dimmed);
+  min-height: 190px;
+  font: inherit;
+}
+.new-deck-tile:hover { color: var(--re-accent); }
+.deck-preview {
+  width: 100%;
+  overflow: hidden;
+  background: var(--re-raised);
+  position: relative;
+}
+.deck-preview-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 960 / 700;
+  color: var(--mantine-color-dimmed);
+  font-size: 12px;
+}
+.deck-tile-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--re-border);
+}
+
 /* ---------- Editor layout ---------- */
 
 .editor-layout { display: flex; flex-direction: column; height: 100%; }

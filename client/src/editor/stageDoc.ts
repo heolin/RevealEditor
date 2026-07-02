@@ -6,7 +6,13 @@
 import type { DeckMeta } from '../state/deckStore';
 import { REVEAL_CSS_RE, resolveDeckUrl, themeUrl } from '../api/client';
 
-export function stageHead(meta: DeckMeta): string {
+/** The subset of deck state slide-rendering surfaces need. */
+export type StageMeta = Pick<
+  DeckMeta,
+  'path' | 'theme' | 'themeHref' | 'stylesheets' | 'headStyles' | 'managedCss' | 'config'
+>;
+
+export function stageHead(meta: StageMeta): string {
   const dir = meta.path.includes('/')
     ? meta.path.slice(0, meta.path.lastIndexOf('/') + 1)
     : '';
@@ -26,7 +32,7 @@ ${userStyles}
 ${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}`;
 }
 
-export function stageLayoutCss(meta: DeckMeta): string {
+export function stageLayoutCss(meta: StageMeta): string {
   const { width, height, center } = meta.config;
   return `
   html, body { margin: 0; overflow: hidden; width: 100%; height: 100%; }
@@ -77,7 +83,7 @@ export function stageLayoutCss(meta: DeckMeta): string {
  * embedded directly, plus a tiny script replicating the per-slide background
  * (the runtime isn't there to paint it).
  */
-export function thumbDoc(meta: DeckMeta, slideSource: string): string {
+export function thumbDoc(meta: StageMeta, slideSource: string): string {
   return `<!doctype html>
 <html>
 <head>

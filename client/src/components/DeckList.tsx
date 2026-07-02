@@ -3,7 +3,6 @@ import {
   ActionIcon,
   Alert,
   Button,
-  Card,
   Container,
   Group,
   Menu,
@@ -26,7 +25,33 @@ import {
   IconTrash,
 } from '@tabler/icons-react';
 import { api, type DeckSummary } from '../api/client';
+import { thumbDoc } from '../editor/stageDoc';
 import { openDeck } from '../App';
+
+/** Live first-slide miniature — the same shell the canvas/thumbnails use. */
+function DeckPreview({ deck }: { deck: DeckSummary }) {
+  const { preview } = deck;
+  if (!preview.firstSlide) {
+    return <div className="deck-preview deck-preview-empty">empty deck</div>;
+  }
+  const { width, height } = preview.config;
+  return (
+    <div className="deck-preview" style={{ aspectRatio: `${width} / ${height}` }}>
+      <iframe
+        title={deck.title}
+        srcDoc={thumbDoc({ ...preview, path: deck.path }, preview.firstSlide)}
+        tabIndex={-1}
+        loading="lazy"
+        style={{ width, height, border: 'none', pointerEvents: 'none', transformOrigin: 'top left' }}
+        ref={(el) => {
+          if (!el || !el.parentElement) return;
+          const scale = el.parentElement.clientWidth / width;
+          el.style.transform = `scale(${scale})`;
+        }}
+      />
+    </div>
+  );
+}
 
 export function DeckList() {
   const [decks, setDecks] = useState<DeckSummary[] | null>(null);
@@ -63,19 +88,14 @@ export function DeckList() {
   }
 
   return (
-    <Container size="sm" py={48}>
+    <Container size="xl" py={40}>
       <Group justify="space-between" mb="lg">
         <Title order={2}>RevealEditor</Title>
-        <Group gap="xs">
-          <Tooltip label={`Switch to ${colorScheme === 'light' ? 'dark' : 'light'} mode`}>
-            <ActionIcon variant="default" size="lg" onClick={toggleColorScheme}>
-              {colorScheme === 'light' ? <IconMoon size={18} /> : <IconSun size={18} />}
-            </ActionIcon>
-          </Tooltip>
-          <Button leftSection={<IconPlus size={16} />} onClick={() => setCreating(true)}>
-            New presentation
-          </Button>
-        </Group>
+        <Tooltip label={`Switch to ${colorScheme === 'light' ? 'dark' : 'light'} mode`}>
+          <ActionIcon variant="default" size="lg" onClick={toggleColorScheme}>
+            {colorScheme === 'light' ? <IconMoon size={18} /> : <IconSun size={18} />}
+          </ActionIcon>
+        </Tooltip>
       </Group>
 
       {error && (
@@ -86,21 +106,22 @@ export function DeckList() {
 
       {decks === null ? (
         <Text c="dimmed">Loading…</Text>
-      ) : decks.length === 0 ? (
-        <Text c="dimmed">No reveal.js presentations found in this workspace yet.</Text>
       ) : (
-        <Stack gap="xs">
+        <div className="deck-grid">
+          <button className="deck-tile new-deck-tile" onClick={() => setCreating(true)}>
+            <IconPlus size={28} />
+            <Text size="sm" fw={600}>
+              New presentation
+            </Text>
+          </button>
           {decks.map((d) => (
-            <Card
-              key={d.path}
-              withBorder
-              padding="md"
-              className="deck-item"
-              onClick={() => void openDeck(d.path)}
-            >
-              <Group justify="space-between" wrap="nowrap">
-                <div style={{ minWidth: 0 }}>
-                  <Text fw={600}>{d.title}</Text>
+            <div key={d.path} className="deck-tile" onClick={() => void openDeck(d.path)}>
+              <DeckPreview deck={d} />
+              <div className="deck-tile-footer">
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <Text size="sm" fw={600} truncate>
+                    {d.title}
+                  </Text>
                   <Text size="xs" c="dimmed" truncate>
                     {d.path} · {d.slideCount} slides
                   </Text>
@@ -142,10 +163,10 @@ export function DeckList() {
                     </Menu.Item>
                   </Menu.Dropdown>
                 </Menu>
-              </Group>
-            </Card>
+              </div>
+            </div>
           ))}
-        </Stack>
+        </div>
       )}
 
       <Modal
