@@ -210,6 +210,32 @@ test('multi-select: shift-click, align, group, ungroup round-trip', async ({ pag
   expect(file).toMatch(/<h1[^>]*position: absolute/);
 });
 
+test('layers panel: tree select, hover, sibling reorder round-trips', async ({ page }) => {
+  await createDeck(page, 'e2e-layers');
+  await openInsertMenu(page);
+  await page.getByRole('menuitem', { name: 'Text', exact: true }).click();
+  await page.getByRole('tab', { name: 'Layers' }).click();
+
+  const rows = page.locator('.layer-row');
+  await expect(rows).toHaveCount(2); // h1 + inserted p
+
+  // Clicking a row selects the element on canvas.
+  await rows.first().click();
+  await expect(page.locator('.selection-box')).toHaveCount(1);
+  await expect(rows.first()).toHaveClass(/selected/);
+
+  // Shift-click builds a multi-selection.
+  await rows.nth(1).click({ modifiers: ['Shift'] });
+  await expect(page.locator('.selection-box')).toHaveCount(2);
+
+  // Reorder: move the h1 after the p, save, verify DOM order in the file.
+  await rows.first().hover();
+  await rows.first().getByTitle('Move later (down in order)').click();
+  await save(page);
+  const file = await fileContents(page, 'e2e-layers.html');
+  expect(file.indexOf('<p')).toBeLessThan(file.indexOf('<h1'));
+});
+
 test('insert menu closes after selection; undo never blanks the deck', async ({ page }) => {
   await openDemo(page);
   await openInsertMenu(page);

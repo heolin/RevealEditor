@@ -10,7 +10,9 @@ import { SorterPanel } from './components/Sorter/SorterPanel';
 import { SlideCanvas } from './components/Canvas/SlideCanvas';
 import { PreviewPane } from './components/Preview/PreviewPane';
 import { ConflictDialog } from './components/ConflictDialog';
+import { Tabs } from '@mantine/core';
 import { InspectorPanel } from './components/Inspector/InspectorPanel';
+import { LayersPanel } from './components/Inspector/LayersPanel';
 import { NotesDrawer } from './components/Notes/NotesDrawer';
 import { CodeModal } from './editor/CodeModal';
 import { ChartModal } from './editor/chart/ChartModal';
@@ -64,7 +66,18 @@ export function App() {
           <NotesDrawer />
         </div>
         <div className="right-col">
-          <InspectorPanel />
+          <Tabs defaultValue="design" className="right-tabs">
+            <Tabs.List>
+              <Tabs.Tab value="design">Design</Tabs.Tab>
+              <Tabs.Tab value="layers">Layers</Tabs.Tab>
+            </Tabs.List>
+            <Tabs.Panel value="design" className="right-tab-panel">
+              <InspectorPanel />
+            </Tabs.Panel>
+            <Tabs.Panel value="layers" className="right-tab-panel">
+              <LayersPanel />
+            </Tabs.Panel>
+          </Tabs>
           <PreviewPane />
         </div>
       </div>

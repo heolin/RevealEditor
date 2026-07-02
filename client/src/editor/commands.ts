@@ -220,6 +220,21 @@ export function getNotes(section: HTMLElement): string {
   return section.querySelector(':scope > aside.notes')?.textContent ?? '';
 }
 
+/** Move an element among its siblings (layers panel reorder = DOM order). */
+export function moveSibling(ctx: StageCtx, el: HTMLElement, dir: 'up' | 'down'): boolean {
+  if (dir === 'up') {
+    const prev = el.previousElementSibling;
+    if (!prev) return false;
+    prev.before(el);
+  } else {
+    const next = el.nextElementSibling;
+    if (!next) return false;
+    next.after(el);
+  }
+  commit(ctx);
+  return true;
+}
+
 /* ---------- element clipboard ---------- */
 
 let internalClipboard: string | null = null;
