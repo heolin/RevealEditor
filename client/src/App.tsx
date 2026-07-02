@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useDeckStore } from './state/deckStore';
 import { useEditorStore } from './editor/editorStore';
 import { dispatchShortcut } from './editor/actions/dispatcher';
+import { applyLayoutOverrides } from './editor/actions/layouts';
 import { api } from './api/client';
 import { DeckList } from './components/DeckList';
 import { Toolbar } from './components/Toolbar';
@@ -18,6 +19,17 @@ import { ComponentPalette } from './components/Palette/ComponentPalette';
 export function App() {
   const meta = useDeckStore((s) => s.meta);
   const conflict = useDeckStore((s) => s.conflict);
+
+  // Toolbar layout overrides from .revealeditor.json (docs/TOOLBARS.md P4).
+  useEffect(() => {
+    api
+      .editorConfig()
+      .then((config) => {
+        applyLayoutOverrides(config);
+        useEditorStore.getState().bump();
+      })
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {

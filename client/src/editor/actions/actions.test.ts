@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { EditorContext } from './types';
 import type { StageCtx } from '../commands';
 import { getAction, resolveLayout, allActions } from './index';
-import { FLOATING_LAYOUT, TOP_LAYOUT, INSERT_MENU_LAYOUT } from './layouts';
+import { applyLayoutOverrides, getLayout, resetLayouts, type SurfaceId } from './layouts';
 import { handlerFor } from '../registry';
 import { fontOptions } from './fonts';
 import type { DeckMeta } from '../../state/deckStore';
@@ -31,8 +31,8 @@ function selected(tag: string, absolute = false): EditorContext {
 
 describe('action availability', () => {
   it('layouts reference only known actions', () => {
-    for (const layout of [FLOATING_LAYOUT, TOP_LAYOUT, INSERT_MENU_LAYOUT]) {
-      for (const id of layout.flat()) {
+    for (const surface of ['top', 'floating', 'insertMenu', 'context'] as SurfaceId[]) {
+      for (const id of getLayout(surface).flat()) {
         expect(getAction(id), id).not.toBeNull();
       }
     }
@@ -71,9 +71,30 @@ describe('action availability', () => {
   });
 
   it('resolveLayout drops unavailable actions and empty groups', () => {
-    const groups = resolveLayout(FLOATING_LAYOUT, fakeCtx());
+    const groups = resolveLayout(getLayout('floating'), fakeCtx());
     // Nothing selected, no session → no floating toolbar content at all.
     expect(groups.flat().filter((a) => a.group === 'format')).toHaveLength(0);
+  });
+
+  it('table quick-ops appear only with a cell context', () => {
+    const cellCtx = (() => {
+      const table = document.createElement('table');
+      table.innerHTML = '<tbody><tr><td>x</td></tr></tbody>';
+      const td = table.querySelector('td')!;
+      return fakeCtx({ selection: td, handler: handlerFor(td), cell: td });
+    })();
+    expect(getAction('table.rowBelow')!.when(cellCtx)).toBe(true);
+    expect(getAction('table.rowBelow')!.when(selected('p'))).toBe(false);
+    const menu = resolveLayout(getLayout('context'), cellCtx).flat();
+    expect(menu.some((a) => a.id === 'table.deleteCol')).toBe(true);
+  });
+
+  it('layout overrides replace surfaces and reject invalid shapes', () => {
+    applyLayoutOverrides({ toolbars: { floating: [['format.bold']], top: 'nonsense' } });
+    expect(getLayout('floating')).toEqual([['format.bold']]);
+    expect(getLayout('top').length).toBeGreaterThan(1); // untouched
+    resetLayouts();
+    expect(getLayout('floating').flat().length).toBeGreaterThan(1);
   });
 
   it('heading select exposes current tag and options', () => {

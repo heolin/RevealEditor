@@ -232,6 +232,12 @@ html, body, #root { height: 100%; margin: 0; }
   z-index: 10;
   white-space: nowrap;
 }
+.context-menu-anchor {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
 .resize-handle {
   position: absolute;
   width: 8px;

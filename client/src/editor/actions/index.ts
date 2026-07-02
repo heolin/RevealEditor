@@ -2,8 +2,15 @@ import type { Action, EditorContext, SurfaceLayout } from './types';
 import { formatActions } from './format';
 import { insertActions } from './insert';
 import { arrangeActions, historyActions } from './arrange';
+import { contentActions } from './content';
 
-const ALL: Action[] = [...formatActions, ...insertActions, ...arrangeActions, ...historyActions];
+const ALL: Action[] = [
+  ...formatActions,
+  ...insertActions,
+  ...arrangeActions,
+  ...historyActions,
+  ...contentActions,
+];
 const BY_ID = new Map(ALL.map((a) => [a.id, a]));
 
 const warned = new Set<string>();

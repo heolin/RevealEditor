@@ -9,7 +9,15 @@ import {
   IconStrikethrough,
 } from '@tabler/icons-react';
 import type { Action, EditorContext } from './types';
-import { convertListToParagraphs, convertToList, execInline, insertList, renameElement, commit } from '../commands';
+import {
+  convertListToParagraphs,
+  convertToList,
+  execInline,
+  insertList,
+  renameElement,
+  commit,
+  wrapSelectionWithStyle,
+} from '../commands';
 import { applyStyle } from '../geometry';
 import { useEditorStore } from '../editorStore';
 import { fontOptions, FONT_SIZES } from './fonts';
@@ -32,8 +40,14 @@ function styleValue(ctx: EditorContext, prop: string): string {
 }
 
 function setStyle(ctx: EditorContext, prop: string, value: string | undefined): void {
+  if (!ctx.stage) return;
+  // During a text session with a live selection, style just the selected
+  // range; otherwise the whole element.
+  if (ctx.session === 'text' && value && wrapSelectionWithStyle(ctx.stage, prop, value)) {
+    return;
+  }
   const el = formatTarget(ctx);
-  if (!el || !ctx.stage) return;
+  if (!el) return;
   applyStyle(el, { [prop]: value || null });
   commit(ctx.stage);
 }

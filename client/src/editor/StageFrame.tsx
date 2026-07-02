@@ -175,8 +175,31 @@ ${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}
       if (p?.dragging && ctxRef.current) commit(ctxRef.current);
     }
 
+    doc.addEventListener('contextmenu', (e) => {
+      const target = e.target as Element;
+      const session = sessionRef.current;
+      // Native menu (spellcheck etc.) stays available inside active editing.
+      if (session && session.el.contains(target)) return;
+      e.preventDefault();
+      const editor = useEditorStore.getState();
+      if (session) endSession(true);
+      if (section.contains(target) && target !== section) {
+        const selected = editor.selectedEl;
+        const within =
+          !!selected && selected.isConnected && (selected === target || selected.contains(target));
+        if (!within) {
+          const el = childOf(section, target);
+          if (el) editor.select(el);
+        }
+      } else {
+        editor.select(null);
+      }
+      editor.setContextMenu({ x: e.clientX, y: e.clientY });
+    });
+
     doc.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
+      if (useEditorStore.getState().contextMenu) useEditorStore.getState().setContextMenu(null);
       if (press) finalizePress(); // stale gesture (missed pointerup)
       const target = e.target as Element;
       const editor = useEditorStore.getState();

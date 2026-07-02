@@ -80,6 +80,18 @@ describe('normalizeInlineMarkup', () => {
     expect(el.innerHTML).toBe('x <span class="hl">y</span>');
   });
 
+  it('keeps intentional range-formatting spans (color/font)', () => {
+    const el = document.createElement('p');
+    el.innerHTML =
+      '<span style="color: red;">a</span><span style="font-size: 2em;">b</span>' +
+      '<span style="font-family: Georgia, serif;">c</span><span style="font-style: italic;">d</span>';
+    normalizeInlineMarkup(el);
+    expect(el.innerHTML).toBe(
+      '<span style="color: red;">a</span><span style="font-size: 2em;">b</span>' +
+        '<span style="font-family: Georgia, serif;">c</span>d',
+    );
+  });
+
   it('removes empty formatting leftovers', () => {
     const el = document.createElement('p');
     el.innerHTML = 'a<strong></strong>b<em></em>';

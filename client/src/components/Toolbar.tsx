@@ -18,7 +18,7 @@ import {
 import { useDeckStore } from '../state/deckStore';
 import { useEditorContext } from '../editor/actions/context';
 import { getAction } from '../editor/actions';
-import { TOP_LAYOUT } from '../editor/actions/layouts';
+import { getLayout } from '../editor/actions/layouts';
 import { ActionControl } from '../editor/actions/ActionControl';
 import { InsertMenu } from '../editor/overlay/EditorOverlay';
 import { api } from '../api/client';
@@ -100,7 +100,7 @@ function FormatRibbon() {
   return (
     <Group gap={4} px="sm" py={4} wrap="nowrap" className="ribbon">
       <InsertMenu />
-      {TOP_LAYOUT.map((group, gi) => {
+      {getLayout('top').map((group, gi) => {
         const actions = group
           .map(getAction)
           .filter((a): a is NonNullable<typeof a> => a !== null);

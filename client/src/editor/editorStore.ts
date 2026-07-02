@@ -26,6 +26,8 @@ interface EditorState {
   fragmentStep: number | null;
   /** Design-system component palette modal. */
   paletteOpen: boolean;
+  /** Right-click context menu position in slide-space px (null = closed). */
+  contextMenu: { x: number; y: number } | null;
   /** Bumped on every DOM mutation / selection change → overlay re-measures. */
   docVersion: number;
 
@@ -42,6 +44,7 @@ interface EditorState {
   setSnapGuides(g: { x: number | null; y: number | null } | null): void;
   setFragmentStep(step: number | null): void;
   setPaletteOpen(open: boolean): void;
+  setContextMenu(pos: { x: number; y: number } | null): void;
   bump(): void;
   /** Stage rebuilt — all element refs are stale. */
   reset(): void;
@@ -57,6 +60,7 @@ export const useEditorStore = create<EditorState>()((set) => ({
   snapGuides: null,
   fragmentStep: null,
   paletteOpen: false,
+  contextMenu: null,
   docVersion: 0,
 
   startSession: () => undefined,
@@ -71,6 +75,7 @@ export const useEditorStore = create<EditorState>()((set) => ({
   setSnapGuides: (g) => set((s) => ({ snapGuides: g, docVersion: s.docVersion + 1 })),
   setFragmentStep: (step) => set((s) => ({ fragmentStep: step, docVersion: s.docVersion + 1 })),
   setPaletteOpen: (open) => set({ paletteOpen: open }),
+  setContextMenu: (pos) => set((s) => ({ contextMenu: pos, docVersion: s.docVersion + 1 })),
   bump: () => set((s) => ({ docVersion: s.docVersion + 1 })),
   reset: () =>
     set((s) => ({
@@ -81,6 +86,7 @@ export const useEditorStore = create<EditorState>()((set) => ({
       chartEditEl: null,
       snapGuides: null,
       fragmentStep: null,
+      contextMenu: null,
       docVersion: s.docVersion + 1,
     })),
 }));

@@ -11,7 +11,7 @@ import { commit } from '../commands';
 import { handlerFor } from '../registry';
 import { useEditorContext } from '../actions/context';
 import { resolveLayout } from '../actions';
-import { FLOATING_LAYOUT, INSERT_MENU_LAYOUT } from '../actions/layouts';
+import { getLayout } from '../actions/layouts';
 import { ActionControl } from '../actions/ActionControl';
 import type { EditorContext } from '../actions/types';
 
@@ -63,7 +63,38 @@ export function EditorOverlay({ scale }: { scale: number }) {
       {snapGuides?.y != null && (
         <div className="snap-guide horizontal" style={{ top: snapGuides.y * scale }} />
       )}
+      <StageContextMenu ctx={ctx} scale={scale} />
     </div>
+  );
+}
+
+/** Right-click menu at the pointer, rendered from the context layout. */
+function StageContextMenu({ ctx, scale }: { ctx: EditorContext; scale: number }) {
+  const pos = useEditorStore((s) => s.contextMenu);
+  if (!pos) return null;
+  const groups = resolveLayout(getLayout('context'), ctx);
+  if (groups.length === 0) return null;
+  const close = () => useEditorStore.getState().setContextMenu(null);
+
+  return (
+    <Menu opened onClose={close} position="bottom-start" withinPortal shadow="md">
+      <Menu.Target>
+        <div
+          className="context-menu-anchor"
+          style={{ left: pos.x * scale, top: pos.y * scale }}
+        />
+      </Menu.Target>
+      <Menu.Dropdown>
+        {groups.map((group, gi) => (
+          <Fragment key={gi}>
+            {gi > 0 && <Menu.Divider />}
+            {group.map((action) => (
+              <ActionControl key={action.id} action={action} ctx={ctx} variant="menu" />
+            ))}
+          </Fragment>
+        ))}
+      </Menu.Dropdown>
+    </Menu>
   );
 }
 
@@ -71,7 +102,7 @@ const TOOLBAR_HEIGHT = 40;
 
 /** Config-driven quick toolbar following the selection (docs/TOOLBARS.md). */
 function FloatingToolbar({ ctx, box }: { ctx: EditorContext; box: Box }) {
-  const groups = resolveLayout(FLOATING_LAYOUT, ctx);
+  const groups = resolveLayout(getLayout('floating'), ctx);
   if (groups.length === 0) return null;
   const top =
     box.top - TOOLBAR_HEIGHT - 6 >= 0 ? box.top - TOOLBAR_HEIGHT - 6 : box.top + box.height + 6;
@@ -103,7 +134,7 @@ function FloatingToolbar({ ctx, box }: { ctx: EditorContext; box: Box }) {
 /** The "+" insert menu — same registry, menu variant. */
 export function InsertMenu() {
   const ctx = useEditorContext();
-  const groups = resolveLayout(INSERT_MENU_LAYOUT, ctx);
+  const groups = resolveLayout(getLayout('insertMenu'), ctx);
   if (!ctx.stage) return null;
   return (
     <Menu withinPortal position="bottom-start">

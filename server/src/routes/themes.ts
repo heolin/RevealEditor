@@ -13,6 +13,17 @@ export function designSystemsRouter(ws: Workspace): Router {
       next(err);
     }
   });
+
+  // Editor configuration (.revealeditor.json in the workspace root):
+  // toolbar layout overrides etc. Missing/invalid file → {}.
+  router.get('/editor-config', async (_req, res) => {
+    try {
+      const raw = await fs.readFile(path.join(ws.root, '.revealeditor.json'), 'utf8');
+      res.json(JSON.parse(raw));
+    } catch {
+      res.json({});
+    }
+  });
   return router;
 }
 

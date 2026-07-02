@@ -60,13 +60,18 @@ export function normalizeInlineMarkup(root: HTMLElement): void {
     }
   }
 
-  // WebKit wraps edits in <span style="…"> — unwrap spans whose ONLY
-  // attribute is a style (user spans with classes/ids are untouched).
+  // WebKit wraps edits in <span style="…"> droppings. But spans carrying
+  // color/font styling are INTENTIONAL (range formatting from the toolbar) —
+  // only unwrap spans whose style is limited to weight/style/decoration
+  // noise that semantic tags (strong/em/s) already express.
+  const INTENTIONAL = ['color', 'background-color', 'font-family', 'font-size'];
   for (const span of Array.from(root.querySelectorAll('span[style]'))) {
-    if (span.attributes.length === 1) {
-      while (span.firstChild) span.parentNode!.insertBefore(span.firstChild, span);
-      span.remove();
-    }
+    if (span.attributes.length !== 1) continue; // user spans with class/id etc.
+    const el = span as HTMLElement;
+    const props = Array.from(el.style);
+    if (props.some((p) => INTENTIONAL.includes(p))) continue;
+    while (span.firstChild) span.parentNode!.insertBefore(span.firstChild, span);
+    span.remove();
   }
 
   // Empty inline formatting elements left behind by deletions.

@@ -145,6 +145,28 @@ export function insertHtmlSnippet(
   return node;
 }
 
+/**
+ * Wrap the current text selection in a styled span (range-level font/color).
+ * extractContents splits partially-selected elements safely; the normalizer
+ * preserves spans carrying these properties (see serializeSlide).
+ */
+export function wrapSelectionWithStyle(ctx: StageCtx, prop: string, value: string): boolean {
+  const sel = ctx.doc.getSelection();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return false;
+  const range = sel.getRangeAt(0);
+  if (!ctx.section.contains(range.commonAncestorContainer)) return false;
+  const span = ctx.doc.createElement('span');
+  span.style.setProperty(prop, value);
+  span.appendChild(range.extractContents());
+  range.insertNode(span);
+  sel.removeAllRanges();
+  const after = ctx.doc.createRange();
+  after.selectNodeContents(span);
+  sel.addRange(after);
+  commit(ctx);
+  return true;
+}
+
 /* ---------- attributes & slide properties ---------- */
 
 const BG_ATTRS = new Set(['data-background-color', 'data-background', 'data-background-image']);

@@ -108,6 +108,7 @@ export const api = {
     }),
   listThemes: () => request<string[]>('/api/themes'),
   listDesignSystems: () => request<DesignSystem[]>('/api/design-systems'),
+  editorConfig: () => request<unknown>('/api/editor-config'),
   uploadAsset: async (deckPath: string, file: File): Promise<{ url: string }> => {
     const form = new FormData();
     form.append('file', file);
