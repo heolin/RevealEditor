@@ -110,6 +110,12 @@ test('drag converts to absolute positioning and snaps into the file', async ({ p
   await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2 + 120, box.y + box.height / 2 - 80, { steps: 8 });
   await page.mouse.up();
+  // Regression: converting to absolute must keep the element under the
+  // pointer — it used to jump up by the centering offset when pinning the
+  // section moved the section origin to the slide top.
+  const after = (await heading.boundingBox())!;
+  expect(Math.abs(after.x - (box.x + 120))).toBeLessThan(12);
+  expect(Math.abs(after.y - (box.y - 80))).toBeLessThan(12);
   await save(page);
   const file = await fileContents(page, 'e2e-drag.html');
   expect(file).toMatch(/<h1[^>]*position: absolute/);

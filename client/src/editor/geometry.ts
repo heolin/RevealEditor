@@ -33,13 +33,16 @@ export function slideRect(ctx: StageCtx, el: HTMLElement) {
 
 /**
  * Convert a flow element to absolute positioning at its current visual spot.
- * The rect is measured BEFORE the section is pinned — pinning must never
- * move the element being grabbed.
+ * The section is pinned BEFORE measuring: pinning zeroes the centered
+ * section offset (--re-center-top), moving the section's origin to the slide
+ * top — a rect measured against the old origin would place the element too
+ * high by exactly that offset. Pinning itself doesn't move flow content (the
+ * inline flex keeps it centered), so the post-pin rect IS the visual spot.
  */
 export function toAbsolute(ctx: StageCtx, el: HTMLElement, designHeight: number): void {
   if (isAbsolute(el)) return;
-  const rect = slideRect(ctx, el);
   ensureFreeLayoutSection(ctx, designHeight);
+  const rect = slideRect(ctx, el);
   applyStyle(el, {
     position: 'absolute',
     left: `${Math.round(rect.left)}px`,
