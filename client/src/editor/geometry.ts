@@ -123,12 +123,18 @@ function maybeUnpinSection(ctx: StageCtx): void {
 
 /** Strip free positioning and return the element to flow layout. */
 export function returnToFlow(ctx: StageCtx, el: HTMLElement): void {
+  // Sized media keep their dimensions: for an image/shape/chart the inline
+  // width IS its scale — unpinning restores flow, it must not undo a resize.
+  // Text-like elements drop the width toAbsolute measured onto them.
+  const sized =
+    ['IMG', 'VIDEO', 'IFRAME'].includes(el.tagName) ||
+    el.hasAttribute('data-re-shape') ||
+    el.hasAttribute('data-re-chart');
   applyStyle(el, {
     position: null,
     left: null,
     top: null,
-    width: null,
-    height: null,
+    ...(sized ? {} : { width: null, height: null }),
     margin: null,
     'z-index': null,
   });
