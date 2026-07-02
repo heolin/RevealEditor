@@ -201,9 +201,15 @@ html, body, #root { height: 100%; margin: 0; }
   white-space: nowrap;
 }
 
-/* ---------- Preview ---------- */
+/* ---------- Center / right columns ---------- */
 
-.preview-pane {
+.center-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.right-col {
   width: 380px;
   flex-shrink: 0;
   display: flex;
@@ -211,5 +217,27 @@ html, body, #root { height: 100%; margin: 0; }
   border-left: 1px solid var(--re-border);
   background: var(--re-panel);
 }
-.preview-pane.collapsed { width: auto; }
-.preview-frame { flex: 1; border: none; width: 100%; background: #111; }
+
+.inspector {
+  flex: 1;
+  overflow-y: auto;
+  border-bottom: 1px solid var(--re-border);
+}
+
+.notes-drawer {
+  border-top: 1px solid var(--re-border);
+  background: var(--re-panel);
+}
+
+/* ---------- Preview ---------- */
+
+.preview-pane {
+  display: flex;
+  flex-direction: column;
+}
+.preview-frame {
+  border: none;
+  width: 100%;
+  aspect-ratio: 960 / 700;
+  background: #111;
+}

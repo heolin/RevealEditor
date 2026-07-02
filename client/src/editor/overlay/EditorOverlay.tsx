@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ActionIcon,
   Group,
@@ -11,17 +11,21 @@ import {
 } from '@mantine/core';
 import {
   IconBold,
+  IconCode,
   IconCopy,
   IconItalic,
   IconLink,
   IconLinkOff,
   IconList,
   IconListNumbers,
+  IconPhoto,
   IconPlus,
   IconStrikethrough,
   IconTrash,
 } from '@tabler/icons-react';
 import { useEditorStore } from '../editorStore';
+import { useDeckStore } from '../../state/deckStore';
+import { api } from '../../api/client';
 import { handlerFor } from '../registry';
 import {
   convertListToParagraphs,
@@ -288,23 +292,58 @@ const SNIPPETS: { label: string; html: string }[] = [
 
 export function InsertMenu({ after }: { after?: HTMLElement | null }) {
   const ctx = useEditorStore((s) => s.ctx);
-  if (!ctx) return null;
+  const meta = useDeckStore((s) => s.meta);
+  const imageInput = useRef<HTMLInputElement>(null);
+  if (!ctx || !meta) return null;
+
   return (
-    <Menu withinPortal position="bottom-start">
-      <Menu.Target>
-        <Tooltip label="Insert">
-          <ActionIcon variant="subtle" color="gray">
-            <IconPlus size={16} />
-          </ActionIcon>
-        </Tooltip>
-      </Menu.Target>
-      <Menu.Dropdown>
-        {SNIPPETS.map((s) => (
-          <Menu.Item key={s.label} onClick={() => insertHtmlSnippet(ctx, s.html, after)}>
-            {s.label}
+    <>
+      <Menu withinPortal position="bottom-start">
+        <Menu.Target>
+          <Tooltip label="Insert">
+            <ActionIcon variant="subtle" color="gray">
+              <IconPlus size={16} />
+            </ActionIcon>
+          </Tooltip>
+        </Menu.Target>
+        <Menu.Dropdown>
+          {SNIPPETS.map((s) => (
+            <Menu.Item key={s.label} onClick={() => insertHtmlSnippet(ctx, s.html, after)}>
+              {s.label}
+            </Menu.Item>
+          ))}
+          <Menu.Divider />
+          <Menu.Item leftSection={<IconPhoto size={14} />} onClick={() => imageInput.current?.click()}>
+            Image…
           </Menu.Item>
-        ))}
-      </Menu.Dropdown>
-    </Menu>
+          <Menu.Item
+            leftSection={<IconCode size={14} />}
+            onClick={() => {
+              const el = insertHtmlSnippet(
+                ctx,
+                '<pre><code class="language-javascript" data-trim>\nconst answer = 42;\n</code></pre>',
+                after,
+              );
+              if (el) useEditorStore.getState().setCodeEditEl(el);
+            }}
+          >
+            Code block
+          </Menu.Item>
+        </Menu.Dropdown>
+      </Menu>
+      <input
+        ref={imageInput}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const { url } = await api.uploadAsset(meta.path, file);
+          insertHtmlSnippet(ctx, `<img src="${url}" alt="">`, after);
+          e.target.value = '';
+        }}
+      />
+    </>
   );
 }

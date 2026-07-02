@@ -81,6 +81,16 @@ export const api = {
   deleteDeck: (path: string) =>
     request<{ ok: true }>(`/api/deck${q(path)}`, { method: 'DELETE' }),
   listThemes: () => request<string[]>('/api/themes'),
+  uploadAsset: async (deckPath: string, file: File): Promise<{ url: string }> => {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`/api/deck/assets${q(deckPath)}`, { method: 'POST', body: form });
+    const body = await res.json().catch(() => undefined);
+    if (!res.ok) {
+      throw new ApiError(res.status, (body as { error?: string })?.error ?? `HTTP ${res.status}`, body);
+    }
+    return body as { url: string };
+  },
 };
 
 /** Resolve a deck-relative or absolute stylesheet href to a URL the editor can load. */

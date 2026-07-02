@@ -5,6 +5,7 @@
  * codebase mutates slide DOM.
  */
 import { serializeSlide } from './serializeSlide';
+import { hydrateCodeBlocks } from './codeHighlight';
 import { useDeckStore } from '../state/deckStore';
 import { useEditorStore } from './editorStore';
 
@@ -18,6 +19,9 @@ export interface StageCtx {
 }
 
 export function commit(ctx: StageCtx): void {
+  // Newly inserted/pasted code blocks get raw-text recording + display
+  // highlighting before serialization restores raw text into the clone.
+  hydrateCodeBlocks(ctx.section);
   const source = serializeSlide(ctx.section);
   ctx.markClean(source);
   useDeckStore.getState().updateSlideSource(ctx.slideId, source);
@@ -139,6 +143,59 @@ export function insertHtmlSnippet(
   useEditorStore.getState().select(node);
   commit(ctx);
   return node;
+}
+
+/* ---------- attributes & slide properties ---------- */
+
+const BG_ATTRS = new Set(['data-background-color', 'data-background', 'data-background-image']);
+
+/** Set/remove an attribute on the slide <section>; null removes it. */
+export function setSectionAttr(ctx: StageCtx, name: string, value: string | null): void {
+  if (value === null || value === '') ctx.section.removeAttribute(name);
+  else ctx.section.setAttribute(name, value);
+  if (BG_ATTRS.has(name)) paintStageBackground(ctx);
+  commit(ctx);
+}
+
+/** Set/remove an attribute on any element; null removes it. */
+export function setElementAttr(ctx: StageCtx, el: HTMLElement, name: string, value: string | null): void {
+  if (value === null || value === '') el.removeAttribute(name);
+  else el.setAttribute(name, value);
+  commit(ctx);
+}
+
+/** Mirror data-background-* onto the static stage (the runtime isn't there to). */
+export function paintStageBackground(ctx: StageCtx): void {
+  const color =
+    ctx.section.getAttribute('data-background-color') ??
+    ctx.section.getAttribute('data-background') ??
+    '';
+  const image = ctx.section.getAttribute('data-background-image');
+  const body = ctx.doc.body;
+  body.style.background = color;
+  body.style.backgroundImage = image ? `url("${image}")` : '';
+  body.style.backgroundSize = image ? 'cover' : '';
+  body.style.backgroundPosition = image ? 'center' : '';
+}
+
+/** Plain-text speaker notes (rich notes come later). Empty text removes the aside. */
+export function setNotes(ctx: StageCtx, text: string): void {
+  let aside = ctx.section.querySelector(':scope > aside.notes');
+  if (text.trim() === '') {
+    if (aside) aside.remove();
+  } else {
+    if (!aside) {
+      aside = ctx.doc.createElement('aside');
+      aside.className = 'notes';
+      ctx.section.appendChild(aside);
+    }
+    aside.textContent = text;
+  }
+  commit(ctx);
+}
+
+export function getNotes(section: HTMLElement): string {
+  return section.querySelector(':scope > aside.notes')?.textContent ?? '';
 }
 
 /* ---------- element clipboard ---------- */

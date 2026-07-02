@@ -16,6 +16,8 @@ interface EditorState {
   hoveredEl: HTMLElement | null;
   /** Element hosting the active contenteditable text session. */
   sessionEl: HTMLElement | null;
+  /** <pre> element open in the code editor modal. */
+  codeEditEl: HTMLElement | null;
   /** Bumped on every DOM mutation / selection change → overlay re-measures. */
   docVersion: number;
 
@@ -27,6 +29,7 @@ interface EditorState {
   select(el: HTMLElement | null): void;
   hover(el: HTMLElement | null): void;
   setSessionEl(el: HTMLElement | null): void;
+  setCodeEditEl(el: HTMLElement | null): void;
   bump(): void;
   /** Stage rebuilt — all element refs are stale. */
   reset(): void;
@@ -37,6 +40,7 @@ export const useEditorStore = create<EditorState>()((set) => ({
   selectedEl: null,
   hoveredEl: null,
   sessionEl: null,
+  codeEditEl: null,
   docVersion: 0,
 
   startSession: () => undefined,
@@ -46,12 +50,14 @@ export const useEditorStore = create<EditorState>()((set) => ({
   select: (el) => set((s) => ({ selectedEl: el, docVersion: s.docVersion + 1 })),
   hover: (el) => set((s) => (s.hoveredEl === el ? s : { hoveredEl: el, docVersion: s.docVersion + 1 })),
   setSessionEl: (el) => set((s) => ({ sessionEl: el, docVersion: s.docVersion + 1 })),
+  setCodeEditEl: (el) => set((s) => ({ codeEditEl: el, docVersion: s.docVersion + 1 })),
   bump: () => set((s) => ({ docVersion: s.docVersion + 1 })),
   reset: () =>
     set((s) => ({
       selectedEl: null,
       hoveredEl: null,
       sessionEl: null,
+      codeEditEl: null,
       docVersion: s.docVersion + 1,
     })),
 }));

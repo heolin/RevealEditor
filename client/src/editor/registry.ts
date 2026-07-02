@@ -45,6 +45,21 @@ export const textHandler: ElementHandler = {
   capabilities: { textEdit: true, delete: true },
 };
 
+/** <pre><code> blocks — edited via the code editor modal, never contenteditable. */
+export const codeHandler: ElementHandler = {
+  type: 'code',
+  priority: 20,
+  match: (el) => el.tagName === 'PRE',
+  capabilities: { textEdit: false, delete: true },
+};
+
+export const imageHandler: ElementHandler = {
+  type: 'image',
+  priority: 20,
+  match: (el) => el.tagName === 'IMG',
+  capabilities: { textEdit: false, delete: true },
+};
+
 /** Never claims text editing; subtree is preserved untouched. */
 export const genericHandler: ElementHandler = {
   type: 'generic',
@@ -53,7 +68,7 @@ export const genericHandler: ElementHandler = {
   capabilities: { textEdit: false, delete: true },
 };
 
-const HANDLERS: ElementHandler[] = [textHandler, genericHandler].sort(
+const HANDLERS: ElementHandler[] = [codeHandler, imageHandler, textHandler, genericHandler].sort(
   (a, b) => b.priority - a.priority,
 );
 

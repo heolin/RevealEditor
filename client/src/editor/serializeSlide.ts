@@ -5,6 +5,8 @@
  * output never contains editor artifacts.
  */
 
+import { restoreRawCode } from './codeHighlight';
+
 const EDITOR_ATTRS = ['contenteditable', 'spellcheck', 'draggable'];
 
 export function serializeSlide(stageSection: HTMLElement): string {
@@ -13,6 +15,9 @@ export function serializeSlide(stageSection: HTMLElement): string {
   // The stage host carries an editor id and the 'present' state class.
   clone.removeAttribute('id');
   stripClass(clone, 'present');
+
+  // Display-only highlight markup out; raw code text back in.
+  restoreRawCode(stageSection, clone);
 
   for (const el of [clone, ...clone.querySelectorAll('*')]) {
     for (const attr of EDITOR_ATTRS) el.removeAttribute(attr);

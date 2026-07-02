@@ -1,0 +1,244 @@
+import { useRef } from 'react';
+import {
+  Button,
+  ColorInput,
+  Divider,
+  Group,
+  NumberInput,
+  Select,
+  Stack,
+  Switch,
+  Text,
+  TextInput,
+} from '@mantine/core';
+import { IconUpload } from '@tabler/icons-react';
+import { useEditorStore } from '../../editor/editorStore';
+import { useDeckStore } from '../../state/deckStore';
+import { handlerFor } from '../../editor/registry';
+import { languageOf } from '../../editor/codeHighlight';
+import { setElementAttr, setSectionAttr } from '../../editor/commands';
+import { api } from '../../api/client';
+
+const TRANSITIONS = ['none', 'fade', 'slide', 'convex', 'concave', 'zoom'];
+
+/**
+ * Context-sensitive properties panel. Reads straight from the live stage DOM
+ * (docVersion re-renders keep it fresh); writes go through commands.
+ */
+export function InspectorPanel() {
+  useEditorStore((s) => s.docVersion);
+  const ctx = useEditorStore((s) => s.ctx);
+  const selectedEl = useEditorStore((s) => s.selectedEl);
+
+  if (!ctx) return null;
+  const el = selectedEl?.isConnected ? selectedEl : null;
+
+  return (
+    <div className="inspector">
+      <Stack gap="sm" p="sm">
+        {el ? <ElementSection el={el} /> : <SlideSection />}
+      </Stack>
+    </div>
+  );
+}
+
+function SlideSection() {
+  const ctx = useEditorStore((s) => s.ctx)!;
+  const section = ctx.section;
+  const meta = useDeckStore((s) => s.meta)!;
+  const slideId = useDeckStore((s) => s.selectedSlideId);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const bgColor = section.getAttribute('data-background-color') ?? '';
+  const bgImage = section.getAttribute('data-background-image') ?? '';
+  const transition = section.getAttribute('data-transition') ?? '';
+  const hidden = section.getAttribute('data-visibility') === 'hidden';
+
+  // Inputs are uncontrolled (commit on blur/pick, not per keystroke — one
+  // undo entry per change); the key refreshes them on slide switch or undo.
+  const inputKey = `${slideId}-${bgColor}-${bgImage}`;
+
+  return (
+    <>
+      <Text size="xs" fw={700} c="dimmed" tt="uppercase">
+        Slide
+      </Text>
+      <ColorInput
+        key={`c-${inputKey}`}
+        label="Background color"
+        size="xs"
+        defaultValue={bgColor}
+        onChangeEnd={(v) => v !== bgColor && setSectionAttr(ctx, 'data-background-color', v || null)}
+        placeholder="theme default"
+        withEyeDropper={false}
+      />
+      {bgColor && (
+        <Button size="compact-xs" variant="subtle" onClick={() => setSectionAttr(ctx, 'data-background-color', null)}>
+          Clear background color
+        </Button>
+      )}
+      <TextInput
+        key={`i-${inputKey}`}
+        label="Background image"
+        size="xs"
+        defaultValue={bgImage}
+        placeholder="URL or upload →"
+        onBlur={(e) =>
+          e.currentTarget.value !== bgImage &&
+          setSectionAttr(ctx, 'data-background-image', e.currentTarget.value || null)
+        }
+        rightSection={
+          <Button
+            size="compact-xs"
+            variant="subtle"
+            onClick={() => fileRef.current?.click()}
+            title="Upload image"
+          >
+            <IconUpload size={14} />
+          </Button>
+        }
+      />
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const { url } = await api.uploadAsset(meta.path, file);
+          setSectionAttr(ctx, 'data-background-image', url);
+          e.target.value = '';
+        }}
+      />
+      <Select
+        label="Transition"
+        size="xs"
+        value={transition || null}
+        placeholder="deck default"
+        clearable
+        data={TRANSITIONS}
+        onChange={(v) => setSectionAttr(ctx, 'data-transition', v)}
+      />
+      <Switch
+        label="Hidden slide"
+        size="xs"
+        checked={hidden}
+        onChange={(e) => setSectionAttr(ctx, 'data-visibility', e.currentTarget.checked ? 'hidden' : null)}
+      />
+      <Divider />
+      <Text size="xs" c="dimmed">
+        Click an element on the slide to edit its properties.
+      </Text>
+    </>
+  );
+}
+
+function ElementSection({ el }: { el: HTMLElement }) {
+  const ctx = useEditorStore((s) => s.ctx)!;
+  const handler = handlerFor(el);
+
+  return (
+    <>
+      <Text size="xs" fw={700} c="dimmed" tt="uppercase">
+        {handler.type} — {'<'}{el.tagName.toLowerCase()}{'>'}
+      </Text>
+      {handler.type === 'image' && <ImageFields el={el as HTMLImageElement} />}
+      {handler.type === 'code' && <CodeFields el={el} />}
+      {(handler.type === 'text' || handler.type === 'generic') && (
+        <Text size="xs" c="dimmed">
+          {el.getAttribute('class')
+            ? `class: ${el.getAttribute('class')}`
+            : 'No extra properties yet.'}
+        </Text>
+      )}
+    </>
+  );
+}
+
+function ImageFields({ el }: { el: HTMLImageElement }) {
+  const ctx = useEditorStore((s) => s.ctx)!;
+  const meta = useDeckStore((s) => s.meta)!;
+  const fileRef = useRef<HTMLInputElement>(null);
+  const src = el.getAttribute('src') ?? '';
+  const alt = el.getAttribute('alt') ?? '';
+  const width = el.getAttribute('width');
+  const inputKey = `${src}-${alt}-${width}`;
+
+  return (
+    <>
+      <TextInput
+        key={`src-${inputKey}`}
+        label="Source"
+        size="xs"
+        defaultValue={src}
+        onBlur={(e) =>
+          e.currentTarget.value !== src && setElementAttr(ctx, el, 'src', e.currentTarget.value)
+        }
+        rightSection={
+          <Button size="compact-xs" variant="subtle" onClick={() => fileRef.current?.click()}>
+            <IconUpload size={14} />
+          </Button>
+        }
+      />
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const { url } = await api.uploadAsset(meta.path, file);
+          setElementAttr(ctx, el, 'src', url);
+          e.target.value = '';
+        }}
+      />
+      <TextInput
+        key={`alt-${inputKey}`}
+        label="Alt text"
+        size="xs"
+        defaultValue={alt}
+        onBlur={(e) =>
+          e.currentTarget.value !== alt &&
+          setElementAttr(ctx, el, 'alt', e.currentTarget.value || null)
+        }
+      />
+      <NumberInput
+        key={`w-${inputKey}`}
+        label="Width (px)"
+        size="xs"
+        defaultValue={width ? parseInt(width, 10) : undefined}
+        placeholder="natural"
+        min={16}
+        onBlur={(e) => {
+          const v = e.currentTarget.value.trim();
+          if (v !== (width ?? '')) setElementAttr(ctx, el, 'width', v || null);
+        }}
+      />
+    </>
+  );
+}
+
+function CodeFields({ el }: { el: HTMLElement }) {
+  const code = el.querySelector('code');
+  return (
+    <>
+      <Text size="xs" c="dimmed">
+        Language: {code ? languageOf(code) ?? 'plain' : '—'}
+        {code?.getAttribute('data-line-numbers')
+          ? ` · steps: ${code.getAttribute('data-line-numbers')}`
+          : ''}
+      </Text>
+      <Group>
+        <Button
+          size="compact-xs"
+          variant="light"
+          onClick={() => useEditorStore.getState().setCodeEditEl(el)}
+        >
+          Edit code…
+        </Button>
+      </Group>
+    </>
+  );
+}

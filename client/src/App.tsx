@@ -9,6 +9,9 @@ import { SorterPanel } from './components/Sorter/SorterPanel';
 import { SlideCanvas } from './components/Canvas/SlideCanvas';
 import { PreviewPane } from './components/Preview/PreviewPane';
 import { ConflictDialog } from './components/ConflictDialog';
+import { InspectorPanel } from './components/Inspector/InspectorPanel';
+import { NotesDrawer } from './components/Notes/NotesDrawer';
+import { CodeModal } from './editor/CodeModal';
 
 export function App() {
   const meta = useDeckStore((s) => s.meta);
@@ -56,9 +59,16 @@ export function App() {
       <Toolbar />
       <div className="editor-body">
         <SorterPanel />
-        <SlideCanvas />
-        <PreviewPane />
+        <div className="center-col">
+          <SlideCanvas />
+          <NotesDrawer />
+        </div>
+        <div className="right-col">
+          <InspectorPanel />
+          <PreviewPane />
+        </div>
       </div>
+      <CodeModal />
       {conflict && <ConflictDialog />}
     </div>
   );

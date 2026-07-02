@@ -7,6 +7,7 @@ import { slideElement } from '../model/deck';
 import { resolveDeckUrl, themeUrl } from '../api/client';
 import { TextSession } from './TextSession';
 import { handlerFor, textEditableFrom } from './registry';
+import { hydrateCodeBlocks } from './codeHighlight';
 import {
   type StageCtx,
   commit,
@@ -132,8 +133,14 @@ ${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}
       const top = childOf(section, target);
       const selected = editor.selectedEl;
       if (selected && (selected === target || selected.contains(target))) {
-        // Click on the already-selected element: enter text editing directly
-        // (select once, click again to edit — double-click still works too).
+        // Click on the already-selected element: activate its editor.
+        if (handlerFor(selected).type === 'code') {
+          e.preventDefault();
+          editor.setCodeEditEl(selected);
+          return;
+        }
+        // Text elements enter editing directly (select once, click again to
+        // edit — double-click still works too).
         if (handlerFor(selected).capabilities.textEdit) {
           const editable = textEditableFrom(target, section) ?? selected;
           // No preventDefault: the browser's own mousedown places the caret
@@ -156,6 +163,12 @@ ${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}
     doc.addEventListener('dblclick', (e) => {
       const target = e.target as Element;
       if (!section.contains(target)) return;
+      const pre = target.closest('pre');
+      if (pre && section.contains(pre) && pre !== section) {
+        e.preventDefault();
+        useEditorStore.getState().setCodeEditEl(pre as HTMLElement);
+        return;
+      }
       const editable = textEditableFrom(target, section);
       if (editable && editable !== sessionRef.current?.el) {
         e.preventDefault();
@@ -223,6 +236,10 @@ ${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}
         deleteElement(ctx, selected);
       } else if (e.key === 'Enter') {
         e.preventDefault();
+        if (handlerFor(selected).type === 'code') {
+          editor.setCodeEditEl(selected);
+          return;
+        }
         const editable = textEditableFrom(selected, ctx.section) ?? null;
         if (editable) startSession(editable);
       } else if (mod && e.key.toLowerCase() === 'c') {
@@ -287,11 +304,16 @@ ${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}
       else section.setAttribute(attr.name, attr.value);
     }
     section.innerHTML = parsed.innerHTML;
+    hydrateCodeBlocks(section);
     const bg =
       parsed.getAttribute('data-background-color') ??
       parsed.getAttribute('data-background') ??
       '';
+    const bgImage = parsed.getAttribute('data-background-image');
     doc.body.style.background = bg;
+    doc.body.style.backgroundImage = bgImage ? `url("${bgImage}")` : '';
+    doc.body.style.backgroundSize = bgImage ? 'cover' : '';
+    doc.body.style.backgroundPosition = bgImage ? 'center' : '';
     cleanSource.current = slide.source;
   }
 
