@@ -56,6 +56,7 @@ const DEFAULTS: Record<SurfaceId, SurfaceLayout> = {
    *  Hidden entirely during text sessions (the textBar takes over). */
   floating: [
     ['code.edit', 'chart.edit'],
+    ['arrange.moveUp', 'arrange.moveDown'],
     ['arrange.front', 'arrange.back', 'arrange.unpin'],
     ['arrange.duplicate', 'arrange.delete'],
   ],
