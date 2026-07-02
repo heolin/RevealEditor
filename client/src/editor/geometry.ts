@@ -205,24 +205,35 @@ function maybeUnpinSection(ctx: StageCtx): void {
   }
 }
 
-/** Strip free positioning and return the element to flow layout. */
-export function returnToFlow(ctx: StageCtx, el: HTMLElement): void {
-  migrateLegacyPin(ctx);
-  // Sized media keep their dimensions: for an image/shape/chart the inline
-  // width IS its scale — unpinning restores flow, it must not undo a resize.
-  // Text-like elements drop the width toAbsolute measured onto them.
-  const sized =
+/**
+ * Sized media own their dimensions: for an image/shape/chart the inline
+ * width IS its scale, so returning to flow must not strip it. Text-like
+ * elements instead shed the width toAbsolute measured onto them.
+ */
+function isSizedMedia(el: HTMLElement): boolean {
+  return (
     ['IMG', 'VIDEO', 'IFRAME'].includes(el.tagName) ||
     el.hasAttribute('data-re-shape') ||
-    el.hasAttribute('data-re-chart');
-  applyStyle(el, {
+    el.hasAttribute('data-re-chart')
+  );
+}
+
+/** The style patch that takes an element out of free positioning. */
+function flowPatch(el: HTMLElement): StylePatch {
+  return {
     position: null,
     left: null,
     top: null,
-    ...(sized ? {} : { width: null, height: null }),
+    ...(isSizedMedia(el) ? {} : { width: null, height: null }),
     margin: null,
     'z-index': null,
-  });
+  };
+}
+
+/** Strip free positioning and return the element to flow layout. */
+export function returnToFlow(ctx: StageCtx, el: HTMLElement): void {
+  migrateLegacyPin(ctx);
+  applyStyle(el, flowPatch(el));
   maybeUnpinSection(ctx);
   syncInlineCentering(ctx);
   commit(ctx);
@@ -239,7 +250,8 @@ export function placeInFlow(
   parent: HTMLElement,
   before: HTMLElement | null,
 ): void {
-  applyStyle(el, { position: null, left: null, top: null, margin: null, 'z-index': null });
+  migrateLegacyPin(ctx);
+  applyStyle(el, flowPatch(el));
   parent.insertBefore(el, before);
   maybeUnpinSection(ctx);
   syncInlineCentering(ctx);
@@ -458,9 +470,11 @@ export function snapEdges(ctx: StageCtx, moving: HTMLElement, designW: number, d
   const xs = [0, designW / 2, designW];
   const ys = [0, designH / 2, designH];
   for (const el of Array.from(ctx.section.children)) {
-    if (el === moving || !(el instanceof HTMLElement)) continue;
+    // No instanceof: iframe-realm elements fail parent-realm class checks —
+    // it silently skipped EVERY sibling, so only slide bounds ever snapped.
+    if (el === moving || (el as HTMLElement).style === undefined) continue;
     if (el.tagName === 'ASIDE') continue;
-    const r = slideRect(ctx, el);
+    const r = slideRect(ctx, el as HTMLElement);
     xs.push(r.left, r.left + r.width / 2, r.left + r.width);
     ys.push(r.top, r.top + r.height / 2, r.top + r.height);
   }
