@@ -104,6 +104,13 @@ test('text edit round-trips into the file', async ({ page }) => {
 
 test('drag converts to absolute positioning and snaps into the file', async ({ page }) => {
   await createDeck(page, 'e2e-drag');
+  // A second flow element makes this the hard case: reveal.css tables carry
+  // margin:auto, which absorbs the free space when pinning turns the section
+  // into a flex column — the sibling being dragged must not inherit that
+  // reflowed position.
+  await openInsertMenu(page);
+  await page.getByRole('menuitem', { name: 'Table' }).click();
+  await expect(stageFrame(page).locator('#re-stage table')).toBeVisible();
   const heading = stageFrame(page).locator('#re-stage h1');
   const box = (await heading.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);

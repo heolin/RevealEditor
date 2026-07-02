@@ -31,25 +31,39 @@ export function slideRect(ctx: StageCtx, el: HTMLElement) {
   return { left: r.left - s.left, top: r.top - s.top, width: r.width, height: r.height };
 }
 
-/**
- * Convert a flow element to absolute positioning at its current visual spot.
- * The section is pinned BEFORE measuring: pinning zeroes the centered
- * section offset (--re-center-top), moving the section's origin to the slide
- * top — a rect measured against the old origin would place the element too
- * high by exactly that offset. Pinning itself doesn't move flow content (the
- * inline flex keeps it centered), so the post-pin rect IS the visual spot.
- */
+/** Convert a flow element to absolute positioning at its current visual spot. */
 export function toAbsolute(ctx: StageCtx, el: HTMLElement, designHeight: number): void {
-  if (isAbsolute(el)) return;
-  ensureFreeLayoutSection(ctx, designHeight);
-  const rect = slideRect(ctx, el);
-  applyStyle(el, {
-    position: 'absolute',
-    left: `${Math.round(rect.left)}px`,
-    top: `${Math.round(rect.top)}px`,
-    width: `${Math.round(rect.width)}px`,
-    margin: '0',
+  toAbsoluteAll(ctx, [el], designHeight);
+}
+
+/**
+ * Convert several flow elements at once, all keeping their visual spots.
+ * Rects are measured against the .slides box — the slide origin, which never
+ * moves — BEFORE pinning, and all before the first conversion. Neither pre-
+ * nor post-pin section-relative rects are safe: pinning moves the section
+ * origin (--re-center-top → 0) AND reflows remaining flow content (the
+ * pinning flex lets reveal.css's `margin: auto` on tables absorb the free
+ * space, shoving siblings to the top). After pinning the section origin IS
+ * the slide origin, so slides-relative coordinates apply verbatim.
+ */
+export function toAbsoluteAll(ctx: StageCtx, els: HTMLElement[], designHeight: number): void {
+  const targets = els.filter((el) => !isAbsolute(el));
+  if (targets.length === 0) return;
+  const origin = (ctx.section.parentElement ?? ctx.section).getBoundingClientRect();
+  const rects = targets.map((el) => {
+    const r = el.getBoundingClientRect();
+    return { left: r.left - origin.left, top: r.top - origin.top, width: r.width };
   });
+  ensureFreeLayoutSection(ctx, designHeight);
+  targets.forEach((el, i) =>
+    applyStyle(el, {
+      position: 'absolute',
+      left: `${Math.round(rects[i].left)}px`,
+      top: `${Math.round(rects[i].top)}px`,
+      width: `${Math.round(rects[i].width)}px`,
+      margin: '0',
+    }),
+  );
 }
 
 /**
@@ -203,7 +217,7 @@ export function alignElements(
   design: { width: number; height: number },
 ): void {
   if (els.length === 0) return;
-  for (const el of els) toAbsolute(ctx, el, design.height);
+  toAbsoluteAll(ctx, els, design.height);
   const rects = els.map((el) => slideRect(ctx, el));
   const box =
     els.length >= 2
@@ -231,7 +245,7 @@ export function distributeElements(
   design: { width: number; height: number },
 ): void {
   if (els.length < 3) return;
-  for (const el of els) toAbsolute(ctx, el, design.height);
+  toAbsoluteAll(ctx, els, design.height);
   const items = els
     .map((el) => ({ el, rect: slideRect(ctx, el) }))
     .sort((a, b) => (axis === 'h' ? a.rect.left - b.rect.left : a.rect.top - b.rect.top));
@@ -273,7 +287,7 @@ export function groupElements(
   design: { width: number; height: number },
 ): HTMLElement | null {
   if (els.length < 2) return null;
-  for (const el of els) toAbsolute(ctx, el, design.height);
+  toAbsoluteAll(ctx, els, design.height);
   const rects = els.map((el) => slideRect(ctx, el));
   const box = unionRect(rects);
   const group = ctx.doc.createElement('div');

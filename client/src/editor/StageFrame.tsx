@@ -17,7 +17,7 @@ import {
   slideRect,
   snapEdges,
   snapRect,
-  toAbsolute,
+  toAbsoluteAll,
 } from './geometry';
 import { showAllFragments } from './fragments';
 import { nextCell } from './table';
@@ -371,8 +371,9 @@ ${stageHead(meta)}
             press.el.style.pointerEvents = 'none';
           }
           if (!layoutMode) {
-            toAbsolute(ctx, press.el, height);
-            for (const o of press.others) toAbsolute(ctx, o.el, height);
+            // One batch: all rects measured before the first conversion —
+            // each conversion reflows the remaining flow content.
+            toAbsoluteAll(ctx, [press.el, ...press.others.map((o) => o.el)], height);
             const r = slideRect(ctx, press.el);
             press.startLeft = r.left;
             press.startTop = r.top;
