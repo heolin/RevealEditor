@@ -168,9 +168,9 @@ html, body, #root { height: 100%; margin: 0; }
   width: 100%;
   aspect-ratio: 16 / 9;
   margin-top: 2px;
-  background: #1a1b1e;
-  color: #909296;
-  border: 1px dashed #3f4147;
+  background: #fff;
+  color: var(--mantine-color-dimmed);
+  border: 1px dashed var(--re-border);
   border-radius: 8px;
   cursor: pointer;
 }
