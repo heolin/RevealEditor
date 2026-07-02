@@ -114,7 +114,6 @@ export const useDeckStore = create<DeckState>()(
 
       load(deck) {
         const columns = parseSections(deck.sections);
-        useDeckStore.temporal.getState().clear();
         set({
           columns,
           meta: {
@@ -135,11 +134,15 @@ export const useDeckStore = create<DeckState>()(
           dirty: false,
           conflict: false,
         });
+        // Clear AFTER the set: the set itself records the pre-load state
+        // (an empty or stale deck) as an undo entry — Ctrl+Z must never be
+        // able to go back past "deck as loaded from disk".
+        useDeckStore.temporal.getState().clear();
       },
 
       close() {
-        useDeckStore.temporal.getState().clear();
         set({ columns: [], meta: null, selectedSlideId: null, dirty: false, conflict: false });
+        useDeckStore.temporal.getState().clear();
       },
 
       select(slideId) {
