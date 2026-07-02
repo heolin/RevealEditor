@@ -30,6 +30,8 @@ import {
   setFragmentVariant,
   showAllFragments,
 } from '../../editor/fragments';
+import { readShapeSpec, writeShapeSpec } from '../../editor/shapes';
+import { readChartSpec } from '../../editor/chart/chart';
 import {
   TABLE_PRESETS,
   type TablePreset,
@@ -245,6 +247,8 @@ function ElementSection({ el }: { el: HTMLElement }) {
       </Text>
       {handler.type === 'image' && <ImageFields el={el as HTMLImageElement} />}
       {handler.type === 'code' && <CodeFields el={el} />}
+      {handler.type === 'shape' && <ShapeFields el={el} />}
+      {handler.type === 'chart' && <ChartFields el={el} />}
       {table && ctx.section.contains(table) && (
         <>
           <Divider />
@@ -436,6 +440,92 @@ function ImageFields({ el }: { el: HTMLImageElement }) {
           if (v !== (width ?? '')) setElementAttr(ctx, el, 'width', v || null);
         }}
       />
+    </>
+  );
+}
+
+function ShapeFields({ el }: { el: HTMLElement }) {
+  const ctx = useEditorStore((s) => s.ctx)!;
+  const spec = readShapeSpec(el);
+  if (!spec) return null;
+  const hasFill = spec.kind === 'rect' || spec.kind === 'ellipse';
+
+  return (
+    <>
+      {hasFill && (
+        <ColorInput
+          key={`f-${spec.fill}`}
+          label="Fill"
+          size="xs"
+          defaultValue={spec.fill === 'none' ? '' : spec.fill}
+          onChangeEnd={(v) => writeShapeSpec(ctx, el, { fill: v || 'none' })}
+          withEyeDropper={false}
+        />
+      )}
+      <ColorInput
+        key={`s-${spec.stroke}`}
+        label={hasFill ? 'Border color' : 'Color'}
+        size="xs"
+        defaultValue={spec.stroke === 'none' ? '' : spec.stroke}
+        onChangeEnd={(v) => writeShapeSpec(ctx, el, { stroke: v || 'none' })}
+        withEyeDropper={false}
+      />
+      <NumberInput
+        label={hasFill ? 'Border width' : 'Line width'}
+        size="xs"
+        min={0}
+        max={40}
+        value={spec.strokeWidth}
+        onChange={(v) => typeof v === 'number' && writeShapeSpec(ctx, el, { strokeWidth: v })}
+      />
+      <Select
+        label="Line style"
+        size="xs"
+        value={spec.dash}
+        data={['solid', 'dashed', 'dotted']}
+        onChange={(v) => v && writeShapeSpec(ctx, el, { dash: v as 'solid' | 'dashed' | 'dotted' })}
+      />
+      {spec.kind === 'rect' && (
+        <NumberInput
+          label="Corner radius"
+          size="xs"
+          min={0}
+          max={100}
+          value={spec.radius ?? 0}
+          onChange={(v) => typeof v === 'number' && writeShapeSpec(ctx, el, { radius: v })}
+        />
+      )}
+      <Text size="xs" c="dimmed">
+        Opacity
+      </Text>
+      <Slider
+        size="sm"
+        min={0.1}
+        max={1}
+        step={0.05}
+        value={spec.opacity}
+        onChangeEnd={(v) => writeShapeSpec(ctx, el, { opacity: v })}
+      />
+    </>
+  );
+}
+
+function ChartFields({ el }: { el: HTMLElement }) {
+  const spec = readChartSpec(el);
+  return (
+    <>
+      <Text size="xs" c="dimmed">
+        {spec ? `${spec.type} · ${spec.series.length} series · ${spec.labels.length} rows` : 'Invalid chart spec'}
+      </Text>
+      <Group>
+        <Button
+          size="compact-xs"
+          variant="light"
+          onClick={() => useEditorStore.getState().setChartEditEl(el)}
+        >
+          Edit chart…
+        </Button>
+      </Group>
     </>
   );
 }

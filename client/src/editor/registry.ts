@@ -48,6 +48,22 @@ export const textHandler: ElementHandler = {
   capabilities: { textEdit: true, delete: true, resize: 'width' },
 };
 
+/** Charts: figure with data-re-chart spec + baked SVG; edited in the chart modal. */
+export const chartHandler: ElementHandler = {
+  type: 'chart',
+  priority: 50,
+  match: (el) => el.hasAttribute('data-re-chart'),
+  capabilities: { textEdit: false, delete: true, resize: 'both' },
+};
+
+/** Shapes: svg with data-re-shape params; styled via the Inspector. */
+export const shapeHandler: ElementHandler = {
+  type: 'shape',
+  priority: 45,
+  match: (el) => el.hasAttribute('data-re-shape'),
+  capabilities: { textEdit: false, delete: true, resize: 'both' },
+};
+
 /** Tables: cell content edits via text sessions; structure via table commands. */
 export const tableHandler: ElementHandler = {
   type: 'table',
@@ -82,6 +98,8 @@ export const genericHandler: ElementHandler = {
 };
 
 const HANDLERS: ElementHandler[] = [
+  chartHandler,
+  shapeHandler,
   tableHandler,
   codeHandler,
   imageHandler,

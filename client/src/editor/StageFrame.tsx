@@ -137,6 +137,10 @@ ${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}
       useEditorStore.getState().setCodeEditEl(el);
       return;
     }
+    if (handler.type === 'chart') {
+      useEditorStore.getState().setChartEditEl(el);
+      return;
+    }
     if (handler.capabilities.textEdit) {
       const editable = textEditableFrom(target ?? el, ctx.section) ?? el;
       startSession(editable, caretPoint);

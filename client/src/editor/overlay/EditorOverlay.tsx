@@ -11,6 +11,7 @@ import {
 } from '@mantine/core';
 import {
   IconBold,
+  IconChartBar,
   IconCode,
   IconCopy,
   IconItalic,
@@ -21,6 +22,7 @@ import {
   IconPhoto,
   IconPinnedOff,
   IconPlus,
+  IconShape,
   IconStackPop,
   IconStackPush,
   IconStrikethrough,
@@ -34,6 +36,8 @@ import { handlerFor } from '../registry';
 import { applyStyle, changeZOrder, isAbsolute, returnToFlow, slideRect } from '../geometry';
 import { effectiveFragments } from '../fragments';
 import { insertTable } from '../table';
+import { SHAPE_KINDS, insertShape, isShapeEl, renderShapeInto } from '../shapes';
+import { insertChart, isChartEl, refreshChart } from '../chart/chart';
 import {
   commit,
   convertListToParagraphs,
@@ -165,8 +169,9 @@ function ResizeHandles({ el, scale }: { el: HTMLElement; scale: number }) {
       if (isImg && (e.shiftKey || handle.length === 2)) h = w / ratio; // aspect lock on corners
       w = Math.max(16, w);
       h = Math.max(16, h);
+      const sized = isImg || isShapeEl(el) || isChartEl(el);
       const patch: Record<string, string | null> = { width: `${Math.round(w)}px` };
-      if (handle.includes('s') || handle.includes('n') || (isImg && handle.length === 2)) {
+      if (handle.includes('s') || handle.includes('n') || (sized && handle.length === 2)) {
         patch.height = `${Math.round(h)}px`;
       }
       if (absolute) {
@@ -174,6 +179,9 @@ function ResizeHandles({ el, scale }: { el: HTMLElement; scale: number }) {
         patch.top = `${Math.round(top)}px`;
       }
       applyStyle(el, patch);
+      // Self-describing blocks re-bake their render at the new size.
+      if (isShapeEl(el)) renderShapeInto(el);
+      else if (isChartEl(el) && ctx) refreshChart(ctx, el);
       useEditorStore.getState().bump();
     }
     function onUp() {
@@ -470,6 +478,26 @@ export function InsertMenu({ after }: { after?: HTMLElement | null }) {
           <Menu.Item leftSection={<IconTable size={14} />} onClick={() => insertTable(ctx, after ?? null)}>
             Table
           </Menu.Item>
+          <Menu.Item
+            leftSection={<IconChartBar size={14} />}
+            onClick={() => {
+              const el = insertChart(ctx, after ?? null);
+              if (el) useEditorStore.getState().setChartEditEl(el);
+            }}
+          >
+            Chart…
+          </Menu.Item>
+          <Menu.Divider />
+          <Menu.Label>Shapes</Menu.Label>
+          {SHAPE_KINDS.map((kind) => (
+            <Menu.Item
+              key={kind}
+              leftSection={<IconShape size={14} />}
+              onClick={() => insertShape(ctx, kind)}
+            >
+              {kind[0].toUpperCase() + kind.slice(1)}
+            </Menu.Item>
+          ))}
         </Menu.Dropdown>
       </Menu>
       <input

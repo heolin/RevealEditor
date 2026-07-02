@@ -18,6 +18,8 @@ interface EditorState {
   sessionEl: HTMLElement | null;
   /** <pre> element open in the code editor modal. */
   codeEditEl: HTMLElement | null;
+  /** Chart figure open in the chart editor modal. */
+  chartEditEl: HTMLElement | null;
   /** Active snap guide lines during a drag, in slide-space px. */
   snapGuides: { x: number | null; y: number | null } | null;
   /** Fragment preview step (null = editor default, all visible). */
@@ -34,6 +36,7 @@ interface EditorState {
   hover(el: HTMLElement | null): void;
   setSessionEl(el: HTMLElement | null): void;
   setCodeEditEl(el: HTMLElement | null): void;
+  setChartEditEl(el: HTMLElement | null): void;
   setSnapGuides(g: { x: number | null; y: number | null } | null): void;
   setFragmentStep(step: number | null): void;
   bump(): void;
@@ -47,6 +50,7 @@ export const useEditorStore = create<EditorState>()((set) => ({
   hoveredEl: null,
   sessionEl: null,
   codeEditEl: null,
+  chartEditEl: null,
   snapGuides: null,
   fragmentStep: null,
   docVersion: 0,
@@ -59,6 +63,7 @@ export const useEditorStore = create<EditorState>()((set) => ({
   hover: (el) => set((s) => (s.hoveredEl === el ? s : { hoveredEl: el, docVersion: s.docVersion + 1 })),
   setSessionEl: (el) => set((s) => ({ sessionEl: el, docVersion: s.docVersion + 1 })),
   setCodeEditEl: (el) => set((s) => ({ codeEditEl: el, docVersion: s.docVersion + 1 })),
+  setChartEditEl: (el) => set((s) => ({ chartEditEl: el, docVersion: s.docVersion + 1 })),
   setSnapGuides: (g) => set((s) => ({ snapGuides: g, docVersion: s.docVersion + 1 })),
   setFragmentStep: (step) => set((s) => ({ fragmentStep: step, docVersion: s.docVersion + 1 })),
   bump: () => set((s) => ({ docVersion: s.docVersion + 1 })),
@@ -68,6 +73,7 @@ export const useEditorStore = create<EditorState>()((set) => ({
       hoveredEl: null,
       sessionEl: null,
       codeEditEl: null,
+      chartEditEl: null,
       snapGuides: null,
       fragmentStep: null,
       docVersion: s.docVersion + 1,

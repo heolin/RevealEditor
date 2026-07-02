@@ -276,3 +276,15 @@ html, body, #root { height: 100%; margin: 0; }
   aspect-ratio: 960 / 700;
   background: #111;
 }
+
+/* ---------- Chart editor ---------- */
+
+.chart-preview {
+  background: #1e1e1d;
+  border-radius: 6px;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.chart-preview svg { max-width: 100%; height: auto; }

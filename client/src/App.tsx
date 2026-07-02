@@ -12,6 +12,7 @@ import { ConflictDialog } from './components/ConflictDialog';
 import { InspectorPanel } from './components/Inspector/InspectorPanel';
 import { NotesDrawer } from './components/Notes/NotesDrawer';
 import { CodeModal } from './editor/CodeModal';
+import { ChartModal } from './editor/chart/ChartModal';
 
 export function App() {
   const meta = useDeckStore((s) => s.meta);
@@ -69,6 +70,7 @@ export function App() {
         </div>
       </div>
       <CodeModal />
+      <ChartModal />
       {conflict && <ConflictDialog />}
     </div>
   );
