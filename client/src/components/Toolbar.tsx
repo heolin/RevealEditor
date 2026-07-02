@@ -16,7 +16,7 @@ import {
 } from '@tabler/icons-react';
 import { useDeckStore } from '../state/deckStore';
 import { useEditorContext } from '../editor/actions/context';
-import { getAction, resolveLayout } from '../editor/actions';
+import { resolveLayout } from '../editor/actions';
 import { getLayout } from '../editor/actions/layouts';
 import { ActionControl } from '../editor/actions/ActionControl';
 import { InsertMenu } from '../editor/overlay/EditorOverlay';
@@ -62,29 +62,30 @@ export function Toolbar() {
         </Button>
       </Group>
       <FormatRibbon />
-      <TextFormatBar />
     </div>
   );
 }
 
 /**
- * THE text toolbar: every text-format control in one place, visible only
- * while a text session is active (docs/TOOLBARS.md — one home for text).
+ * The ribbon row. Actions HIDE when they don't apply (no disabled button
+ * graveyards); during a text session the freed space hosts the full text
+ * toolbar inline — one row, one home for text formatting.
  */
-function TextFormatBar() {
+function FormatRibbon() {
   const ctx = useEditorContext();
-  if (ctx.session !== 'text') return null;
-  const groups = resolveLayout(getLayout('textBar'), ctx);
-  if (groups.length === 0) return null;
+  const groups = resolveLayout(getLayout('top'), ctx);
+  const textGroups = ctx.session === 'text' ? resolveLayout(getLayout('textBar'), ctx) : [];
   return (
     <Group
       gap={4}
       px="sm"
       py={4}
       wrap="nowrap"
-      className="ribbon text-bar"
-      onMouseDown={(e) => e.preventDefault()} // keep the session focused
+      className="ribbon"
+      // Keep text sessions focused across any ribbon interaction.
+      onMouseDown={(e) => ctx.session === 'text' && e.preventDefault()}
     >
+      <InsertMenu />
       {groups.map((group, gi) => (
         <Fragment key={gi}>
           {gi > 0 && <Divider orientation="vertical" />}
@@ -93,36 +94,18 @@ function TextFormatBar() {
           ))}
         </Fragment>
       ))}
-    </Group>
-  );
-}
-
-/**
- * The ribbon-lite row: TOP_LAYOUT rendered in full — actions that don't apply
- * to the current selection are DISABLED, not hidden, so the panel is stable
- * (PowerPoint behavior). See docs/TOOLBARS.md.
- */
-function FormatRibbon() {
-  const ctx = useEditorContext();
-  return (
-    <Group gap={4} px="sm" py={4} wrap="nowrap" className="ribbon">
-      <InsertMenu />
-      {getLayout('top').map((group, gi) => {
-        const actions = group
-          .map(getAction)
-          .filter((a): a is NonNullable<typeof a> => a !== null);
-        if (actions.length === 0) return null;
-        return (
-          <Fragment key={gi}>
-            {gi > 0 && <Divider orientation="vertical" />}
-            {actions.map((action) =>
-              action.when(ctx) || action.kind !== 'custom' ? (
+      {textGroups.length > 0 && (
+        <Group gap={4} wrap="nowrap" className="text-bar">
+          {textGroups.map((group, gi) => (
+            <Fragment key={gi}>
+              <Divider orientation="vertical" />
+              {group.map((action) => (
                 <ActionControl key={action.id} action={action} ctx={ctx} variant="toolbar" />
-              ) : null,
-            )}
-          </Fragment>
-        );
-      })}
+              ))}
+            </Fragment>
+          ))}
+        </Group>
+      )}
     </Group>
   );
 }

@@ -78,8 +78,9 @@ export function DeckList() {
     let path = String(form.get('path') || '').trim();
     if (!path) path = `${title.toLowerCase().replace(/[^\w]+/g, '-')}.html`;
     if (!path.endsWith('.html')) path += '.html';
+    const [w, h] = String(form.get('size') || '1280x720').split('x').map(Number);
     try {
-      await api.createDeck(path, title, String(form.get('theme') || 'black'));
+      await api.createDeck(path, title, String(form.get('theme') || 'beige'), w, h);
       setCreating(false);
       await openDeck(path);
     } catch (err) {
@@ -254,9 +255,20 @@ export function DeckList() {
             <Select
               label="Theme"
               name="theme"
-              defaultValue="black"
-              data={themes.length ? themes : ['black']}
+              defaultValue="beige"
+              data={themes.length ? themes : ['beige']}
               searchable
+            />
+            <Select
+              label="Size"
+              name="size"
+              defaultValue="1280x720"
+              data={[
+                { value: '1280x720', label: '16:9 — 1280 × 720 (recommended)' },
+                { value: '1280x800', label: '16:10 — 1280 × 800' },
+                { value: '1024x768', label: '4:3 — 1024 × 768' },
+                { value: '960x700', label: 'Classic reveal — 960 × 700' },
+              ]}
             />
             <Group justify="flex-end" mt="xs">
               <Button variant="default" onClick={() => setCreating(false)}>

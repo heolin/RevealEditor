@@ -20,6 +20,7 @@ import {
 } from '../commands';
 import { applyStyle } from '../geometry';
 import { useEditorStore } from '../editorStore';
+import { buildEditorContext } from './context';
 import { fontOptions, FONT_SIZES } from './fonts';
 import { LinkControl } from './customControls';
 
@@ -41,15 +42,23 @@ function styleValue(ctx: EditorContext, prop: string): string {
 
 function setStyle(ctx: EditorContext, prop: string, value: string | undefined): void {
   if (!ctx.stage) return;
+  const wasSession = ctx.session === 'text';
+  const target = formatTarget(ctx);
   // During a text session with a live selection, style just the selected
-  // range; otherwise the whole element.
-  if (ctx.session === 'text' && value && wrapSelectionWithStyle(ctx.stage, prop, value)) {
-    return;
+  // range; otherwise the whole element. (The DOM selection survives the
+  // dropdown's focus steal even though the session blur-exited.)
+  const rangeStyled =
+    wasSession && !!value && wrapSelectionWithStyle(ctx.stage, prop, value);
+  if (!rangeStyled) {
+    if (!target) return;
+    applyStyle(target, { [prop]: value || null });
+    commit(ctx.stage);
   }
-  const el = formatTarget(ctx);
-  if (!el) return;
-  applyStyle(el, { [prop]: value || null });
-  commit(ctx.stage);
+  // Interacting with a dropdown (font/size/color) blurs the iframe and ends
+  // the session — bring it back so the text toolbar stays put.
+  if (wasSession && target?.isConnected && !buildEditorContext().session) {
+    useEditorStore.getState().startSession(target);
+  }
 }
 
 const HEADING_OPTIONS = [

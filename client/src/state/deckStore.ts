@@ -35,6 +35,8 @@ interface DeckState {
   conflict: boolean;
   /** Deck-relative stylesheet hrefs to add to the head on next save. */
   pendingLinks: string[];
+  /** Reveal config values to splice into the file on next save. */
+  pendingConfig: { width?: number; height?: number } | null;
 
   load(deck: DeckData): void;
   close(): void;
@@ -53,6 +55,8 @@ interface DeckState {
   setManagedCss(css: string): void;
   /** Link stylesheets into the deck head (applied immediately, spliced on save). */
   linkStylesheets(hrefs: string[]): void;
+  /** Change the slide design size (applied immediately, spliced on save). */
+  setDeckSize(width: number, height: number): void;
   /** Commit edited slide markup from the editing engine (no-op if unchanged). */
   updateSlideSource(slideId: string, source: string): void;
 
@@ -120,6 +124,7 @@ export const useDeckStore = create<DeckState>()(
       saving: false,
       conflict: false,
       pendingLinks: [],
+      pendingConfig: null,
 
       load(deck) {
         const columns = parseSections(deck.sections);
@@ -144,6 +149,7 @@ export const useDeckStore = create<DeckState>()(
           dirty: false,
           conflict: false,
           pendingLinks: [],
+          pendingConfig: null,
         });
         // Clear AFTER the set: the set itself records the pre-load state
         // (an empty or stale deck) as an undo entry — Ctrl+Z must never be
@@ -309,6 +315,16 @@ export const useDeckStore = create<DeckState>()(
         set({ meta: { ...meta, managedCss: css }, dirty: true });
       },
 
+      setDeckSize(width, height) {
+        const { meta, pendingConfig } = get();
+        if (!meta || (meta.config.width === width && meta.config.height === height)) return;
+        set({
+          meta: { ...meta, config: { ...meta.config, width, height } },
+          pendingConfig: { ...pendingConfig, width, height },
+          dirty: true,
+        });
+      },
+
       linkStylesheets(hrefs) {
         const { meta, pendingLinks } = get();
         if (!meta) return;
@@ -340,7 +356,7 @@ export const useDeckStore = create<DeckState>()(
       },
 
       async save(opts) {
-        const { meta, columns, mtime, saving, pendingLinks } = get();
+        const { meta, columns, mtime, saving, pendingLinks, pendingConfig } = get();
         if (!meta || saving) return;
         set({ saving: true });
         try {
@@ -349,10 +365,17 @@ export const useDeckStore = create<DeckState>()(
             theme: meta.theme ?? undefined,
             managedCss: meta.managedCss || undefined,
             addStylesheetLinks: pendingLinks.length ? pendingLinks : undefined,
+            configPatch: pendingConfig ?? undefined,
             baseMtime: mtime,
             force: opts?.force,
           });
-          set({ mtime: res.mtime, dirty: false, conflict: false, pendingLinks: [] });
+          set({
+            mtime: res.mtime,
+            dirty: false,
+            conflict: false,
+            pendingLinks: [],
+            pendingConfig: null,
+          });
         } catch (err) {
           if (err instanceof ApiError && err.status === 409) {
             set({ conflict: true });

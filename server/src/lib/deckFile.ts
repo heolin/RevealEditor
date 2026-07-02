@@ -71,6 +71,12 @@ export interface DeckUpdate {
   managedCss?: string;
   /** Stylesheet hrefs (relative to the deck file) to link before </head>. */
   addStylesheetLinks?: string[];
+  /**
+   * Write width/height into Reveal.initialize({...}) — the one surgical
+   * config write (docs/ARCHITECTURE.md §3): existing numbers are replaced
+   * in place, missing keys are inserted after the opening brace.
+   */
+  configPatch?: { width?: number; height?: number };
 }
 
 type Element = T.Element;
@@ -351,6 +357,30 @@ export function updateDeck(src: string, update: DeckUpdate): string {
       .join('');
     if (links) {
       edits.push({ start: info.headInsertOffset, end: info.headInsertOffset, text: links });
+    }
+  }
+
+  if (update.configPatch && (update.configPatch.width || update.configPatch.height)) {
+    const init = /Reveal\.initialize\s*\(\s*\{([\s\S]*?)\}\s*\)/.exec(src);
+    if (!init) {
+      throw new DeckParseError('Deck has no Reveal.initialize({...}) to write config into');
+    }
+    const innerStart = init.index + init[0].indexOf('{') + 1;
+    const inner = init[1];
+    const missing: string[] = [];
+    for (const key of ['width', 'height'] as const) {
+      const value = update.configPatch[key];
+      if (!value) continue;
+      const m = new RegExp(`\\b${key}\\s*:\\s*(\\d+)`).exec(inner);
+      if (m) {
+        const numStart = innerStart + m.index + m[0].length - m[1].length;
+        edits.push({ start: numStart, end: numStart + m[1].length, text: String(value) });
+      } else {
+        missing.push(`${key}: ${value}`);
+      }
+    }
+    if (missing.length > 0) {
+      edits.push({ start: innerStart, end: innerStart, text: ` ${missing.join(', ')},` });
     }
   }
 

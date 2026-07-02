@@ -44,6 +44,7 @@ export interface SavePayload {
   title?: string;
   managedCss?: string;
   addStylesheetLinks?: string[];
+  configPatch?: { width?: number; height?: number };
   baseMtime: number;
   force?: boolean;
 }
@@ -98,10 +99,10 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(payload),
     }),
-  createDeck: (path: string, title: string, theme: string) =>
+  createDeck: (path: string, title: string, theme: string, width = 1280, height = 720) =>
     request<{ path: string; mtime: number }>('/api/decks', {
       method: 'POST',
-      body: JSON.stringify({ path, title, theme }),
+      body: JSON.stringify({ path, title, theme, width, height }),
     }),
   deleteDeck: (path: string) =>
     request<{ ok: true }>(`/api/deck${q(path)}`, { method: 'DELETE' }),

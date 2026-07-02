@@ -113,7 +113,7 @@ test('drag converts to absolute positioning and snaps into the file', async ({ p
   await save(page);
   const file = await fileContents(page, 'e2e-drag.html');
   expect(file).toMatch(/<h1[^>]*position: absolute/);
-  expect(file).toMatch(/<section[^>]*height: 700px/); // section pinned
+  expect(file).toMatch(/<section[^>]*height: \d+px/); // section pinned to design height
 });
 
 test('table: insert, edit cells with Tab, add row via context menu', async ({ page }) => {
@@ -198,10 +198,10 @@ test('multi-select: shift-click, align, group, ungroup round-trip', async ({ pag
   let file = await fileContents(page, 'e2e-multi.html');
   expect(file).toContain('re-group');
 
-  // Ungroup restores flat structure with slide coordinates. Click empty
-  // canvas first — clicking a selected group drills into its children.
-  await stage.locator('#re-stage').click({ position: { x: 5, y: 5 } });
-  await stage.locator('#re-stage .re-group').click();
+  // Ungroup restores flat structure with slide coordinates. Select the
+  // group via the Layers panel — unambiguous, no canvas drill semantics.
+  await page.getByRole('tab', { name: 'Layers' }).click();
+  await page.locator('.layer-row').filter({ hasText: 'Group' }).first().click();
   await page.keyboard.press('ControlOrMeta+Shift+g');
   await expect(stage.locator('#re-stage .re-group')).toHaveCount(0);
   await save(page);

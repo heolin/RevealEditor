@@ -93,7 +93,11 @@ html, body, #root { height: 100%; margin: 0; }
   border-top: 1px solid var(--re-border);
   overflow-x: auto;
 }
-.text-bar { background: var(--re-raised); }
+.text-bar {
+  background: var(--re-raised);
+  border-radius: 6px;
+  padding: 0 4px;
+}
 .dirty-dot {
   width: 8px;
   height: 8px;

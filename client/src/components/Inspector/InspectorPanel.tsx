@@ -79,21 +79,79 @@ export function InspectorPanel() {
   );
 }
 
+const SIZE_PRESETS = [
+  { value: '1280x720', label: '16:9 — 1280 × 720' },
+  { value: '1280x800', label: '16:10 — 1280 × 800' },
+  { value: '1024x768', label: '4:3 — 1024 × 768' },
+  { value: '960x700', label: 'Classic — 960 × 700' },
+];
+
 /** Deck-level design settings (theme lives here, not in the toolbar). */
 function DeckSection() {
   const meta = useDeckStore((s) => s.meta)!;
   const setTheme = useDeckStore((s) => s.setTheme);
+  const setDeckSize = useDeckStore((s) => s.setDeckSize);
   const [themes, setThemes] = useState<string[]>([]);
 
   useEffect(() => {
     api.listThemes().then(setThemes).catch(() => setThemes([]));
   }, []);
 
+  const { width, height } = meta.config;
+  const sizeValue = `${width}x${height}`;
+  const isPreset = SIZE_PRESETS.some((p) => p.value === sizeValue);
+  const [customSize, setCustomSize] = useState(false);
+  const showCustom = customSize || !isPreset;
+
   return (
     <>
       <Text size="xs" fw={700} c="dimmed" tt="uppercase">
         Deck
       </Text>
+      <Select
+        label="Size"
+        size="xs"
+        value={showCustom ? 'custom' : sizeValue}
+        data={[...SIZE_PRESETS, { value: 'custom', label: 'Custom…' }]}
+        onChange={(v) => {
+          if (!v) return;
+          if (v === 'custom') {
+            setCustomSize(true);
+            return;
+          }
+          setCustomSize(false);
+          const [w, h] = v.split('x').map(Number);
+          setDeckSize(w, h);
+        }}
+      />
+      {showCustom && (
+        <Group gap={4} grow>
+          <NumberInput
+            key={`w-${width}`}
+            label="Width"
+            size="xs"
+            min={320}
+            max={7680}
+            defaultValue={width}
+            onBlur={(e) => {
+              const v = parseInt(e.currentTarget.value, 10);
+              if (Number.isFinite(v) && v !== width) setDeckSize(v, height);
+            }}
+          />
+          <NumberInput
+            key={`h-${height}`}
+            label="Height"
+            size="xs"
+            min={200}
+            max={4320}
+            defaultValue={height}
+            onBlur={(e) => {
+              const v = parseInt(e.currentTarget.value, 10);
+              if (Number.isFinite(v) && v !== height) setDeckSize(width, v);
+            }}
+          />
+        </Group>
+      )}
       {meta.theme === null ? (
         <Tooltip label="This deck uses its own custom styling — there is no standard theme link to switch">
           <Select label="Theme" size="xs" placeholder="custom styling" data={[]} disabled />

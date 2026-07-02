@@ -29,10 +29,12 @@ export function decksRouter(ws: Workspace): Router {
 
   router.post('/decks', async (req, res, next) => {
     try {
-      const { path: relPath, title, theme } = req.body as {
+      const { path: relPath, title, theme, width, height } = req.body as {
         path?: string;
         title?: string;
         theme?: string;
+        width?: number;
+        height?: number;
       };
       if (!relPath || !relPath.endsWith('.html')) {
         return res.status(400).json({ error: 'path must end with .html' });
@@ -43,7 +45,9 @@ export function decksRouter(ws: Workspace): Router {
       const template = await fs.readFile(TEMPLATE_PATH, 'utf8');
       const content = template
         .replaceAll('{{title}}', escapeHtml(title || 'New presentation'))
-        .replaceAll('{{theme}}', /^[\w-]+$/.test(theme || '') ? theme! : 'black');
+        .replaceAll('{{theme}}', /^[\w-]+$/.test(theme || '') ? theme! : 'black')
+        .replaceAll('{{width}}', String(Number.isFinite(width) && width! > 0 ? width : 1280))
+        .replaceAll('{{height}}', String(Number.isFinite(height) && height! > 0 ? height : 720));
       await ws.ensureDirFor(relPath);
       const mtime = await ws.writeDeck(relPath, content);
       res.status(201).json({ path: relPath, mtime });
@@ -79,13 +83,14 @@ export function decksRouter(ws: Workspace): Router {
   router.put('/deck', async (req, res, next) => {
     try {
       const relPath = deckPathParam(req);
-      const { slidesHtml, theme, title, managedCss, addStylesheetLinks, baseMtime, force } =
+      const { slidesHtml, theme, title, managedCss, addStylesheetLinks, configPatch, baseMtime, force } =
         req.body as {
           slidesHtml?: string;
           theme?: string;
           title?: string;
           managedCss?: string;
           addStylesheetLinks?: string[];
+          configPatch?: { width?: number; height?: number };
           baseMtime?: number;
           force?: boolean;
         };
@@ -97,7 +102,14 @@ export function decksRouter(ws: Workspace): Router {
         });
       }
       const { src } = await ws.readDeck(relPath);
-      const updated = updateDeck(src, { slidesHtml, theme, title, managedCss, addStylesheetLinks });
+      const updated = updateDeck(src, {
+        slidesHtml,
+        theme,
+        title,
+        managedCss,
+        addStylesheetLinks,
+        configPatch,
+      });
       const mtime = await ws.writeDeck(relPath, updated);
       res.json({ mtime });
     } catch (err) {

@@ -51,8 +51,12 @@ export function stageLayoutCss(meta: StageMeta): string {
        section padding (benchmarks: 48px) otherwise overflow right. */
     box-sizing: border-box;
   }
-  /* Pinned (free-layout) sections carry inline height + flex — top stays 0. */
+  /* Pinned (free-layout) sections carry inline height + flex — top stays 0,
+     and their inline flex centering must WIN over our block !important
+     (otherwise remaining flow content jumps to the top in the canvas while
+     the runtime, where inline styles rule, keeps it centered). */
   .reveal .slides > section[style*="height"] { top: 0; }
+  .reveal .slides > section[style*="display: flex"] { display: flex !important; }
   .reveal .slides section .fragment {
     visibility: visible !important;
     opacity: 1 !important;
@@ -103,6 +107,9 @@ ${slideSource}
   var s = document.querySelector('.slides > section');
   if (s) {
     s.classList.add('present');
+    // Highlight-theme block background (miniatures embed raw source, which
+    // lacks the hljs class the live stage adds during hydration).
+    s.querySelectorAll('pre > code').forEach(function (c) { c.classList.add('hljs'); });
     var bg = s.getAttribute('data-background-color') || s.getAttribute('data-background') || '';
     var img = s.getAttribute('data-background-image');
     document.body.style.background = bg;

@@ -172,6 +172,24 @@ describe('updateDeck round-trip', () => {
     expect(v2.match(/data-revealeditor/g)).toHaveLength(1);
   });
 
+  it('writes width/height into Reveal.initialize: replace and insert', () => {
+    // weird.html HAS width/height → digits replaced in place, revert is exact.
+    const weird = fixture('weird.html');
+    const resized = updateDeck(weird, { configPatch: { width: 1920, height: 1080 } });
+    expect(parseDeck(resized).config.width).toBe(1920);
+    expect(parseDeck(resized).config.height).toBe(1080);
+    expect(updateDeck(resized, { configPatch: { width: 1280, height: 720 } })).toBe(weird);
+
+    // demo.html has NO width/height → keys inserted after the opening brace.
+    const demo = fixture('demo.html');
+    const withSize = updateDeck(demo, { configPatch: { width: 1280, height: 720 } });
+    const info = parseDeck(withSize);
+    expect(info.config.width).toBe(1280);
+    expect(info.config.height).toBe(720);
+    // user comment inside config survives the insertion
+    expect(withSize).toContain('// user comment inside config');
+  });
+
   it('handles weird formatting (single quotes, odd whitespace, comments between sections)', () => {
     const src = fixture('weird.html');
     const info = parseDeck(src);
