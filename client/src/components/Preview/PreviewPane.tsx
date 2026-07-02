@@ -22,8 +22,10 @@ export function PreviewPane() {
     if (!open) return;
 
     let timer: ReturnType<typeof setTimeout> | null = null;
-    let lastColumns: unknown = null;
-    let lastTheme: unknown = null;
+    // Primed with current values: the initial paint is sent on harness-loaded,
+    // so the subscription must not fire a duplicate racing sync at mount.
+    let lastColumns: unknown = useDeckStore.getState().columns;
+    let lastTheme: unknown = useDeckStore.getState().meta?.theme;
 
     function buildAndSend() {
       const s = useDeckStore.getState();
@@ -57,7 +59,7 @@ export function PreviewPane() {
       timer = setTimeout(buildAndSend, 300);
     }
 
-    let lastCss: unknown = null;
+    let lastCss: unknown = useDeckStore.getState().meta?.managedCss;
     const unsubscribe = useDeckStore.subscribe((state) => {
       if (
         state.columns !== lastColumns ||

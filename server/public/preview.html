@@ -23,6 +23,7 @@
     // ever read back from this document — one-way data flow by design.
     let deck = null;
     const extraLinks = new Set();
+    window.__debug = { messages: [] }; // introspection for automated tests
 
     function applyHead(m) {
       if (m.baseHref) document.getElementById('re-base').href = m.baseHref;
@@ -57,33 +58,65 @@
       } catch (e) { /* display-only */ }
     }
 
+    // Sync application must be SERIALIZED: a second sync replacing .slides
+    // innerHTML while Reveal.initialize() is still awaiting leaves reveal
+    // registered against detached nodes — wrong slide counts, clamped
+    // navigation, broken layout. Only the latest pending sync matters.
+    let busy = false;
+    let pending = null;
+
+    async function applySync(m) {
+      applyHead(m);
+      document.querySelector('.slides').innerHTML = m.slidesHtml;
+      if (!deck) {
+        deck = new Reveal(document.querySelector('.reveal'), {
+          hash: false,
+          embedded: false,
+          width: m.width || 960,
+          height: m.height || 700,
+          center: m.center !== false,
+          margin: typeof m.margin === 'number' ? m.margin : 0.04,
+          // Reveal 5 auto-switches narrow viewports (<435px) to scroll view,
+          // which flattens stacks into .scroll-page divs — breaking (h,v)
+          // navigation and layout. The preview pane is 380px wide: never.
+          scrollActivationWidth: null,
+          plugins: [RevealHighlight, RevealNotes],
+        });
+        await deck.initialize();
+      } else {
+        try {
+          deck.sync();
+          rehighlight();
+        } catch (e) {
+          location.reload(); // parent re-sends on harness-loaded
+          return;
+        }
+      }
+      if (typeof m.h === 'number') deck.slide(m.h, m.v || 0);
+    }
+
     window.addEventListener('message', async (event) => {
       const m = event.data || {};
+      window.__debug.messages.push({ type: m.type, h: m.h, v: m.v, t: Date.now() });
+      window.__debug.deck = deck;
+      if (m.slidesHtml !== undefined) window.__debug.lastSlidesHtml = m.slidesHtml;
       if (m.type === 'sync') {
-        applyHead(m);
-        document.querySelector('.slides').innerHTML = m.slidesHtml;
-        if (!deck) {
-          deck = new Reveal(document.querySelector('.reveal'), {
-            hash: false,
-            embedded: false,
-            width: m.width || 960,
-            height: m.height || 700,
-            center: m.center !== false,
-            margin: typeof m.margin === 'number' ? m.margin : 0.04,
-            plugins: [RevealHighlight, RevealNotes],
-          });
-          await deck.initialize();
-        } else {
-          try {
-            deck.sync();
-            rehighlight();
-          } catch (e) {
-            location.reload(); // parent re-sends on harness-loaded
-            return;
-          }
+        if (busy) {
+          pending = m; // coalesce: only the latest matters
+          return;
         }
-        if (typeof m.h === 'number') deck.slide(m.h, m.v || 0);
-      } else if (m.type === 'navigate' && deck) {
+        busy = true;
+        try {
+          await applySync(m);
+          while (pending) {
+            const next = pending;
+            pending = null;
+            await applySync(next);
+          }
+        } finally {
+          busy = false;
+        }
+      } else if (m.type === 'navigate' && deck && !busy) {
         deck.slide(m.h, m.v || 0);
       }
     });

@@ -38,6 +38,9 @@ export function stageLayoutCss(meta: DeckMeta): string {
     width: 100%;
     height: 100%;
     top: 0;
+    /* Padding must count INTO the forced 100% box, like the runtime — decks
+       with section padding (benchmarks: 48px) otherwise overflow right. */
+    box-sizing: border-box;
   }
   .reveal .slides section .fragment {
     visibility: visible !important;
