@@ -3,6 +3,8 @@ import {
   IconChartBar,
   IconCircle,
   IconCode,
+  IconColumns2,
+  IconColumns3,
   IconComponents,
   IconHeading,
   IconLetterT,
@@ -14,6 +16,7 @@ import {
 } from '@tabler/icons-react';
 import type { Action, EditorContext } from './types';
 import { insertHtmlSnippet } from '../commands';
+import { ensureManagedBlock } from '../managedCss';
 import { insertTable } from '../table';
 import { insertShape, type ShapeKind } from '../shapes';
 import { insertChart } from '../chart/chart';
@@ -39,6 +42,27 @@ function snippetAction(
   };
 }
 
+const LAYOUT_CSS_MARKER = '/* re:layout */';
+const LAYOUT_CSS = `.re-cols { display: flex; gap: 24px; width: 100%; align-items: stretch; }
+.re-col { flex: 1 1 0; min-width: 0; }`;
+
+function columnsAction(count: 2 | 3): Action {
+  return {
+    id: `insert.columns${count}`,
+    title: `${count === 2 ? 'Two' : 'Three'} columns`,
+    icon: count === 2 ? IconColumns2 : IconColumns3,
+    kind: 'button',
+    group: 'insert',
+    when: canInsert,
+    run: (ctx) => {
+      if (!ctx.stage) return;
+      ensureManagedBlock(LAYOUT_CSS_MARKER, LAYOUT_CSS);
+      const cols = Array.from({ length: count }, () => '  <div class="re-col"></div>').join('\n');
+      insertHtmlSnippet(ctx.stage, `<div class="re-cols">\n${cols}\n</div>`, ctx.selection);
+    },
+  };
+}
+
 const SHAPE_ICONS: Record<ShapeKind, Action['icon']> = {
   rect: IconRectangle,
   ellipse: IconCircle,
@@ -56,6 +80,8 @@ export const insertActions: Action[] = [
     '<ul>\n  <li>First item</li>\n  <li>Second item</li>\n</ul>',
   ),
   snippetAction('insert.quote', 'Quote', IconBlockquote, '<blockquote>Quote</blockquote>'),
+  columnsAction(2),
+  columnsAction(3),
   {
     id: 'insert.image',
     title: 'Image…',

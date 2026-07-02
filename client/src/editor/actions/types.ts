@@ -32,7 +32,8 @@ export type ActionGroup =
   | 'format'
   | 'arrange'
   | 'table'
-  | 'slide';
+  | 'slide'
+  | 'view';
 
 export interface ActionOption {
   value: string;

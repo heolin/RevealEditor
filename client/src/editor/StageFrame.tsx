@@ -8,7 +8,16 @@ import { stageHead, stageLayoutCss } from './stageDoc';
 import { TextSession } from './TextSession';
 import { handlerFor, textEditableFrom } from './registry';
 import { hydrateCodeBlocks } from './codeHighlight';
-import { applyStyle, isAbsolute, slideRect, snapEdges, snapRect, toAbsolute } from './geometry';
+import {
+  applyStyle,
+  isAbsolute,
+  isLayoutContainer,
+  placeInFlow,
+  slideRect,
+  snapEdges,
+  snapRect,
+  toAbsolute,
+} from './geometry';
 import { showAllFragments } from './fragments';
 import { nextCell } from './table';
 import { type StageCtx, commit } from './commands';
@@ -141,6 +150,65 @@ ${stageHead(meta)}
     /** Marquee rubber-band selection, started from empty canvas. */
     let marquee: { x0: number; y0: number; active: boolean } | null = null;
 
+    /** Prospective drop position during a layout-mode drag. */
+    let drop: { parent: HTMLElement; before: HTMLElement | null } | null = null;
+
+    /** Resolve the container + insertion point under the pointer. */
+    function resolveDrop(x: number, y: number, dragged: HTMLElement) {
+      const ctx = ctxRef.current!;
+      let hit = doc.elementFromPoint(x, y);
+      while (hit && (hit === dragged || dragged.contains(hit))) hit = hit.parentElement;
+      let container: HTMLElement | null = null;
+      let cursor: Element | null = hit;
+      while (cursor) {
+        if (isLayoutContainer(cursor, section)) {
+          container = cursor as HTMLElement;
+          break;
+        }
+        if (cursor === section) break;
+        cursor = cursor.parentElement;
+      }
+      if (!container) container = section;
+
+      const kids = Array.from(container.children).filter(
+        (c): c is HTMLElement =>
+          c !== dragged &&
+          (c as HTMLElement).style !== undefined &&
+          !(c.tagName === 'ASIDE' && c.classList.contains('notes')) &&
+          (c as HTMLElement).style.position !== 'absolute',
+      );
+      const cs = ctx.doc.defaultView!.getComputedStyle(container);
+      const horizontal = cs.display.includes('flex') && cs.flexDirection.startsWith('row');
+      let before: HTMLElement | null = null;
+      for (const kid of kids) {
+        const r = slideRect(ctx, kid);
+        const mid = horizontal ? r.left + r.width / 2 : r.top + r.height / 2;
+        if ((horizontal ? x : y) < mid) {
+          before = kid;
+          break;
+        }
+      }
+      // Insertion indicator line in slide coords.
+      const cRect = slideRect(ctx, container);
+      let indicator: { x: number; y: number; w: number; h: number };
+      if (kids.length === 0) {
+        indicator = horizontal
+          ? { x: cRect.left + 4, y: cRect.top + 2, w: 2, h: Math.max(24, cRect.height - 4) }
+          : { x: cRect.left + 2, y: cRect.top + 4, w: Math.max(24, cRect.width - 4), h: 2 };
+      } else {
+        const anchor = before ?? kids[kids.length - 1];
+        const r = slideRect(ctx, anchor);
+        const pos = before
+          ? horizontal ? r.left - 2 : r.top - 2
+          : horizontal ? r.left + r.width + 2 : r.top + r.height + 2;
+        indicator = horizontal
+          ? { x: pos, y: r.top, w: 2, h: r.height }
+          : { x: r.left, y: pos, w: r.width, h: 2 };
+      }
+      drop = { parent: container, before };
+      useEditorStore.getState().setDropIndicator(indicator);
+    }
+
     function applyMarquee(x1: number, y1: number) {
       if (!marquee) return;
       const rect = {
@@ -171,8 +239,13 @@ ${stageHead(meta)}
         marquee = null;
         useEditorStore.getState().setMarquee(null);
       }
+      drop = null;
+      useEditorStore.getState().setDropIndicator(null);
       useEditorStore.getState().setSnapGuides(null);
-      if (p?.dragging && ctxRef.current) commit(ctxRef.current);
+      if (p?.dragging) applyStyle(p.el, { 'pointer-events': null });
+      if (p?.dragging && ctxRef.current && !useEditorStore.getState().layoutMode) {
+        commit(ctxRef.current);
+      }
     }
 
     doc.addEventListener('contextmenu', (e) => {
@@ -281,6 +354,7 @@ ${stageHead(meta)}
       if (press && ctx) {
         const dx = e.clientX - press.x;
         const dy = e.clientY - press.y;
+        const layoutMode = useEditorStore.getState().layoutMode;
         if (!press.dragging && Math.hypot(dx, dy) >= DRAG_THRESHOLD) {
           press.dragging = true;
           // Pointer capture keeps the gesture alive even when the pointer
@@ -291,15 +365,28 @@ ${stageHead(meta)}
           } catch {
             /* capture is best-effort */
           }
-          toAbsolute(ctx, press.el, height);
-          for (const o of press.others) toAbsolute(ctx, o.el, height);
-          const r = slideRect(ctx, press.el);
-          press.startLeft = r.left;
-          press.startTop = r.top;
-          press.others = press.others.map((o) => {
-            const or = slideRect(ctx, o.el);
-            return { ...o, startLeft: or.left, startTop: or.top };
-          });
+          if (layoutMode) {
+            // Let elementFromPoint see through the dragged element — walking
+            // up from it would resolve its OWN parent as the drop target.
+            press.el.style.pointerEvents = 'none';
+          }
+          if (!layoutMode) {
+            toAbsolute(ctx, press.el, height);
+            for (const o of press.others) toAbsolute(ctx, o.el, height);
+            const r = slideRect(ctx, press.el);
+            press.startLeft = r.left;
+            press.startTop = r.top;
+            press.others = press.others.map((o) => {
+              const or = slideRect(ctx, o.el);
+              return { ...o, startLeft: or.left, startTop: or.top };
+            });
+          }
+        }
+        if (press.dragging && layoutMode) {
+          // Layout mode: the drag targets a flow position, not coordinates.
+          e.preventDefault();
+          resolveDrop(e.clientX, e.clientY, press.el);
+          return;
         }
         if (press.dragging) {
           e.preventDefault();
@@ -352,7 +439,15 @@ ${stageHead(meta)}
       if (!p || !ctx) return;
       useEditorStore.getState().setSnapGuides(null);
       if (p.dragging) {
-        commit(ctx);
+        const pendingDrop = drop;
+        drop = null;
+        useEditorStore.getState().setDropIndicator(null);
+        applyStyle(p.el, { 'pointer-events': null }); // layout-drag transparency off
+        if (useEditorStore.getState().layoutMode && pendingDrop) {
+          placeInFlow(ctx, p.el, pendingDrop.parent, pendingDrop.before);
+        } else {
+          commit(ctx);
+        }
         return;
       }
       // Clean click on an already-selected element → activate its editor.
@@ -466,6 +561,7 @@ ${stageHead(meta)}
     ctxRef.current = ctx;
     useEditorStore.getState().setCtx(ctx);
     useEditorStore.getState().setStartSession(startSession);
+    doc.body.toggleAttribute('data-re-layout', useEditorStore.getState().layoutMode);
     wireInteractions(doc, section);
     cleanSource.current = null; // force injection
     inject();
@@ -522,6 +618,12 @@ ${stageHead(meta)}
     inject();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slide?.id, slide?.source]);
+
+  // Mirror layout mode onto the stage document (drives the dashed-outline CSS).
+  const layoutMode = useEditorStore((s) => s.layoutMode);
+  useEffect(() => {
+    ctxRef.current?.doc.body.toggleAttribute('data-re-layout', layoutMode);
+  }, [layoutMode]);
 
   useEffect(
     () => () => {

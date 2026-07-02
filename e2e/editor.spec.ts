@@ -236,6 +236,61 @@ test('layers panel: tree select, hover, sibling reorder round-trips', async ({ p
   expect(file.indexOf('<p')).toBeLessThan(file.indexOf('<h1'));
 });
 
+test('layout mode: columns, drag into flow, free out, back into layout', async ({ page }) => {
+  await createDeck(page, 'e2e-layout');
+  const stage = stageFrame(page);
+
+  // Insert a two-column container and enable layout mode.
+  await openInsertMenu(page);
+  await page.getByRole('menuitem', { name: 'Two columns' }).click();
+  await expect(stage.locator('#re-stage .re-cols .re-col')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Layout mode' }).click();
+
+  // Drag the template h1 into the first (empty) column.
+  const h1 = stage.locator('#re-stage h1');
+  const col1 = stage.locator('#re-stage .re-col').first();
+  const from = (await h1.boundingBox())!;
+  const to = (await col1.boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 10 });
+  await page.mouse.up();
+  await expect(stage.locator('#re-stage .re-col:first-child h1')).toHaveCount(1);
+  await save(page);
+  let file = await fileContents(page, 'e2e-layout.html');
+  expect(file).toMatch(/re-col[^]*?<h1/); // h1 nested inside the column
+  expect(file).not.toMatch(/<h1[^>]*position: absolute/);
+
+  // Leave layout mode; drag the h1 free (absolute), then re-enter layout
+  // mode and drop it back into the second column.
+  await page.getByRole('button', { name: 'Layout mode' }).click();
+  const inCol = (await stage.locator('#re-stage h1').boundingBox())!;
+  await page.mouse.move(inCol.x + 20, inCol.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(inCol.x + 220, inCol.y + 200, { steps: 10 });
+  await page.mouse.up();
+  await expect
+    .poll(async () => stage.locator('#re-stage h1').evaluate((el) => el.style.position))
+    .toBe('absolute');
+
+  await page.getByRole('button', { name: 'Layout mode' }).click();
+  const freePos = (await stage.locator('#re-stage h1').boundingBox())!;
+  const col2 = (await stage.locator('#re-stage .re-col').nth(1).boundingBox())!;
+  await page.mouse.move(freePos.x + 20, freePos.y + 10);
+  await page.mouse.down();
+  // Drop at the column's vertical center — empty columns are only ~28
+  // slide-px tall (min-height), so a fixed offset can overshoot.
+  await page.mouse.move(col2.x + col2.width / 2, col2.y + col2.height / 2, { steps: 10 });
+  await page.mouse.up();
+  await expect(stage.locator('#re-stage .re-col:nth-child(2) h1')).toHaveCount(1);
+  await expect
+    .poll(async () => stage.locator('#re-stage h1').evaluate((el) => el.style.position))
+    .toBe('');
+  await save(page);
+  file = await fileContents(page, 'e2e-layout.html');
+  expect(file).not.toMatch(/<h1[^>]*position: absolute/);
+});
+
 test('insert menu closes after selection; undo never blanks the deck', async ({ page }) => {
   await openDemo(page);
   await openInsertMenu(page);

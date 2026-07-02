@@ -49,7 +49,27 @@ export function stageLayoutCss(meta: DeckMeta): string {
   }
   aside.notes { display: none !important; }
   /* Native image drag-and-drop steals pointer events from element dragging. */
-  img { -webkit-user-drag: none; user-select: none; }`;
+  img { -webkit-user-drag: none; user-select: none; }
+  /* Text is selectable ONLY inside an active text session — otherwise moving
+     an element must never start a text selection. */
+  .reveal .slides section { user-select: none; }
+  .reveal .slides section [contenteditable="true"],
+  .reveal .slides section [contenteditable="true"] * { user-select: text; }
+  /* Layout mode: expose the layout tree — dashed container outlines, and a
+     minimum drop size so empty containers stay grabbable. */
+  body[data-re-layout] .reveal .slides > section {
+    outline: 1px dashed rgba(79, 143, 247, 0.45);
+    outline-offset: -2px;
+  }
+  body[data-re-layout] .reveal .slides section :is(div, td, th, blockquote):not([data-re-shape]):not([data-re-chart]):not(.re-group) {
+    outline: 1px dashed rgba(79, 143, 247, 0.55);
+    outline-offset: 2px;
+    min-height: 28px;
+  }
+  body[data-re-layout] .reveal .slides section pre :is(div, td, th) {
+    outline: none;
+    min-height: 0;
+  }`;
 }
 
 /**

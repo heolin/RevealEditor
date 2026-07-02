@@ -36,6 +36,7 @@ export function EditorOverlay({ scale }: { scale: number }) {
   const sessionEl = useEditorStore((s) => s.sessionEl);
   const snapGuides = useEditorStore((s) => s.snapGuides);
   const marquee = useEditorStore((s) => s.marquee);
+  const dropIndicator = useEditorStore((s) => s.dropIndicator);
   const ctx = useEditorContext();
 
   const target = sessionEl ?? selectedEl;
@@ -73,6 +74,17 @@ export function EditorOverlay({ scale }: { scale: number }) {
           {!sessionEl && extras.length === 0 && <ResizeHandles el={connected} scale={scale} />}
           <FloatingToolbar ctx={ctx} box={boxFor(connected, scale)} />
         </>
+      )}
+      {dropIndicator && (
+        <div
+          className="drop-indicator"
+          style={{
+            left: dropIndicator.x * scale,
+            top: dropIndicator.y * scale,
+            width: Math.max(2, dropIndicator.w * scale),
+            height: Math.max(2, dropIndicator.h * scale),
+          }}
+        />
       )}
       {snapGuides?.x != null && (
         <div className="snap-guide vertical" style={{ left: snapGuides.x * scale }} />

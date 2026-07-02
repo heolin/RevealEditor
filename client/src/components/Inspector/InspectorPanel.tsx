@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Button,
   ColorInput,
@@ -11,6 +11,7 @@ import {
   Switch,
   Text,
   TextInput,
+  Tooltip,
 } from '@mantine/core';
 import { IconArrowDown, IconArrowUp, IconUpload } from '@tabler/icons-react';
 import { useEditorStore } from '../../editor/editorStore';
@@ -66,9 +67,49 @@ export function InspectorPanel() {
   return (
     <div className="inspector">
       <Stack gap="sm" p="sm">
-        {el ? <ElementSection el={el} /> : <SlideSection />}
+        {el ? <ElementSection el={el} /> : (
+          <>
+            <DeckSection />
+            <Divider />
+            <SlideSection />
+          </>
+        )}
       </Stack>
     </div>
+  );
+}
+
+/** Deck-level design settings (theme lives here, not in the toolbar). */
+function DeckSection() {
+  const meta = useDeckStore((s) => s.meta)!;
+  const setTheme = useDeckStore((s) => s.setTheme);
+  const [themes, setThemes] = useState<string[]>([]);
+
+  useEffect(() => {
+    api.listThemes().then(setThemes).catch(() => setThemes([]));
+  }, []);
+
+  return (
+    <>
+      <Text size="xs" fw={700} c="dimmed" tt="uppercase">
+        Deck
+      </Text>
+      {meta.theme === null ? (
+        <Tooltip label="This deck uses its own custom styling — there is no standard theme link to switch">
+          <Select label="Theme" size="xs" placeholder="custom styling" data={[]} disabled />
+        </Tooltip>
+      ) : (
+        <Select
+          label="Theme"
+          size="xs"
+          value={meta.theme}
+          data={themes}
+          onChange={(v) => v && setTheme(v)}
+          searchable
+          comboboxProps={{ withinPortal: true }}
+        />
+      )}
+    </>
   );
 }
 

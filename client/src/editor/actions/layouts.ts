@@ -40,6 +40,7 @@ const DEFAULTS: Record<SurfaceId, SurfaceLayout> = {
       'arrange.distributeV',
     ],
     ['arrange.group', 'arrange.front', 'arrange.back', 'arrange.unpin'],
+    ['view.layoutMode'],
   ],
 
   /** Floating toolbar: the quick subset that follows the selection. */
@@ -62,6 +63,7 @@ const DEFAULTS: Record<SurfaceId, SurfaceLayout> = {
   /** Insert "+" menu. */
   insertMenu: [
     ['insert.heading', 'insert.text', 'insert.bulletList', 'insert.quote'],
+    ['insert.columns2', 'insert.columns3'],
     ['insert.image', 'insert.code', 'insert.table', 'insert.chart', 'insert.component'],
     ['insert.shape.rect', 'insert.shape.ellipse', 'insert.shape.line', 'insert.shape.arrow'],
   ],

@@ -210,6 +210,12 @@ html, body, #root { height: 100%; margin: 0; }
   background: rgba(79, 143, 247, 0.08);
   z-index: 6;
 }
+.drop-indicator {
+  position: absolute;
+  background: var(--re-accent);
+  border-radius: 2px;
+  z-index: 9;
+}
 .selection-label {
   position: absolute;
   top: -18px;

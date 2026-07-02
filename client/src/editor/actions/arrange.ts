@@ -11,6 +11,7 @@ import {
   IconLayoutAlignTop,
   IconLayoutDistributeHorizontal,
   IconLayoutDistributeVertical,
+  IconLayoutGrid,
   IconPinnedOff,
   IconStackPop,
   IconStackPush,
@@ -180,6 +181,23 @@ export const arrangeActions: Action[] = [
       if (!ctx.stage) return;
       // Delete the whole selection set (multi-select aware).
       for (const el of ctx.selections) deleteElement(ctx.stage, el);
+    },
+  },
+];
+
+export const viewActions: Action[] = [
+  {
+    id: 'view.layoutMode',
+    title: 'Layout mode',
+    icon: IconLayoutGrid,
+    kind: 'toggle',
+    group: 'view',
+    shortcut: 'mod+l',
+    when: (ctx) => !!ctx.stage,
+    active: () => useEditorStore.getState().layoutMode,
+    run: () => {
+      const s = useEditorStore.getState();
+      s.setLayoutMode(!s.layoutMode);
     },
   },
 ];

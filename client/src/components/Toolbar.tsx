@@ -1,10 +1,9 @@
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment } from 'react';
 import {
   ActionIcon,
   Button,
   Divider,
   Group,
-  Select,
   Text,
   Tooltip,
   useMantineColorScheme,
@@ -21,7 +20,6 @@ import { getAction } from '../editor/actions';
 import { getLayout } from '../editor/actions/layouts';
 import { ActionControl } from '../editor/actions/ActionControl';
 import { InsertMenu } from '../editor/overlay/EditorOverlay';
-import { api } from '../api/client';
 
 export function Toolbar() {
   const meta = useDeckStore((s) => s.meta)!;
@@ -29,13 +27,7 @@ export function Toolbar() {
   const saving = useDeckStore((s) => s.saving);
   const save = useDeckStore((s) => s.save);
   const close = useDeckStore((s) => s.close);
-  const setTheme = useDeckStore((s) => s.setTheme);
-  const [themes, setThemes] = useState<string[]>([]);
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
-
-  useEffect(() => {
-    api.listThemes().then(setThemes).catch(() => setThemes([]));
-  }, []);
 
   return (
     <div className="toolbar">
@@ -50,22 +42,6 @@ export function Toolbar() {
         </Text>
         {dirty && <span className="dirty-dot" title="Unsaved changes" />}
         <div style={{ flex: 1 }} />
-        {themes.length > 0 &&
-          (meta.theme === null ? (
-            <Tooltip label="This deck uses its own custom styling — there is no standard theme link to switch">
-              <Select size="xs" w={150} placeholder="custom styling" data={[]} disabled />
-            </Tooltip>
-          ) : (
-            <Select
-              size="xs"
-              w={150}
-              value={meta.theme}
-              data={themes}
-              onChange={(v) => v && setTheme(v)}
-              searchable
-              comboboxProps={{ withinPortal: true }}
-            />
-          ))}
         <Tooltip label={`Switch editor to ${colorScheme === 'light' ? 'dark' : 'light'} mode`}>
           <ActionIcon variant="subtle" color="gray" onClick={toggleColorScheme}>
             {colorScheme === 'light' ? <IconMoon size={18} /> : <IconSun size={18} />}

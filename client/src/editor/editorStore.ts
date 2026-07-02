@@ -18,6 +18,10 @@ interface EditorState {
   extraSelected: HTMLElement[];
   /** Marquee rectangle during rubber-band selection, slide-space px. */
   marquee: { x: number; y: number; w: number; h: number } | null;
+  /** Layout mode: dashed containers, drags reparent into flow instead of pinning. */
+  layoutMode: boolean;
+  /** Insertion indicator during a layout-mode drag, slide-space px. */
+  dropIndicator: { x: number; y: number; w: number; h: number } | null;
   hoveredEl: HTMLElement | null;
   /** Element hosting the active contenteditable text session. */
   sessionEl: HTMLElement | null;
@@ -47,6 +51,8 @@ interface EditorState {
   /** Replace the whole selection set (marquee). */
   selectMany(els: HTMLElement[]): void;
   setMarquee(rect: { x: number; y: number; w: number; h: number } | null): void;
+  setLayoutMode(on: boolean): void;
+  setDropIndicator(rect: { x: number; y: number; w: number; h: number } | null): void;
   hover(el: HTMLElement | null): void;
   setSessionEl(el: HTMLElement | null): void;
   setCodeEditEl(el: HTMLElement | null): void;
@@ -65,6 +71,8 @@ export const useEditorStore = create<EditorState>()((set) => ({
   selectedEl: null,
   extraSelected: [],
   marquee: null,
+  layoutMode: false,
+  dropIndicator: null,
   hoveredEl: null,
   sessionEl: null,
   codeEditEl: null,
@@ -100,6 +108,8 @@ export const useEditorStore = create<EditorState>()((set) => ({
       docVersion: s.docVersion + 1,
     })),
   setMarquee: (rect) => set((s) => ({ marquee: rect, docVersion: s.docVersion + 1 })),
+  setLayoutMode: (on) => set((s) => ({ layoutMode: on, docVersion: s.docVersion + 1 })),
+  setDropIndicator: (rect) => set((s) => ({ dropIndicator: rect, docVersion: s.docVersion + 1 })),
   hover: (el) => set((s) => (s.hoveredEl === el ? s : { hoveredEl: el, docVersion: s.docVersion + 1 })),
   setSessionEl: (el) => set((s) => ({ sessionEl: el, docVersion: s.docVersion + 1 })),
   setCodeEditEl: (el) => set((s) => ({ codeEditEl: el, docVersion: s.docVersion + 1 })),
@@ -114,6 +124,7 @@ export const useEditorStore = create<EditorState>()((set) => ({
       selectedEl: null,
       extraSelected: [],
       marquee: null,
+      dropIndicator: null, // layoutMode itself persists across slides
       hoveredEl: null,
       sessionEl: null,
       codeEditEl: null,

@@ -70,18 +70,8 @@ export function ensureFreeLayoutSection(ctx: StageCtx, designHeight: number): vo
   }
 }
 
-/** Strip free positioning and return the element to flow layout. */
-export function returnToFlow(ctx: StageCtx, el: HTMLElement): void {
-  applyStyle(el, {
-    position: null,
-    left: null,
-    top: null,
-    width: null,
-    height: null,
-    margin: null,
-    'z-index': null,
-  });
-  // Last absolute element gone → unpin the section (restores pure flow).
+/** Unpin the section when the last freely positioned element left the slide. */
+function maybeUnpinSection(ctx: StageCtx): void {
   // No instanceof: iframe-realm elements fail parent-realm class checks.
   const anyAbsolute = Array.from(ctx.section.children).some(
     (c) => (c as HTMLElement).style?.position === 'absolute',
@@ -94,7 +84,47 @@ export function returnToFlow(ctx: StageCtx, el: HTMLElement): void {
       'justify-content': null,
     });
   }
+}
+
+/** Strip free positioning and return the element to flow layout. */
+export function returnToFlow(ctx: StageCtx, el: HTMLElement): void {
+  applyStyle(el, {
+    position: null,
+    left: null,
+    top: null,
+    width: null,
+    height: null,
+    margin: null,
+    'z-index': null,
+  });
+  maybeUnpinSection(ctx);
   commit(ctx);
+}
+
+/**
+ * Layout-mode drop: move an element INTO a flow container at a position.
+ * Strips free positioning (the element rejoins the layout tree) and unpins
+ * the section if it was the last free element.
+ */
+export function placeInFlow(
+  ctx: StageCtx,
+  el: HTMLElement,
+  parent: HTMLElement,
+  before: HTMLElement | null,
+): void {
+  applyStyle(el, { position: null, left: null, top: null, margin: null, 'z-index': null });
+  parent.insertBefore(el, before);
+  maybeUnpinSection(ctx);
+  commit(ctx);
+}
+
+/** Containers an element may be dropped into during layout mode. */
+export function isLayoutContainer(el: Element, section: HTMLElement): boolean {
+  if (el === section) return true;
+  if (!section.contains(el)) return false;
+  if (el.closest('pre') || isGroupEl(el)) return false;
+  if (el.hasAttribute('data-re-shape') || el.hasAttribute('data-re-chart')) return false;
+  return ['DIV', 'TD', 'TH', 'BLOCKQUOTE', 'FIGURE'].includes(el.tagName);
 }
 
 export function changeZOrder(ctx: StageCtx, el: HTMLElement, dir: 1 | -1): void {
