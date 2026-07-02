@@ -140,7 +140,12 @@ export function InsertMenu() {
     <Menu withinPortal position="bottom-start">
       <Menu.Target>
         <Tooltip label="Insert">
-          <ActionIcon variant="subtle" color="gray" disabled={groups.length === 0}>
+          <ActionIcon
+            variant="subtle"
+            color="gray"
+            disabled={groups.length === 0}
+            aria-label="Insert"
+          >
             <IconPlus size={16} />
           </ActionIcon>
         </Tooltip>

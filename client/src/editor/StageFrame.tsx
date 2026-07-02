@@ -153,10 +153,15 @@ ${stageHead(meta)}
       const editor = useEditorStore.getState();
       if (session) endSession(true);
       if (section.contains(target) && target !== section) {
+        // Right-click targets what's under the cursor. Table cells take
+        // priority: row/column ops need a cell context (PowerPoint behavior).
+        const cell = target.closest('td, th');
         const selected = editor.selectedEl;
         const within =
           !!selected && selected.isConnected && (selected === target || selected.contains(target));
-        if (!within) {
+        if (cell && section.contains(cell) && cell !== selected) {
+          editor.select(cell as HTMLElement);
+        } else if (!within) {
           const el = childOf(section, target);
           if (el) editor.select(el);
         }
