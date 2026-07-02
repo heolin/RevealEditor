@@ -6,7 +6,7 @@ import { useEditorStore } from './editorStore';
 import { slideElement } from '../model/deck';
 import { resolveDeckUrl, themeUrl } from '../api/client';
 import { TextSession } from './TextSession';
-import { textEditableFrom } from './registry';
+import { handlerFor, textEditableFrom } from './registry';
 import {
   type StageCtx,
   commit,
@@ -131,17 +131,23 @@ ${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}
       }
       const top = childOf(section, target);
       const selected = editor.selectedEl;
-      // Drill-in: clicking inside the current selection selects one level deeper.
-      if (
-        selected &&
-        selected !== target &&
-        selected.contains(target) &&
-        selected.children.length > 0
-      ) {
-        const deeper = childOf(selected, target);
-        if (deeper) {
-          editor.select(deeper);
+      if (selected && (selected === target || selected.contains(target))) {
+        // Click on the already-selected element: enter text editing directly
+        // (select once, click again to edit — double-click still works too).
+        if (handlerFor(selected).capabilities.textEdit) {
+          const editable = textEditableFrom(target, section) ?? selected;
+          // No preventDefault: the browser's own mousedown places the caret
+          // at the click point once contenteditable is on.
+          startSession(editable);
           return;
+        }
+        // Non-text containers: drill into nested markup one level per click.
+        if (selected !== target && selected.children.length > 0) {
+          const deeper = childOf(selected, target);
+          if (deeper) {
+            editor.select(deeper);
+            return;
+          }
         }
       }
       if (top) editor.select(top);
