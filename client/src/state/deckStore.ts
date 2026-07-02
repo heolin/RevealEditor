@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useShallow } from 'zustand/shallow';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import { api, type DeckData, ApiError } from '../api/client';
@@ -309,8 +310,12 @@ export const useDeckStore = create<DeckState>()(
   ),
 );
 
+// findSlide returns a fresh {h, v} object each call — shallow-compare it so
+// the selector doesn't produce a new snapshot every render (infinite loop).
 export function useSelectedPosition(): { h: number; v: number } | null {
-  return useDeckStore((s) =>
-    s.selectedSlideId ? findSlide(s.columns, s.selectedSlideId) : null,
+  return useDeckStore(
+    useShallow((s) =>
+      s.selectedSlideId ? findSlide(s.columns, s.selectedSlideId) : null,
+    ),
   );
 }
