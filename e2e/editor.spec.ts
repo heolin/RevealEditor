@@ -93,6 +93,16 @@ test('text edit round-trips into the file', async ({ page }) => {
   await heading.click();
   await heading.click(); // click-again enters editing
   await page.waitForTimeout(200);
+  // Drag-selecting text inside the session must select text — it once ended
+  // the session and DRAGGED the element (cells ripped out of their table).
+  const hb = (await heading.boundingBox())!;
+  await page.mouse.move(hb.x + 8, hb.y + hb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2, { steps: 4 });
+  await page.mouse.up();
+  await page.waitForTimeout(200);
+  await expect(heading).toHaveAttribute('contenteditable', 'true');
+  expect(await heading.getAttribute('style')).toBeNull(); // not dragged absolute
   await page.keyboard.press('ControlOrMeta+a');
   await page.keyboard.type('Edited headline');
   await page.keyboard.press('Escape');

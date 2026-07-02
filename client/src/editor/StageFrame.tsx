@@ -316,19 +316,29 @@ ${stageHead(meta)}
     });
 
     doc.addEventListener('pointerdown', (e) => {
+      const target = e.target as Element;
+      const session = sessionRef.current;
+      const inSession = !!session && session.el.contains(target);
       // Mantine popovers/menus in the parent close on outside mousedown, but
       // clicks inside this iframe never reach the parent document — forward
       // one so open pickers/dropdowns close like they would anywhere else.
-      document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-      (document.activeElement as HTMLElement | null)?.blur?.();
+      // Flagged: the App-level session-ending handler must ignore it, or a
+      // click INSIDE the active session would end that session — and the
+      // ensuing drag-to-select-text would DRAG the element (a table cell
+      // ripped to position:absolute "disappears").
+      const fwd = new MouseEvent('mousedown', { bubbles: true }) as MouseEvent & {
+        reFromStage?: boolean;
+      };
+      fwd.reFromStage = true;
+      document.dispatchEvent(fwd);
+      // Keep focus in the editable when the click stays inside the session.
+      if (!inSession) (document.activeElement as HTMLElement | null)?.blur?.();
       if (e.button !== 0) return;
       if (useEditorStore.getState().contextMenu) useEditorStore.getState().setContextMenu(null);
       if (press) finalizePress(); // stale gesture (missed pointerup)
-      const target = e.target as Element;
       const editor = useEditorStore.getState();
-      const session = sessionRef.current;
       if (session) {
-        if (session.el.contains(target)) return; // native text editing
+        if (inSession) return; // native text editing
         endSession(true);
       }
       if (!section.contains(target) || target === section) {

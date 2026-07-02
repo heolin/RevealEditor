@@ -26,6 +26,10 @@ export function App() {
   // blur to end it — parent clicks OUTSIDE editor chrome close it explicitly.
   useEffect(() => {
     function onMouseDown(e: MouseEvent) {
+      // Synthetic mousedowns forwarded from the stage iframe (to close open
+      // popovers) are NOT outside clicks — the stage manages its own session
+      // lifecycle for clicks on the canvas.
+      if ((e as MouseEvent & { reFromStage?: boolean }).reFromStage) return;
       const editor = useEditorStore.getState();
       if (!editor.sessionEl) return;
       const target = e.target as HTMLElement;
