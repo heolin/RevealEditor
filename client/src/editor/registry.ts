@@ -56,11 +56,15 @@ export const chartHandler: ElementHandler = {
   capabilities: { textEdit: false, delete: true, resize: 'both' },
 };
 
-/** Shapes: svg with data-re-shape params; styled via the Inspector. */
+/** Shapes: svg with data-re-shape params; styled via the Inspector. The
+ *  class fallback recognizes shapes from decks saved while serialization
+ *  stripped data-re-* attributes. */
 export const shapeHandler: ElementHandler = {
   type: 'shape',
   priority: 45,
-  match: (el) => el.hasAttribute('data-re-shape'),
+  match: (el) =>
+    el.hasAttribute('data-re-shape') ||
+    (el.tagName === 'svg' && el.classList.contains('re-shape')),
   capabilities: { textEdit: false, delete: true, resize: 'both' },
 };
 

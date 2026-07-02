@@ -205,8 +205,7 @@ function syncInlineCentering(ctx: StageCtx): void {
     const el = child as HTMLElement;
     if (el.style === undefined) continue;
     const flow = el.style.position !== 'absolute';
-    const replaced =
-      ['IMG', 'VIDEO', 'IFRAME'].includes(el.tagName) || el.hasAttribute('data-re-shape');
+    const replaced = ['IMG', 'VIDEO', 'IFRAME', 'SVG'].includes(el.tagName.toUpperCase());
     if (replaced) {
       if (pinnedFlex && centered && flow && !el.style.alignSelf) {
         applyStyle(el, { 'align-self': 'center' });
@@ -246,9 +245,10 @@ function maybeUnpinSection(ctx: StageCtx): void {
  * elements instead shed the width toAbsolute measured onto them.
  */
 function isSizedMedia(el: HTMLElement): boolean {
+  // SVG covers shapes (whose data-re-shape attr older saves stripped) and
+  // hand-authored inline svgs alike — all replaced elements own their size.
   return (
-    ['IMG', 'VIDEO', 'IFRAME'].includes(el.tagName) ||
-    el.hasAttribute('data-re-shape') ||
+    ['IMG', 'VIDEO', 'IFRAME', 'SVG'].includes(el.tagName.toUpperCase()) ||
     el.hasAttribute('data-re-chart')
   );
 }

@@ -24,12 +24,33 @@ export interface ShapeSpec {
 }
 
 export function isShapeEl(el: Element): boolean {
-  return el.hasAttribute(SHAPE_ATTR);
+  // Class fallback: decks saved while serialization stripped data-re-*
+  // attributes (fixed since) lost the spec attr but kept the class.
+  return (
+    el.hasAttribute(SHAPE_ATTR) || (el.tagName === 'svg' && el.classList.contains('re-shape'))
+  );
 }
 
 export function readShapeSpec(el: Element): ShapeSpec | null {
   const raw = el.getAttribute(SHAPE_ATTR);
-  if (!raw) return null;
+  if (!raw) {
+    if (!isShapeEl(el)) return null;
+    // Orphaned shape (spec attr stripped by the old serializer): reconstruct
+    // a best-effort spec from the baked markup — the next edit writes the
+    // attr back and fully heals the file.
+    const kind: ShapeKind = el.querySelector('ellipse')
+      ? 'ellipse'
+      : el.querySelector('polygon')
+        ? 'arrow'
+        : el.querySelector('line')
+          ? 'line'
+          : 'rect';
+    const spec = defaultShapeSpec(kind);
+    const painted = el.querySelector('rect, ellipse');
+    const fill = painted?.getAttribute('fill');
+    if (fill && fill !== 'none') spec.fill = fill;
+    return spec;
+  }
   try {
     return { ...defaultShapeSpec('rect'), ...(JSON.parse(raw) as Partial<ShapeSpec>) };
   } catch {
