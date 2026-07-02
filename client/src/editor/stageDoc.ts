@@ -39,15 +39,20 @@ export function stageLayoutCss(meta: StageMeta): string {
   .reveal { position: relative; width: 100%; height: 100%; overflow: hidden; }
   .reveal .slides { position: absolute; inset: 0; width: ${width}px; height: ${height}px; }
   .reveal .slides > section {
-    position: relative;
-    ${center ? 'display: flex !important;\n    flex-direction: column;\n    justify-content: center;' : 'display: block !important;'}
+    /* Centering replicates reveal's REAL mechanism: block layout + measured
+       top offset (--re-center-top set by the host/script). Flex emulation is
+       wrong: vertical margin:auto (reveal.css tables!) absorbs free space in
+       flex but is always 0 in the runtime's block layout. */
+    position: absolute;
+    display: block !important;
     width: 100%;
-    height: 100%;
-    top: 0;
-    /* Padding must count INTO the forced 100% box, like the runtime — decks
-       with section padding (benchmarks: 48px) otherwise overflow right. */
+    ${center ? 'top: var(--re-center-top, 0px);' : 'height: 100%;\n    top: 0;'}
+    /* Padding must count INTO the box, like the runtime — decks with
+       section padding (benchmarks: 48px) otherwise overflow right. */
     box-sizing: border-box;
   }
+  /* Pinned (free-layout) sections carry inline height + flex — top stays 0. */
+  .reveal .slides > section[style*="height"] { top: 0; }
   .reveal .slides section .fragment {
     visibility: visible !important;
     opacity: 1 !important;
@@ -106,6 +111,12 @@ ${slideSource}
       document.body.style.backgroundSize = 'cover';
       document.body.style.backgroundPosition = 'center';
     }
+    var recenter = function () {
+      if (s.style.height) return; // pinned sections sit at top 0
+      var top = Math.max(0, (${meta.config.height} - s.offsetHeight) / 2);
+      s.parentElement.style.setProperty('--re-center-top', top + 'px');
+    };
+    ${meta.config.center ? 'recenter();\n    if (document.fonts) document.fonts.ready.then(recenter);' : ''}
   }
 </script>
 </body>

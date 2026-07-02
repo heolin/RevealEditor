@@ -67,6 +67,12 @@ export function ensureFreeLayoutSection(ctx: StageCtx, designHeight: number): vo
         ? { display: 'flex', 'flex-direction': 'column', 'justify-content': 'center' }
         : {}),
     });
+    // Pinned sections sit at the slide origin — clear the centering offset
+    // so free-position coordinates match the runtime exactly.
+    (ctx.section.parentElement as HTMLElement | null)?.style.setProperty(
+      '--re-center-top',
+      '0px',
+    );
   }
 }
 

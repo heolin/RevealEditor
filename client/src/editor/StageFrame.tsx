@@ -544,6 +544,23 @@ ${stageHead(meta)}
     });
   }
 
+  /**
+   * Replicate reveal's centering: measured top offset on a CSS variable
+   * (never inline on the section — nothing to strip at serialization).
+   */
+  function recenter() {
+    const ctx = ctxRef.current;
+    if (!ctx) return;
+    const slides = ctx.section.parentElement as HTMLElement | null;
+    if (!slides) return;
+    if (!meta.config.center || ctx.section.style.height) {
+      slides.style.setProperty('--re-center-top', '0px');
+      return;
+    }
+    const top = Math.max(0, (height - ctx.section.offsetHeight) / 2);
+    slides.style.setProperty('--re-center-top', `${top}px`);
+  }
+
   function onFrameLoad() {
     const doc = iframeRef.current?.contentDocument;
     const section = doc?.getElementById('re-stage') as HTMLElement | null;
@@ -563,6 +580,10 @@ ${stageHead(meta)}
     useEditorStore.getState().setStartSession(startSession);
     doc.body.toggleAttribute('data-re-layout', useEditorStore.getState().layoutMode);
     wireInteractions(doc, section);
+    // Content height changes (typing, inserts, unpinning, late fonts) move
+    // the centered offset — the observer keeps it true.
+    new ResizeObserver(recenter).observe(section);
+    doc.defaultView?.document.fonts?.ready.then(recenter).catch(() => undefined);
     cleanSource.current = null; // force injection
     inject();
   }
@@ -608,6 +629,7 @@ ${stageHead(meta)}
     doc.body.style.backgroundSize = bgImage ? 'cover' : '';
     doc.body.style.backgroundPosition = bgImage ? 'center' : '';
     cleanSource.current = slide.source;
+    recenter();
   }
 
   // Rebuild the stage DOM when the slide changes externally (slide switch,
