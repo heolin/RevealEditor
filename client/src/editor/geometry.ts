@@ -108,10 +108,15 @@ export function ensureFreeLayoutSection(ctx: StageCtx, designHeight: number): vo
   }
 }
 
-/** Inline-level replaced elements (images, shape svgs) that block flow
- * centers via text-align lose that in a pinned section's flex column —
- * align-self restores it, inline, so the presented file matches too.
- * Idempotent: pinned+centered adds it to flow children, unpinned strips it. */
+/** A pinned section's flex column breaks two block-flow behaviors that
+ * reveal decks rely on, so pinning keeps compensating inline styles in sync
+ * on the remaining flow children (inline — the presented file matches):
+ *  - inline replaced elements (images, shape svgs) lose text-align centering
+ *    → align-self: center restores it;
+ *  - reveal.css tables carry margin: auto, which is 0 vertically in block
+ *    flow but absorbs ALL free space in flex, shoving siblings to the top
+ *    → margin: 0 auto pins the block-flow resolution.
+ * Idempotent: pinned adds, unpinned strips. */
 function syncInlineCentering(ctx: StageCtx): void {
   const view = ctx.doc.defaultView!;
   const cs = view.getComputedStyle(ctx.section);
@@ -120,15 +125,21 @@ function syncInlineCentering(ctx: StageCtx): void {
   for (const child of Array.from(ctx.section.children)) {
     const el = child as HTMLElement;
     if (el.style === undefined) continue;
+    const flow = el.style.position !== 'absolute';
     const replaced =
       ['IMG', 'VIDEO', 'IFRAME'].includes(el.tagName) || el.hasAttribute('data-re-shape');
-    if (!replaced) continue;
-    if (pinnedFlex && centered) {
-      if (el.style.position !== 'absolute' && !el.style.alignSelf) {
+    if (replaced) {
+      if (pinnedFlex && centered && flow && !el.style.alignSelf) {
         applyStyle(el, { 'align-self': 'center' });
+      } else if (!(pinnedFlex && centered) && el.style.alignSelf === 'center') {
+        applyStyle(el, { 'align-self': null }); // inert outside flex — keep files clean
       }
-    } else if (el.style.alignSelf === 'center') {
-      applyStyle(el, { 'align-self': null }); // inert outside flex — keep files clean
+    } else if (el.tagName === 'TABLE') {
+      if (pinnedFlex && flow && !el.style.margin) {
+        applyStyle(el, { margin: '0 auto' });
+      } else if (!pinnedFlex && el.style.margin === '0px auto') {
+        applyStyle(el, { margin: null }); // block flow resolves auto to this anyway
+      }
     }
   }
 }

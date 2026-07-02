@@ -125,6 +125,7 @@ export function insertShape(ctx: StageCtx, kind: ShapeKind): HTMLElement | null 
     ctx,
     `<svg class="re-shape" xmlns="http://www.w3.org/2000/svg" style="position: absolute; left: ${left}px; top: ${top}px; width: ${w}px; height: ${h}px;"></svg>`,
     null,
+    false, // commit once below — one undo step for the whole insert
   );
   if (el) {
     el.setAttribute(SHAPE_ATTR, JSON.stringify(defaultShapeSpec(kind)));

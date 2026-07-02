@@ -95,6 +95,7 @@ export function insertChart(ctx: StageCtx, after: HTMLElement | null): HTMLEleme
     ctx,
     `<figure class="re-chart" style="width: 640px; height: 400px; margin: 0 auto;"></figure>`,
     after,
+    false, // commit once below — one undo step for the whole insert
   );
   if (el) {
     el.setAttribute(CHART_ATTR, JSON.stringify(defaultChartSpec()));

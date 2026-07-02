@@ -94,9 +94,6 @@ const DEFAULTS: Record<SurfaceId, SurfaceLayout> = {
       'arrange.distributeV',
     ],
     ['arrange.front', 'arrange.back', 'arrange.unpin'],
-    // insert.image is deliberately absent: its file input would unmount when
-    // the menu closes, dropping the picker callback.
-    ['insert.heading', 'insert.text', 'insert.bulletList', 'insert.code', 'insert.table', 'insert.chart', 'insert.component'],
     ['arrange.delete'],
   ],
 };

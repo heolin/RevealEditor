@@ -129,6 +129,9 @@ export function insertHtmlSnippet(
   ctx: StageCtx,
   html: string,
   after?: HTMLElement | null,
+  // Multi-step inserts (shape/chart: insert, then bake attributes + render)
+  // pass false and commit once at the end — one insert, ONE undo step.
+  commitNow = true,
 ): HTMLElement | null {
   const tpl = ctx.doc.createElement('template');
   tpl.innerHTML = html;
@@ -141,7 +144,7 @@ export function insertHtmlSnippet(
     ctx.section.appendChild(node);
   }
   useEditorStore.getState().select(node);
-  commit(ctx);
+  if (commitNow) commit(ctx);
   return node;
 }
 
