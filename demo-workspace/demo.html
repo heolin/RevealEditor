@@ -12,22 +12,48 @@
     /* user's own custom styles — the editor must never touch these */
     .brand { color: #e7ad52; letter-spacing: 0.05em; }
   </style>
+<style data-revealeditor="managed">
+/* re:tables */
+.re-table { border-collapse: collapse; margin: 0 auto; }
+.re-table th, .re-table td { padding: 0.35em 0.7em; }
+.re-table--bordered th, .re-table--bordered td { border: 1px solid currentColor; }
+.re-table--striped tbody tr:nth-child(odd) { background: rgba(128, 128, 128, 0.18); }
+.re-table--minimal th, .re-table--minimal td { border: none; }
+.re-table--minimal thead th { border-bottom: 2px solid currentColor; }
+</style>
+<link rel="stylesheet" href="design/acme/system.css">
 </head>
 <body>
   <div class="reveal">
     <div class="slides">
-      <section data-background-color="#e6baba" data-transition="concave" style="height: 700px;">
-        <h1 class="brand" style="position: absolute; left: -18px; top: 225px; width: 960px; margin: 0px;">RevealEditor</h1>
-        <p style="position: absolute; left: 0px; top: 397px; width: 960px; margin: 0px;">A demo deck with <em>hand-written</em> markup.</p>
+      <section data-background-color="#e6baba" data-transition="concave">
+        <h1 class="brand" style="color: rgb(173, 50, 50); text-align: center;">RevealEditor</h1>
+        <p>A demo deck with <em>hand-written</em> markup.</p>
         <aside class="notes">Welcome everyone — intro slide.</aside>
-      </section>
+      <table class="re-table re-table--bordered">
+  <thead>
+    <tr><th>Column 1</th><th>Column 2</th><th>Column 3</th></tr>
+  </thead>
+  <tbody>
+    <tr><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td></tr>
+  </tbody>
+</table></section>
       <section>
+        <section>
         <h2>Code</h2>
         
       <ul>
   <li>First item</li>
   <li>Second item</li>
 </ul></section>
+        <section style="height: 700px; display: flex; flex-direction: column; justify-content: center;">
+          
+        <pre style="position: absolute; left: 48px; top: 319px; width: 864px; margin: 0px;"><code class="language-python" data-trim="">
+const answer = 42
+</code></pre></section>
+</section>
       <section>
         <section>
           <h2>Vertical stack — top</h2>

@@ -39,6 +39,10 @@ export function codeTextOf(codeEl: Element): string {
 function paint(codeEl: Element): void {
   const raw = rawCode.get(codeEl) ?? '';
   const lang = languageOf(codeEl);
+  // The 'hljs' class carries the highlight theme's block background (e.g.
+  // monokai) — without it the canvas code block is transparent. Display-only:
+  // serialization strips it (the reveal plugin re-adds it at present time).
+  codeEl.classList.add('hljs');
   try {
     if (lang && hljs.getLanguage(lang)) {
       codeEl.innerHTML = hljs.highlight(raw, { language: lang }).value;
@@ -59,7 +63,11 @@ export function restoreRawCode(original: HTMLElement, clone: HTMLElement): void 
   const cloneCodes = Array.from(clone.querySelectorAll('pre > code'));
   for (let i = 0; i < cloneCodes.length; i++) {
     const raw = origCodes[i] ? rawCode.get(origCodes[i]) : undefined;
-    if (raw !== undefined) cloneCodes[i].textContent = raw;
+    if (raw !== undefined) {
+      cloneCodes[i].textContent = raw;
+      cloneCodes[i].classList.remove('hljs'); // display-only (added by paint)
+      if (cloneCodes[i].getAttribute('class') === '') cloneCodes[i].removeAttribute('class');
+    }
   }
 }
 

@@ -44,7 +44,9 @@ export function stageLayoutCss(meta: DeckMeta): string {
     opacity: 1 !important;
     transform: none !important;
   }
-  aside.notes { display: none !important; }`;
+  aside.notes { display: none !important; }
+  /* Native image drag-and-drop steals pointer events from element dragging. */
+  img { -webkit-user-drag: none; user-select: none; }`;
 }
 
 /**

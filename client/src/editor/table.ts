@@ -68,8 +68,11 @@ export function setTablePreset(ctx: StageCtx, table: HTMLElement, preset: TableP
 
 /* ---------- grid helpers ---------- */
 
-function asTable(el: Element): HTMLTableElement | null {
-  return el instanceof HTMLTableElement ? el : null;
+// NEVER use `instanceof HTMLTableElement` here: stage elements live in the
+// iframe's realm, whose element classes are different objects — instanceof
+// against the parent window's classes silently fails.
+function asTable(el: Element | null): HTMLTableElement | null {
+  return el && el.tagName === 'TABLE' ? (el as HTMLTableElement) : null;
 }
 
 function rowsOf(table: HTMLTableElement): HTMLTableRowElement[] {

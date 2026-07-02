@@ -195,10 +195,12 @@ function ResizeHandles({ el, scale }: { el: HTMLElement; scale: number }) {
   const capability = handlerFor(el).capabilities.resize;
   if (capability === 'none') return null;
   const absolute = isAbsolute(el);
+  // Sized elements (images, shapes, charts) always show all 8 handles — in
+  // flow layout the n/w handles just resize toward the anchored edge.
   const handles =
     capability === 'width'
       ? absolute ? ['e', 'w'] : ['e']
-      : absolute ? ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'] : ['e', 's', 'se'];
+      : ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
 
   const box = boxFor(el, scale);
 

@@ -410,6 +410,10 @@ ${stageHead(meta)}
     section.innerHTML = parsed.innerHTML;
     hydrateCodeBlocks(section);
     showAllFragments(section);
+    // draggable=false kills native image DnD (serialization strips the attr).
+    section.querySelectorAll('img').forEach((img) => {
+      (img as HTMLImageElement).draggable = false;
+    });
     const bg =
       parsed.getAttribute('data-background-color') ??
       parsed.getAttribute('data-background') ??

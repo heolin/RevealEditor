@@ -82,8 +82,9 @@ export function returnToFlow(ctx: StageCtx, el: HTMLElement): void {
     'z-index': null,
   });
   // Last absolute element gone → unpin the section (restores pure flow).
+  // No instanceof: iframe-realm elements fail parent-realm class checks.
   const anyAbsolute = Array.from(ctx.section.children).some(
-    (c) => c instanceof HTMLElement && c.style.position === 'absolute',
+    (c) => (c as HTMLElement).style?.position === 'absolute',
   );
   if (!anyAbsolute) {
     applyStyle(ctx.section, {
