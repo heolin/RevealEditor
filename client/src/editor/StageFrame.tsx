@@ -11,15 +11,8 @@ import { hydrateCodeBlocks } from './codeHighlight';
 import { applyStyle, isAbsolute, slideRect, snapEdges, snapRect, toAbsolute } from './geometry';
 import { showAllFragments } from './fragments';
 import { nextCell } from './table';
-import {
-  type StageCtx,
-  commit,
-  copyElement,
-  cutElement,
-  deleteElement,
-  duplicateElement,
-  pasteElement,
-} from './commands';
+import { type StageCtx, commit } from './commands';
+import { dispatchShortcut } from './actions/dispatcher';
 
 const DRAG_THRESHOLD = 4; // slide px before a press becomes a drag
 const SNAP_THRESHOLD = 6; // slide px
@@ -313,68 +306,61 @@ ${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}
       const mod = e.ctrlKey || e.metaKey;
       const inSession = !!sessionRef.current;
 
-      if (mod && e.key.toLowerCase() === 's') {
+      // Session-boundary shortcuts need the session committed/dropped FIRST —
+      // that ordering is interaction logic, not a command, so it stays here.
+      if (inSession && mod && e.key.toLowerCase() === 's') {
         e.preventDefault();
         endSession(true);
         void useDeckStore.getState().save();
         return;
       }
-      if (mod && !e.shiftKey && e.key.toLowerCase() === 'z') {
+      if (inSession && mod && e.key.toLowerCase() === 'z' && !e.shiftKey) {
         e.preventDefault();
         endSession(true);
         useDeckStore.temporal.getState().undo();
         return;
       }
-      if ((mod && e.shiftKey && e.key.toLowerCase() === 'z') || (mod && e.key.toLowerCase() === 'y')) {
+      if (inSession && ((mod && e.shiftKey && e.key.toLowerCase() === 'z') || (mod && e.key.toLowerCase() === 'y'))) {
         e.preventDefault();
         endSession(false);
         useDeckStore.temporal.getState().redo();
         return;
       }
-      if (inSession || !ctx) return;
 
-      const selected = editor.selectedEl;
-      if (e.key === 'Escape') {
-        if (!selected) return;
-        const parent = selected.parentElement;
-        editor.select(parent && parent !== ctx.section ? parent : null);
-        return;
+      // Selection navigation & activation — interaction logic, not commands.
+      if (!inSession && ctx) {
+        const selected = editor.selectedEl;
+        if (e.key === 'Escape' && selected) {
+          const parent = selected.parentElement;
+          editor.select(parent && parent !== ctx.section ? parent : null);
+          return;
+        }
+        if (e.key === 'Enter' && selected) {
+          e.preventDefault();
+          activate(selected);
+          return;
+        }
+        // Arrow-key nudge for freely positioned elements (1px, Shift = 10px).
+        if (
+          selected &&
+          isAbsolute(selected) &&
+          ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)
+        ) {
+          e.preventDefault();
+          const step = e.shiftKey ? 10 : 1;
+          const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+          const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
+          applyStyle(selected, {
+            left: `${(parseInt(selected.style.left, 10) || 0) + dx}px`,
+            top: `${(parseInt(selected.style.top, 10) || 0) + dy}px`,
+          });
+          commit(ctx);
+          return;
+        }
       }
-      if (!selected) return;
 
-      // Arrow-key nudge for freely positioned elements (1px, Shift = 10px).
-      if (isAbsolute(selected) && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
-        e.preventDefault();
-        const step = e.shiftKey ? 10 : 1;
-        const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
-        const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
-        applyStyle(selected, {
-          left: `${(parseInt(selected.style.left, 10) || 0) + dx}px`,
-          top: `${(parseInt(selected.style.top, 10) || 0) + dy}px`,
-        });
-        commit(ctx);
-        return;
-      }
-
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        e.preventDefault();
-        deleteElement(ctx, selected);
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        activate(selected);
-      } else if (mod && e.key.toLowerCase() === 'c') {
-        e.preventDefault();
-        copyElement(selected);
-      } else if (mod && e.key.toLowerCase() === 'x') {
-        e.preventDefault();
-        cutElement(ctx, selected);
-      } else if (mod && e.key.toLowerCase() === 'v') {
-        e.preventDefault();
-        pasteElement(ctx, selected);
-      } else if (mod && e.key.toLowerCase() === 'd') {
-        e.preventDefault();
-        duplicateElement(ctx, selected);
-      }
+      // Everything else is a command — one dispatcher for all shortcuts.
+      if (dispatchShortcut(e, inSession)) e.preventDefault();
     });
   }
 

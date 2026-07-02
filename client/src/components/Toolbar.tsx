@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import {
   ActionIcon,
   Button,
+  Divider,
   Group,
   Select,
   Text,
@@ -9,15 +10,16 @@ import {
   useMantineColorScheme,
 } from '@mantine/core';
 import {
-  IconArrowBackUp,
-  IconArrowForwardUp,
   IconChevronLeft,
   IconMoon,
   IconPlayerPlay,
   IconSun,
 } from '@tabler/icons-react';
 import { useDeckStore } from '../state/deckStore';
-import { useEditorStore } from '../editor/editorStore';
+import { useEditorContext } from '../editor/actions/context';
+import { getAction } from '../editor/actions';
+import { TOP_LAYOUT } from '../editor/actions/layouts';
+import { ActionControl } from '../editor/actions/ActionControl';
 import { InsertMenu } from '../editor/overlay/EditorOverlay';
 import { api } from '../api/client';
 
@@ -36,76 +38,84 @@ export function Toolbar() {
   }, []);
 
   return (
-    <Group gap="xs" px="sm" py={6} className="toolbar" wrap="nowrap">
-      <Tooltip label="Back to presentations">
-        <ActionIcon variant="subtle" color="gray" onClick={close}>
-          <IconChevronLeft size={18} />
-        </ActionIcon>
-      </Tooltip>
-      <Text fw={600} size="sm" truncate style={{ minWidth: 0 }}>
-        {meta.title || meta.path}
-      </Text>
-      {dirty && <span className="dirty-dot" title="Unsaved changes" />}
-      <div style={{ flex: 1 }} />
-      <Tooltip label="Undo (Ctrl+Z)">
-        <ActionIcon
-          variant="subtle"
-          color="gray"
-          onClick={() => useDeckStore.temporal.getState().undo()}
-        >
-          <IconArrowBackUp size={18} />
-        </ActionIcon>
-      </Tooltip>
-      <Tooltip label="Redo (Ctrl+Y)">
-        <ActionIcon
-          variant="subtle"
-          color="gray"
-          onClick={() => useDeckStore.temporal.getState().redo()}
-        >
-          <IconArrowForwardUp size={18} />
-        </ActionIcon>
-      </Tooltip>
-      <ToolbarInsert />
-      {themes.length > 0 &&
-        (meta.theme === null ? (
-          <Tooltip label="This deck uses its own custom styling — there is no standard theme link to switch">
-            <Select size="xs" w={150} placeholder="custom styling" data={[]} disabled />
-          </Tooltip>
-        ) : (
-          <Select
+    <div className="toolbar">
+      <Group gap="xs" px="sm" py={4} wrap="nowrap">
+        <Tooltip label="Back to presentations">
+          <ActionIcon variant="subtle" color="gray" onClick={close}>
+            <IconChevronLeft size={18} />
+          </ActionIcon>
+        </Tooltip>
+        <Text fw={600} size="sm" truncate style={{ minWidth: 0 }}>
+          {meta.title || meta.path}
+        </Text>
+        {dirty && <span className="dirty-dot" title="Unsaved changes" />}
+        <div style={{ flex: 1 }} />
+        {themes.length > 0 &&
+          (meta.theme === null ? (
+            <Tooltip label="This deck uses its own custom styling — there is no standard theme link to switch">
+              <Select size="xs" w={150} placeholder="custom styling" data={[]} disabled />
+            </Tooltip>
+          ) : (
+            <Select
+              size="xs"
+              w={150}
+              value={meta.theme}
+              data={themes}
+              onChange={(v) => v && setTheme(v)}
+              searchable
+              comboboxProps={{ withinPortal: true }}
+            />
+          ))}
+        <Tooltip label={`Switch editor to ${colorScheme === 'light' ? 'dark' : 'light'} mode`}>
+          <ActionIcon variant="subtle" color="gray" onClick={toggleColorScheme}>
+            {colorScheme === 'light' ? <IconMoon size={18} /> : <IconSun size={18} />}
+          </ActionIcon>
+        </Tooltip>
+        <Tooltip label="Open the real file — exactly what your audience sees">
+          <Button
             size="xs"
-            w={150}
-            value={meta.theme}
-            data={themes}
-            onChange={(v) => v && setTheme(v)}
-            searchable
-            comboboxProps={{ withinPortal: true }}
-          />
-        ))}
-      <Tooltip label={`Switch editor to ${colorScheme === 'light' ? 'dark' : 'light'} mode`}>
-        <ActionIcon variant="subtle" color="gray" onClick={toggleColorScheme}>
-          {colorScheme === 'light' ? <IconMoon size={18} /> : <IconSun size={18} />}
-        </ActionIcon>
-      </Tooltip>
-      <Tooltip label="Open the real file — exactly what your audience sees">
-        <Button
-          size="xs"
-          variant="default"
-          leftSection={<IconPlayerPlay size={14} />}
-          onClick={() => window.open(`/files/${meta.path}`, '_blank')}
-        >
-          Present
+            variant="default"
+            leftSection={<IconPlayerPlay size={14} />}
+            onClick={() => window.open(`/files/${meta.path}`, '_blank')}
+          >
+            Present
+          </Button>
+        </Tooltip>
+        <Button size="xs" disabled={!dirty} loading={saving} onClick={() => void save()}>
+          Save
         </Button>
-      </Tooltip>
-      <Button size="xs" disabled={!dirty} loading={saving} onClick={() => void save()}>
-        Save
-      </Button>
-    </Group>
+      </Group>
+      <FormatRibbon />
+    </div>
   );
 }
 
-/** Insert menu in the main toolbar — appends after the current selection. */
-function ToolbarInsert() {
-  const selectedEl = useEditorStore((s) => s.selectedEl);
-  return <InsertMenu after={selectedEl} />;
+/**
+ * The ribbon-lite row: TOP_LAYOUT rendered in full — actions that don't apply
+ * to the current selection are DISABLED, not hidden, so the panel is stable
+ * (PowerPoint behavior). See docs/TOOLBARS.md.
+ */
+function FormatRibbon() {
+  const ctx = useEditorContext();
+  return (
+    <Group gap={4} px="sm" py={4} wrap="nowrap" className="ribbon">
+      <InsertMenu />
+      {TOP_LAYOUT.map((group, gi) => {
+        const actions = group
+          .map(getAction)
+          .filter((a): a is NonNullable<typeof a> => a !== null);
+        if (actions.length === 0) return null;
+        return (
+          <Fragment key={gi}>
+            {gi > 0 && <Divider orientation="vertical" />}
+            {actions.map((action) =>
+              action.when(ctx) || action.kind !== 'custom' ? (
+                <ActionControl key={action.id} action={action} ctx={ctx} variant="toolbar" />
+              ) : null,
+            )}
+          </Fragment>
+        );
+      })}
+    </Group>
+  );
 }

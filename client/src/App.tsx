@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useDeckStore } from './state/deckStore';
 import { useEditorStore } from './editor/editorStore';
-import { deleteElement } from './editor/commands';
+import { dispatchShortcut } from './editor/actions/dispatcher';
 import { api } from './api/client';
 import { DeckList } from './components/DeckList';
 import { Toolbar } from './components/Toolbar';
@@ -23,29 +23,15 @@ export function App() {
     function onKeyDown(e: KeyboardEvent) {
       const state = useDeckStore.getState();
       if (!state.meta) return;
-      const mod = e.ctrlKey || e.metaKey;
-      if (mod && e.key.toLowerCase() === 's') {
+      const target = e.target as HTMLElement;
+      if (target.closest('input, textarea, select, [contenteditable]')) return;
+      // Commands first (element delete, clipboard, undo/save, formatting).
+      if (dispatchShortcut(e, false)) {
         e.preventDefault();
-        void state.save();
-      } else if (mod && !e.shiftKey && e.key.toLowerCase() === 'z') {
-        e.preventDefault();
-        useDeckStore.temporal.getState().undo();
-      } else if (
-        (mod && e.shiftKey && e.key.toLowerCase() === 'z') ||
-        (mod && e.key.toLowerCase() === 'y')
-      ) {
-        e.preventDefault();
-        useDeckStore.temporal.getState().redo();
-      } else if (e.key === 'Delete' && state.selectedSlideId) {
-        const target = e.target as HTMLElement;
-        if (target.closest('input, textarea, [contenteditable]')) return;
-        // An element selection on the canvas takes precedence over the slide.
-        const editor = useEditorStore.getState();
-        if (editor.selectedEl && editor.ctx) {
-          e.preventDefault();
-          deleteElement(editor.ctx, editor.selectedEl);
-          return;
-        }
+        return;
+      }
+      // No element selected: Delete falls through to the slide itself.
+      if (e.key === 'Delete' && state.selectedSlideId && !useEditorStore.getState().selectedEl) {
         e.preventDefault();
         state.deleteSlide(state.selectedSlideId);
       }

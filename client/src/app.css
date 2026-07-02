@@ -33,6 +33,10 @@ html, body, #root { height: 100%; margin: 0; }
   background: var(--re-panel);
   border-bottom: 1px solid var(--re-border);
 }
+.ribbon {
+  border-top: 1px solid var(--re-border);
+  overflow-x: auto;
+}
 .dirty-dot {
   width: 8px;
   height: 8px;
