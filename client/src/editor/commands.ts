@@ -220,17 +220,21 @@ export function getNotes(section: HTMLElement): string {
   return section.querySelector(':scope > aside.notes')?.textContent ?? '';
 }
 
+/** Adjacent CONTENT sibling in the same parent — speaker notes don't count. */
+export function contentSibling(el: HTMLElement, dir: 'up' | 'down'): HTMLElement | null {
+  let sib = dir === 'up' ? el.previousElementSibling : el.nextElementSibling;
+  while (sib && sib.tagName === 'ASIDE') {
+    sib = dir === 'up' ? sib.previousElementSibling : sib.nextElementSibling;
+  }
+  return sib as HTMLElement | null;
+}
+
 /** Move an element among its siblings (layers panel reorder = DOM order). */
 export function moveSibling(ctx: StageCtx, el: HTMLElement, dir: 'up' | 'down'): boolean {
-  if (dir === 'up') {
-    const prev = el.previousElementSibling;
-    if (!prev) return false;
-    prev.before(el);
-  } else {
-    const next = el.nextElementSibling;
-    if (!next) return false;
-    next.after(el);
-  }
+  const sib = contentSibling(el, dir);
+  if (!sib) return false;
+  if (dir === 'up') sib.before(el);
+  else sib.after(el);
   commit(ctx);
   return true;
 }

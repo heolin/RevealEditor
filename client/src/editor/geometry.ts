@@ -24,11 +24,27 @@ export function isAbsolute(el: HTMLElement): boolean {
   return el.style.position === 'absolute';
 }
 
-/** Rect of an element relative to the slide section, in slide-space px. */
+/**
+ * Rect of an element relative to the slide SECTION — the containing block
+ * for inline left/top. Use for reading/writing free-position coordinates.
+ * Beware: a centered, unpinned section sits BELOW the slide origin
+ * (--re-center-top), so this is NOT the visual/pointer coordinate space.
+ */
 export function slideRect(ctx: StageCtx, el: HTMLElement) {
   const s = ctx.section.getBoundingClientRect();
   const r = el.getBoundingClientRect();
   return { left: r.left - s.left, top: r.top - s.top, width: r.width, height: r.height };
+}
+
+/**
+ * Rect relative to the .slides box — the slide origin, which never moves.
+ * This IS the pointer/client coordinate space inside the stage iframe: use
+ * it whenever comparing against clientX/Y or drawing overlay chrome.
+ */
+export function stageRect(ctx: StageCtx, el: HTMLElement) {
+  const origin = (ctx.section.parentElement ?? ctx.section).getBoundingClientRect();
+  const r = el.getBoundingClientRect();
+  return { left: r.left - origin.left, top: r.top - origin.top, width: r.width, height: r.height };
 }
 
 /** Convert a flow element to absolute positioning at its current visual spot. */
@@ -49,11 +65,7 @@ export function toAbsolute(ctx: StageCtx, el: HTMLElement, designHeight: number)
 export function toAbsoluteAll(ctx: StageCtx, els: HTMLElement[], designHeight: number): void {
   const targets = els.filter((el) => !isAbsolute(el));
   if (targets.length === 0) return;
-  const origin = (ctx.section.parentElement ?? ctx.section).getBoundingClientRect();
-  const rects = targets.map((el) => {
-    const r = el.getBoundingClientRect();
-    return { left: r.left - origin.left, top: r.top - origin.top, width: r.width };
-  });
+  const rects = targets.map((el) => stageRect(ctx, el));
   ensureFreeLayoutSection(ctx, designHeight);
   targets.forEach((el, i) =>
     applyStyle(el, {
@@ -159,7 +171,7 @@ export function columnRatios(colsEl: HTMLElement): number[] {
     .map((col) => parseFloat(col.style.flexGrow) || 1);
 }
 
-/** Top-level elements intersecting a marquee rect (slide-space px). */
+/** Top-level elements intersecting a marquee rect (pointer/slide coords). */
 export function marqueeHits(
   ctx: StageCtx,
   rect: { x: number; y: number; w: number; h: number },
@@ -167,7 +179,7 @@ export function marqueeHits(
   return Array.from(ctx.section.children).filter((c): c is HTMLElement => {
     const el = c as HTMLElement;
     if (el.tagName === 'ASIDE' || el.style === undefined) return false;
-    const r = slideRect(ctx, el);
+    const r = stageRect(ctx, el);
     return (
       r.left < rect.x + rect.w &&
       r.left + r.width > rect.x &&

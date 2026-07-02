@@ -17,6 +17,7 @@ import {
   slideRect,
   snapEdges,
   snapRect,
+  stageRect,
   toAbsoluteAll,
 } from './geometry';
 import { showAllFragments } from './fragments';
@@ -190,8 +191,10 @@ ${stageHead(meta)}
       const cs = ctx.doc.defaultView!.getComputedStyle(container);
       const horizontal = cs.display.includes('flex') && cs.flexDirection.startsWith('row');
       let before: HTMLElement | null = null;
+      // stageRect, not slideRect: x/y are pointer coords, and on a centered
+      // unpinned section the section origin sits below the slide origin.
       for (const kid of kids) {
-        const r = slideRect(ctx, kid);
+        const r = stageRect(ctx, kid);
         const mid = horizontal ? r.left + r.width / 2 : r.top + r.height / 2;
         if ((horizontal ? x : y) < mid) {
           before = kid;
@@ -199,7 +202,7 @@ ${stageHead(meta)}
         }
       }
       // Insertion indicator line in slide coords.
-      const cRect = slideRect(ctx, container);
+      const cRect = stageRect(ctx, container);
       let indicator: { x: number; y: number; w: number; h: number };
       if (kids.length === 0) {
         indicator = horizontal
@@ -207,7 +210,7 @@ ${stageHead(meta)}
           : { x: cRect.left + 2, y: cRect.top + 4, w: Math.max(24, cRect.width - 4), h: 2 };
       } else {
         const anchor = before ?? kids[kids.length - 1];
-        const r = slideRect(ctx, anchor);
+        const r = stageRect(ctx, anchor);
         const pos = before
           ? horizontal ? r.left - 2 : r.top - 2
           : horizontal ? r.left + r.width + 2 : r.top + r.height + 2;
@@ -554,12 +557,15 @@ ${stageHead(meta)}
     if (!ctx) return;
     const slides = ctx.section.parentElement as HTMLElement | null;
     if (!slides) return;
-    if (!meta.config.center || ctx.section.style.height) {
-      slides.style.setProperty('--re-center-top', '0px');
-      return;
-    }
-    const top = Math.max(0, (height - ctx.section.offsetHeight) / 2);
-    slides.style.setProperty('--re-center-top', `${top}px`);
+    const next =
+      !meta.config.center || ctx.section.style.height
+        ? '0px'
+        : `${Math.max(0, (height - ctx.section.offsetHeight) / 2)}px`;
+    if (slides.style.getPropertyValue('--re-center-top') === next) return;
+    slides.style.setProperty('--re-center-top', next);
+    // The offset shift moves everything on the slide — overlay chrome
+    // (selection box on a just-inserted element) must recompute its rects.
+    useEditorStore.getState().bump();
   }
 
   function onFrameLoad() {

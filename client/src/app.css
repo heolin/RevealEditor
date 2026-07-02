@@ -262,6 +262,19 @@ html, body, #root { height: 100%; margin: 0; }
   box-shadow: 0 4px 24px var(--re-shadow);
   border-radius: 4px;
 }
+.layout-mode-badge {
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--re-accent);
+  user-select: none;
+  pointer-events: none;
+}
 .canvas-stage > div:first-child {
   overflow: hidden;
   border-radius: 4px;

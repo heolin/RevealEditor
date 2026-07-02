@@ -80,6 +80,7 @@ const DEFAULTS: Record<SurfaceId, SurfaceLayout> = {
       'table.deleteCol',
     ],
     ['arrange.duplicate', 'arrange.copy', 'arrange.cut', 'arrange.paste'],
+    ['arrange.moveUp', 'arrange.moveDown'],
     ['arrange.group', 'arrange.ungroup'],
     [
       'arrange.align.left',

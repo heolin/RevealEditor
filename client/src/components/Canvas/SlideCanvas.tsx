@@ -22,6 +22,7 @@ export function SlideCanvas() {
   const paneRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.5);
+  const layoutMode = useEditorStore((s) => s.layoutMode);
   const { width, height } = meta.config;
 
   useEffect(() => {
@@ -99,6 +100,7 @@ export function SlideCanvas() {
         className="canvas-stage"
         style={{ width: width * scale, height: height * scale }}
       >
+        {layoutMode && <div className="layout-mode-badge">Layout mode</div>}
         <div
           style={{
             width,

@@ -84,6 +84,13 @@ export function stageLayoutCss(meta: StageMeta): string {
   body[data-re-layout] .reveal .slides section pre :is(div, td, th) {
     outline: none;
     min-height: 0;
+  }
+  /* Content components get a neutral dashed outline (containers stay blue).
+     Code-block internals are excluded — hljs wraps every token in a span. */
+  body[data-re-layout] .reveal .slides section
+    :is(h1, h2, h3, h4, h5, h6, p, span, a, ul, ol, img, table, figure, pre, svg):not(pre *):not(svg *) {
+    outline: 1px dashed rgba(128, 128, 128, 0.6);
+    outline-offset: 1px;
   }`;
 }
 

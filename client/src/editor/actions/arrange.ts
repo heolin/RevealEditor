@@ -1,6 +1,8 @@
 import {
   IconArrowBackUp,
+  IconArrowDown,
   IconArrowForwardUp,
+  IconArrowUp,
   IconBoxMultiple,
   IconCopy,
   IconLayoutAlignBottom,
@@ -18,7 +20,16 @@ import {
   IconTrash,
 } from '@tabler/icons-react';
 import type { Action, EditorContext } from './types';
-import { copyElement, cutElement, deleteElement, duplicateElement, pasteElement, hasClipboard } from '../commands';
+import {
+  contentSibling,
+  copyElement,
+  cutElement,
+  deleteElement,
+  duplicateElement,
+  hasClipboard,
+  moveSibling,
+  pasteElement,
+} from '../commands';
 import {
   type AlignEdge,
   alignElements,
@@ -85,6 +96,26 @@ export const arrangeActions: Action[] = [
     when: (ctx) => !!ctx.stage && !ctx.session,
     enabled: () => hasClipboard(),
     run: (ctx) => ctx.stage && pasteElement(ctx.stage, ctx.selection),
+  },
+  {
+    id: 'arrange.moveUp',
+    title: 'Move up',
+    icon: IconArrowUp,
+    kind: 'button',
+    group: 'arrange',
+    // Only when a sibling exists to swap with — a lone element in its
+    // container (a column, a cell, the slide) shows neither arrow.
+    when: (ctx) => hasSelection(ctx) && !!ctx.selection && !!contentSibling(ctx.selection, 'up'),
+    run: (ctx) => ctx.stage && ctx.selection && moveSibling(ctx.stage, ctx.selection, 'up'),
+  },
+  {
+    id: 'arrange.moveDown',
+    title: 'Move down',
+    icon: IconArrowDown,
+    kind: 'button',
+    group: 'arrange',
+    when: (ctx) => hasSelection(ctx) && !!ctx.selection && !!contentSibling(ctx.selection, 'down'),
+    run: (ctx) => ctx.stage && ctx.selection && moveSibling(ctx.stage, ctx.selection, 'down'),
   },
   {
     id: 'arrange.front',
