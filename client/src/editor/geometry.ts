@@ -127,6 +127,24 @@ export function snapEdges(ctx: StageCtx, moving: HTMLElement, designW: number, d
   return { xs, ys };
 }
 
+/** Snap a single edge coordinate against candidates (resize gestures). */
+export function snapValue(
+  v: number,
+  candidates: number[],
+  threshold: number,
+): { v: number; guide: number | null } {
+  let best = threshold + 1;
+  let out = v;
+  for (const edge of candidates) {
+    const d = Math.abs(edge - v);
+    if (d < best) {
+      best = d;
+      out = edge;
+    }
+  }
+  return best <= threshold ? { v: out, guide: out } : { v, guide: null };
+}
+
 /** Snap a moving rect against edges; returns adjustment + guide lines. */
 export function snapRect(
   rect: { left: number; top: number; width: number; height: number },

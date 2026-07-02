@@ -33,7 +33,15 @@ import { useEditorStore } from '../editorStore';
 import { useDeckStore } from '../../state/deckStore';
 import { api } from '../../api/client';
 import { handlerFor } from '../registry';
-import { applyStyle, changeZOrder, isAbsolute, returnToFlow, slideRect } from '../geometry';
+import {
+  applyStyle,
+  changeZOrder,
+  isAbsolute,
+  returnToFlow,
+  slideRect,
+  snapEdges,
+  snapValue,
+} from '../geometry';
 import { effectiveFragments } from '../fragments';
 import { insertTable } from '../table';
 import { SHAPE_KINDS, insertShape, isShapeEl, renderShapeInto } from '../shapes';
@@ -158,6 +166,8 @@ function ResizeHandles({ el, scale }: { el: HTMLElement; scale: number }) {
     const grip = down.currentTarget as HTMLElement;
     grip.setPointerCapture(down.pointerId);
     const start = slideRect(ctx, el);
+    const design = useDeckStore.getState().meta?.config ?? { width: 960, height: 700 };
+    const edges = snapEdges(ctx, el, design.width, design.height);
     const isImg = el.tagName === 'IMG';
     const ratio = start.width / Math.max(1, start.height);
     const x0 = down.clientX;
@@ -167,13 +177,36 @@ function ResizeHandles({ el, scale }: { el: HTMLElement; scale: number }) {
       const dx = (e.clientX - x0) / scale;
       const dy = (e.clientY - y0) / scale;
       let { left, top, width: w, height: h } = start;
-      if (handle.includes('e')) w = start.width + dx;
-      if (handle.includes('w')) { w = start.width - dx; left = start.left + dx; }
-      if (handle.includes('s')) h = start.height + dy;
-      if (handle.includes('n')) { h = start.height - dy; top = start.top + dy; }
-      if (isImg && (e.shiftKey || handle.length === 2)) h = w / ratio; // aspect lock on corners
+      const aspectLocked = isImg && (e.shiftKey || handle.length === 2);
+      let guideX: number | null = null;
+      let guideY: number | null = null;
+      // Snap the edge being dragged — same guides and threshold as moving.
+      if (handle.includes('e')) {
+        const snap = snapValue(start.left + start.width + dx, edges.xs, 6);
+        w = snap.v - start.left;
+        guideX = snap.guide;
+      }
+      if (handle.includes('w')) {
+        const snap = snapValue(start.left + dx, edges.xs, 6);
+        left = snap.v;
+        w = start.width + (start.left - snap.v);
+        guideX = snap.guide;
+      }
+      if (handle.includes('s') && !aspectLocked) {
+        const snap = snapValue(start.top + start.height + dy, edges.ys, 6);
+        h = snap.v - start.top;
+        guideY = snap.guide;
+      }
+      if (handle.includes('n') && !aspectLocked) {
+        const snap = snapValue(start.top + dy, edges.ys, 6);
+        top = snap.v;
+        h = start.height + (start.top - snap.v);
+        guideY = snap.guide;
+      }
+      if (aspectLocked) h = w / ratio;
       w = Math.max(16, w);
       h = Math.max(16, h);
+      useEditorStore.getState().setSnapGuides(guideX != null || guideY != null ? { x: guideX, y: guideY } : null);
       const sized = isImg || isShapeEl(el) || isChartEl(el);
       const patch: Record<string, string | null> = { width: `${Math.round(w)}px` };
       if (handle.includes('s') || handle.includes('n') || (sized && handle.length === 2)) {
@@ -193,6 +226,7 @@ function ResizeHandles({ el, scale }: { el: HTMLElement; scale: number }) {
       grip.removeEventListener('pointermove', onMove);
       grip.removeEventListener('pointerup', onUp);
       grip.removeEventListener('pointercancel', onUp);
+      useEditorStore.getState().setSnapGuides(null);
       if (ctx) commit(ctx);
     }
     // With capture active, all pointer events retarget to the grip.
