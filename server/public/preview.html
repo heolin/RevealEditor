@@ -25,7 +25,14 @@
 
     function applyHead(m) {
       if (m.baseHref) document.getElementById('re-base').href = m.baseHref;
-      if (m.themeHref) document.getElementById('re-theme').href = m.themeHref;
+      const themeLink = document.getElementById('re-theme');
+      if (m.themeHref) {
+        themeLink.href = m.themeHref;
+        themeLink.disabled = false;
+      } else {
+        // Custom-styled deck with no theme link — inject nothing.
+        themeLink.disabled = true;
+      }
       document.getElementById('re-managed').textContent = m.managedCss || '';
       (m.extraStylesheets || []).forEach((href) => {
         if (extraLinks.has(href)) return;
@@ -59,6 +66,8 @@
             embedded: false,
             width: m.width || 960,
             height: m.height || 700,
+            center: m.center !== false,
+            margin: typeof m.margin === 'number' ? m.margin : 0.04,
             plugins: [RevealHighlight, RevealNotes],
           });
           await deck.initialize();

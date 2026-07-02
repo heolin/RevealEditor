@@ -54,7 +54,7 @@ export interface DeckInfo {
   stylesheets: string[];
   managedCss: string;
   managedCssRange: Region | null;
-  config: { width: number; height: number };
+  config: { width: number; height: number; center: boolean; margin: number };
   sections: SectionInfo[];
 }
 
@@ -243,15 +243,19 @@ export function parseDeck(src: string): DeckInfo {
     ? src.slice(managedCssRange.start, managedCssRange.end)
     : '';
 
-  // Best-effort read of design dimensions from Reveal.initialize({...}).
+  // Best-effort read of layout-relevant options from Reveal.initialize({...}).
   // The config script is opaque to the editor and is never rewritten.
-  const config = { width: 960, height: 700 };
+  const config = { width: 960, height: 700, center: true, margin: 0.04 };
   const initMatch = src.match(/Reveal\.initialize\s*\(\s*\{([\s\S]*?)\}\s*\)/);
   if (initMatch) {
     const w = initMatch[1].match(/\bwidth\s*:\s*(\d+)/);
     const h = initMatch[1].match(/\bheight\s*:\s*(\d+)/);
+    const c = initMatch[1].match(/\bcenter\s*:\s*(true|false)/);
+    const m = initMatch[1].match(/\bmargin\s*:\s*([\d.]+)/);
     if (w) config.width = parseInt(w[1], 10);
     if (h) config.height = parseInt(h[1], 10);
+    if (c) config.center = c[1] === 'true';
+    if (m) config.margin = parseFloat(m[1]);
   }
 
   return {

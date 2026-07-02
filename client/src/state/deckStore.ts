@@ -20,7 +20,7 @@ export interface DeckMeta {
   themeHref: string | null;
   stylesheets: string[];
   managedCss: string;
-  config: { width: number; height: number };
+  config: { width: number; height: number; center: boolean; margin: number };
   layout: SlidesLayout;
 }
 

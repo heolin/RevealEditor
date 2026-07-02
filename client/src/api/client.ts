@@ -21,7 +21,7 @@ export interface DeckData {
   themeHref: string | null;
   stylesheets: string[];
   managedCss: string;
-  config: { width: number; height: number };
+  config: { width: number; height: number; center: boolean; margin: number };
   sections: SectionInfo[];
   slidesTrailing: string;
   sectionIndent: string;
@@ -102,9 +102,20 @@ export function resolveDeckUrl(deckPath: string, href: string): string {
   return `/files/${dir}${href}`;
 }
 
-/** URL for a theme: built-in name via vendored reveal, otherwise the deck's own href. */
-export function themeUrl(deckPath: string, theme: string | null, themeHref: string | null): string {
+/**
+ * URL for a theme: built-in name via vendored reveal, otherwise the deck's
+ * own href. Returns null for decks with no theme link at all (fully
+ * custom-styled decks) — injecting a default theme would pollute them.
+ */
+export function themeUrl(
+  deckPath: string,
+  theme: string | null,
+  themeHref: string | null,
+): string | null {
   if (theme) return `/vendor/reveal.js/dist/theme/${theme}.css`;
   if (themeHref) return resolveDeckUrl(deckPath, themeHref);
-  return '/vendor/reveal.js/dist/theme/black.css';
+  return null;
 }
+
+/** Stylesheets from the deck head that the editor should NOT re-inject. */
+export const REVEAL_CSS_RE = /reveal(\.min)?\.css|(?:^|\/)theme\/[\w-]+(\.min)?\.css/;

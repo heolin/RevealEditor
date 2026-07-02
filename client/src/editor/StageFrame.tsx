@@ -4,7 +4,7 @@ import type { DeckMeta } from '../state/deckStore';
 import { useDeckStore } from '../state/deckStore';
 import { useEditorStore } from './editorStore';
 import { slideElement } from '../model/deck';
-import { resolveDeckUrl, themeUrl } from '../api/client';
+import { REVEAL_CSS_RE, resolveDeckUrl, themeUrl } from '../api/client';
 import { TextSession } from './TextSession';
 import { handlerFor, textEditableFrom } from './registry';
 import { hydrateCodeBlocks } from './codeHighlight';
@@ -42,23 +42,24 @@ export function StageFrame({ slide, meta }: { slide: Slide | null; meta: DeckMet
   const slideRef = useRef(slide);
   slideRef.current = slide;
 
-  const { width, height } = meta.config;
+  const { width, height, center } = meta.config;
 
   const srcDoc = useMemo(() => {
     const dir = meta.path.includes('/')
       ? meta.path.slice(0, meta.path.lastIndexOf('/') + 1)
       : '';
     const userSheets = meta.stylesheets
-      .filter((href) => !/reveal\.css|theme\/[\w-]+\.css/.test(href))
+      .filter((href) => !REVEAL_CSS_RE.test(href))
       .map((href) => `<link rel="stylesheet" href="${resolveDeckUrl(meta.path, href)}">`)
       .join('\n');
+    const theme = themeUrl(meta.path, meta.theme, meta.themeHref);
     return `<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
 <base href="/files/${dir}">
 <link rel="stylesheet" href="/vendor/reveal.js/dist/reveal.css">
-<link rel="stylesheet" href="${themeUrl(meta.path, meta.theme, meta.themeHref)}">
+${theme ? `<link rel="stylesheet" href="${theme}">` : '<!-- custom-styled deck: no theme injected -->'}
 <link rel="stylesheet" href="/vendor/reveal.js/plugin/highlight/monokai.css">
 ${userSheets}
 ${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}
@@ -66,14 +67,13 @@ ${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}
   html, body { margin: 0; overflow: hidden; width: 100%; height: 100%; }
   .reveal { position: relative; width: 100%; height: 100%; overflow: hidden; }
   .reveal .slides { position: absolute; inset: 0; width: ${width}px; height: ${height}px; }
-  /* Replicate reveal's centered layout statically — the runtime never runs
-     here. position:relative makes the section the containing block for
-     absolutely positioned elements, exactly like reveal's own layout. */
+  /* Replicate reveal's layout statically — the runtime never runs here.
+     position:relative makes the section the containing block for absolutely
+     positioned elements, exactly like reveal's own layout. center:false
+     decks flow from the top in block layout, like the runtime renders them. */
   .reveal .slides > section.present {
     position: relative;
-    display: flex !important;
-    flex-direction: column;
-    justify-content: center;
+    ${center ? 'display: flex !important;\n    flex-direction: column;\n    justify-content: center;' : 'display: block !important;'}
     width: 100%;
     height: 100%;
     top: 0;
@@ -89,7 +89,7 @@ ${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}
 <div class="reveal"><div class="slides"><section class="present" id="re-stage"></section></div></div>
 </body>
 </html>`;
-  }, [meta.path, meta.theme, meta.themeHref, meta.stylesheets, meta.managedCss, width, height]);
+  }, [meta.path, meta.theme, meta.themeHref, meta.stylesheets, meta.managedCss, width, height, center]);
 
   function endSession(commitFirst: boolean) {
     const session = sessionRef.current;

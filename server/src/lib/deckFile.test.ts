@@ -44,12 +44,21 @@ describe('parseDeck', () => {
     expect(info.theme).toBe('black');
     expect(info.title).toBe('RevealEditor demo deck');
     expect(info.stylesheets).toHaveLength(3);
-    expect(info.config).toEqual({ width: 960, height: 700 });
+    expect(info.config).toEqual({ width: 960, height: 700, center: true, margin: 0.04 });
   });
 
   it('reads custom width/height from Reveal.initialize', () => {
     const info = parseDeck(fixture('weird.html'));
-    expect(info.config).toEqual({ width: 1280, height: 720 });
+    expect(info.config.width).toBe(1280);
+    expect(info.config.height).toBe(720);
+  });
+
+  it('handles a fully custom-styled deck (no theme link, center:false)', () => {
+    const info = parseDeck(fixture('benchmarks.html'));
+    expect(info.theme).toBeNull();
+    expect(info.themeHref).toBeNull();
+    expect(info.sections).toHaveLength(21);
+    expect(info.config).toEqual({ width: 1280, height: 720, center: false, margin: 0.025 });
   });
 
   it('rejects non-reveal HTML', () => {

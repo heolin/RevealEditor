@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude and Coding Benchmarks — presentation</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,900;1,9..144,500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f4efe6; --paper-2:#ece4d6; --ink:#1c1a17; --ink-soft:#3d3933;
+    --muted:#6b6358; --rust:#b4451f; --rust-deep:#8a3315; --teal:#1f5d57;
+    --gold:#c98a1a; --line:#cdc2ad; --card:#fbf8f1;
+  }
+  .reveal{font-family:'Newsreader',Georgia,serif;font-size:26px;color:var(--ink);}
+  .reveal .slides{text-align:left;}
+  .reveal .slides section{
+    height:100%;padding:30px 48px 26px;
+    background:
+      radial-gradient(circle at 88% 8%, rgba(180,69,31,.05), transparent 42%),
+      radial-gradient(circle at 10% 94%, rgba(31,93,87,.05), transparent 44%),
+      var(--paper);
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.02);
+  }
+  .reveal .backgrounds .slide-background{background:var(--paper);}
+  .reveal .slides section::after{
+    content:"";position:absolute;inset:0;pointer-events:none;opacity:.03;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .reveal .kicker{font-family:'JetBrains Mono',monospace;font-size:13px;letter-spacing:.26em;text-transform:uppercase;color:var(--rust);font-weight:700;margin-bottom:11px;display:flex;align-items:center;gap:14px;}
+  .reveal .kicker::after{content:"";flex:1;height:1px;background:var(--line);max-width:300px;}
+  .reveal .kicker.teal{color:var(--teal);}
+  .reveal h1{font-family:'Fraunces',serif;font-weight:900;letter-spacing:-.02em;line-height:.96;color:var(--ink);text-transform:none;font-size:1.9em;margin:0 0 .2em;}
+  .reveal h1 em{font-style:italic;font-weight:500;color:var(--rust);}
+  .reveal h2{font-family:'Fraunces',serif;font-weight:900;letter-spacing:-.018em;line-height:1.0;color:var(--ink);text-transform:none;font-size:1.38em;margin:0 0 .36em;}
+  .reveal h2 em{font-style:italic;font-weight:500;color:var(--rust);}
+  .reveal h3{font-family:'Fraunces',serif;font-weight:600;color:var(--ink);text-transform:none;font-size:.98em;margin:.05em 0 .2em;letter-spacing:-.01em;}
+  .reveal p{line-height:1.4;margin:0 0 .4em;}
+  .reveal .lead{font-size:1.06em;color:var(--ink-soft);line-height:1.34;}
+  .reveal strong{color:var(--ink);font-weight:600;}
+  .reveal em.it{color:var(--rust-deep);font-style:italic;}
+  .reveal .term{font-family:'JetBrains Mono',monospace;font-size:.76em;background:var(--paper-2);padding:2px 7px;border-radius:4px;color:var(--rust-deep);font-style:normal;}
+
+  .reveal ul{margin:0;list-style:none;}
+  .reveal ul li{position:relative;padding-left:24px;margin-bottom:.3em;line-height:1.3;}
+  .reveal ul li::before{content:"";position:absolute;left:4px;top:.5em;width:8px;height:8px;background:var(--rust);border-radius:2px;transform:rotate(45deg);}
+  .reveal ul.teal li::before{background:var(--teal);}
+  .reveal .sub{color:var(--muted);font-size:.88em;}
+
+  .reveal table{font-size:.64em;border-collapse:collapse;width:100%;margin:.25em 0;}
+  .reveal table th{font-family:'JetBrains Mono',monospace;font-size:.8em;letter-spacing:.04em;text-transform:uppercase;background:var(--ink);color:var(--paper);font-weight:700;padding:7px 11px;text-align:left;border:none;}
+  .reveal table td{padding:7px 11px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  .reveal table tr:nth-child(even) td{background:rgba(205,194,173,.18);}
+  .reveal table .num{font-family:'JetBrains Mono',monospace;text-align:right;font-weight:500;}
+  .reveal table .hl{color:var(--rust);font-weight:700;}
+  .reveal table.bench{table-layout:fixed;font-size:.8em;}
+  .reveal table.bench col.c1{width:19%;} .reveal table.bench col.c2{width:12%;}
+  .reveal table.bench col.c3{width:31%;} .reveal table.bench col.c4{width:19%;} .reveal table.bench col.c5{width:19%;}
+  .reveal table.bench td{padding:6px 10px;}
+
+  .reveal .stats{display:flex;gap:14px;margin:.3em 0;}
+  .reveal .stat{flex:1;background:var(--card);border:1px solid var(--line);border-top:4px solid var(--rust);padding:13px 16px;}
+  .reveal .stat .n{font-family:'Fraunces',serif;font-weight:900;font-size:1.7em;line-height:1;color:var(--rust);}
+  .reveal .stat .l{font-size:.62em;color:var(--muted);margin-top:6px;line-height:1.24;}
+  .reveal .stat.teal{border-top-color:var(--teal);} .reveal .stat.teal .n{color:var(--teal);}
+  .reveal .stat.gold{border-top-color:var(--gold);} .reveal .stat.gold .n{color:var(--gold);}
+
+  /* fact pills */
+  .reveal .pills{display:flex;flex-wrap:wrap;gap:7px;margin:.3em 0;}
+  .reveal .pill{font-family:'JetBrains Mono',monospace;font-size:.54em;background:var(--paper-2);border:1px solid var(--line);border-radius:30px;padding:5px 12px;color:var(--ink-soft);letter-spacing:.01em;}
+  .reveal .pill b{color:var(--rust-deep);font-weight:700;}
+  .reveal .pill.t b{color:var(--teal);}
+
+  .reveal .card{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--teal);padding:11px 16px;margin:.25em 0;box-shadow:0 14px 40px -32px rgba(40,30,15,.4);}
+  .reveal .card.warn{border-left-color:var(--rust);}
+  .reveal .card.gold{border-left-color:var(--gold);}
+  .reveal .card .lbl{font-family:'JetBrains Mono',monospace;font-size:.5em;letter-spacing:.18em;text-transform:uppercase;font-weight:700;color:var(--teal);margin-bottom:4px;}
+  .reveal .card.warn .lbl{color:var(--rust);}
+  .reveal .card.gold .lbl{color:var(--gold);}
+  .reveal .card p{margin:0;font-size:.76em;line-height:1.32;}
+
+  .reveal .pull{font-family:'Fraunces',serif;font-style:italic;font-weight:500;color:var(--ink);font-size:1.22em;line-height:1.2;border-left:5px solid var(--rust);padding-left:22px;margin:.2em 0;}
+
+  .reveal .exhibit{background:#211e1a;border:1px solid #34302a;border-radius:6px;overflow:hidden;margin:.25em 0;}
+  .reveal .exhibit .eh{display:flex;justify-content:space-between;align-items:center;background:#191613;padding:8px 16px;border-bottom:1px solid #34302a;}
+  .reveal .exhibit .eh .eid{font-family:'JetBrains Mono',monospace;font-size:.58em;color:#f0b86c;font-weight:700;}
+  .reveal .exhibit .eh .ebadge{font-family:'JetBrains Mono',monospace;font-size:.48em;letter-spacing:.14em;text-transform:uppercase;padding:4px 10px;border-radius:30px;background:rgba(31,93,87,.25);color:#76c7ba;border:1px solid #2f7a70;font-weight:700;}
+  .reveal .exhibit pre{margin:0;box-shadow:none;width:100%;}
+  .reveal .exhibit code{font-family:'JetBrains Mono',monospace;font-size:.5em;line-height:1.5;background:#15120f;color:#cbb;display:block;padding:13px 18px;border-radius:0;}
+  .reveal .exhibit .add{color:#7fd19a;} .reveal .exhibit .del{color:#e88;}
+  .reveal .exhibit .cmt{color:#7d7567;font-style:italic;} .reveal .exhibit .kw{color:#e8b85c;}
+
+  .reveal .cols{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start;}
+  .reveal .cols.tri{grid-template-columns:1fr 1fr 1fr;gap:14px;}
+
+  .reveal .phases{display:flex;align-items:flex-start;justify-content:space-between;gap:0;margin:.45em 0 1.4em;position:relative;padding:0 6px;}
+  .reveal .phases::before{content:"";position:absolute;left:7%;right:7%;top:30px;height:3px;background:linear-gradient(90deg,var(--rust),var(--teal));border-radius:2px;z-index:0;}
+  .reveal .phase{position:relative;z-index:1;flex:1;text-align:center;display:flex;flex-direction:column;align-items:center;}
+  .reveal .phase .dot{width:60px;height:60px;border-radius:50%;background:var(--card);border:3px solid var(--rust);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:900;font-size:1.4em;color:var(--rust);box-shadow:0 10px 26px -16px rgba(40,30,15,.5);}
+  .reveal .phase:nth-child(2) .dot{border-color:#c25a2a;color:#c25a2a;}
+  .reveal .phase:nth-child(3) .dot{border-color:#7a6a35;color:#7a6a35;}
+  .reveal .phase:nth-child(4) .dot{border-color:var(--teal);color:var(--teal);}
+  .reveal .phase .pt{font-family:'Fraunces',serif;font-weight:600;font-size:.9em;margin-top:11px;}
+  .reveal .phase .pd{font-size:.6em;color:var(--muted);line-height:1.28;margin-top:5px;max-width:92%;}
+
+  /* compact horizontal task-flow strip */
+  .reveal .taskflow{display:flex;align-items:stretch;gap:0;margin:.1em 0 .5em;}
+  .reveal .tf{flex:1;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:11px 13px;position:relative;display:flex;flex-direction:column;gap:3px;box-shadow:0 10px 28px -24px rgba(40,30,15,.45);}
+  .reveal .tf .tfn{font-family:'JetBrains Mono',monospace;font-size:.5em;letter-spacing:.12em;font-weight:700;color:var(--rust);}
+  .reveal .tf .tft{font-family:'Fraunces',serif;font-weight:600;font-size:.78em;line-height:1.1;}
+  .reveal .tf .tfd{font-size:.58em;color:var(--muted);line-height:1.26;}
+  .reveal .tf.green{border-top:3px solid var(--teal);}
+  .reveal .tf.score{border-top:3px solid var(--gold);}
+  .reveal .tf:not(:last-child){margin-right:26px;}
+  .reveal .tf:not(:last-child)::after{content:"\2192";position:absolute;right:-19px;top:50%;transform:translateY(-50%);color:var(--rust);font-size:.9em;font-weight:700;z-index:2;}
+
+  .reveal .chat{display:flex;flex-direction:column;gap:8px;}
+  .reveal .chat .convo-label{font-family:'JetBrains Mono',monospace;font-size:.54em;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:2px;}
+  .reveal .bubble{max-width:92%;padding:9px 14px;border-radius:15px;font-size:.8em;line-height:1.3;}
+  .reveal .bubble .who{font-family:'JetBrains Mono',monospace;font-size:.6em;letter-spacing:.12em;text-transform:uppercase;opacity:.72;margin-bottom:3px;display:block;}
+  .reveal .bubble.you{align-self:flex-end;background:var(--ink);color:var(--paper);border-bottom-right-radius:4px;}
+  .reveal .bubble.you strong{color:#fff;}
+  .reveal .bubble.ai{align-self:flex-start;background:var(--card);border:1px solid var(--line);border-bottom-left-radius:4px;color:var(--ink-soft);}
+  .reveal .bubble.ai strong{color:var(--rust-deep);}
+
+  .reveal .dcol{border:1px solid var(--line);background:var(--card);padding:12px 15px;border-top:5px solid var(--teal);}
+  .reveal .dcol.amber{border-top-color:var(--gold);}
+  .reveal .dcol.red{border-top-color:var(--rust);}
+  .reveal .dcol .dt{font-family:'JetBrains Mono',monospace;font-size:.48em;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--teal);margin-bottom:4px;}
+  .reveal .dcol.amber .dt{color:var(--gold);} .reveal .dcol.red .dt{color:var(--rust);}
+  .reveal .dcol h3{font-size:.82em;margin:0 0 .3em;}
+  .reveal .dcol ul li{font-size:.62em;padding-left:17px;margin-bottom:.26em;}
+  .reveal .dcol ul li::before{width:6px;height:6px;top:.42em;}
+
+  .reveal .slide-number{font-family:'JetBrains Mono',monospace;background:transparent;color:var(--muted);font-size:13px;}
+
+  .reveal section.title{display:flex;flex-direction:column;justify-content:center;}
+  .reveal section.title .meta{margin-top:24px;display:flex;gap:30px;flex-wrap:wrap;font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);}
+  .reveal section.title .meta b{color:var(--ink);}
+  .reveal .bignum{position:absolute;right:40px;bottom:26px;font-family:'Fraunces',serif;font-weight:900;font-size:11em;line-height:.8;color:rgba(180,69,31,.06);pointer-events:none;z-index:0;}
+
+  .reveal .tag-note{font-family:'JetBrains Mono',monospace;font-size:.5em;color:var(--gold);letter-spacing:.04em;margin-top:.25em;}
+  .reveal .acttag{font-family:'JetBrains Mono',monospace;font-size:.56em;letter-spacing:.2em;text-transform:uppercase;color:var(--paper);background:var(--ink);padding:3px 11px;display:inline-block;margin-bottom:9px;}
+
+  .reveal .refline{position:absolute;bottom:60px;left:48px;right:48px;font-family:'JetBrains Mono',monospace;font-size:10.5px;line-height:1.4;color:var(--muted);letter-spacing:.01em;border-top:1px solid var(--line);padding-top:6px;}
+  .reveal .refline b{color:var(--rust-deep);font-weight:700;}
+
+  .reveal section.qa{display:flex;flex-direction:column;justify-content:center;align-items:flex-start;}
+  .reveal section.qa h1{font-size:3.3em;}
+  .reveal section.qa .qline{font-family:'JetBrains Mono',monospace;font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-top:18px;}
+  .reveal .qmark{position:absolute;right:60px;top:50%;transform:translateY(-50%);font-family:'Fraunces',serif;font-weight:900;font-size:19em;line-height:.7;color:rgba(31,93,87,.08);pointer-events:none;}
+
+  /* sources slide */
+  .reveal .srcgrid{columns:2;column-gap:34px;font-size:.46em;line-height:1.45;margin-top:.2em;}
+  .reveal .srcgrid p{margin:0 0 .55em;break-inside:avoid;color:var(--ink-soft);padding-left:16px;text-indent:-16px;}
+  .reveal .srcgrid b{color:var(--rust-deep);font-weight:700;}
+</style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- 1 — TITLE -->
+<section class="title" data-auto-animate>
+  <div class="kicker">Technical briefing · for engineering leads</div>
+  <h1>Claude &amp; coding<br><em>benchmarks</em></h1>
+  <p class="lead" style="max-width:80%;margin-top:.4em;">How to read them, what they actually prove, and what they mean for your team's day-to-day work.</p>
+  <div class="meta">
+    <span><b>From a headline metric</b> to a delegation decision</span>
+    <span><b>Scope</b> the SWE-bench family</span>
+    <span><b>Models</b> Opus 4.7 · 4.8 · state as of May 2026</span>
+  </div>
+  <div class="bignum">88.6</div>
+</section>
+
+<!-- 2 — INTRO -->
+<section>
+  <div class="kicker">Intro · why benchmarks matter</div>
+  <h2>Benchmark score vs.&nbsp;code in your repo</h2>
+  <div class="cols">
+    <div>
+      <p class="lead">Coding benchmarks are standardized exams for models. Every few weeks a new high score appears, and it gets repeated in news articles, launch posts, and social media — usually without the details that explain what it actually measures.</p>
+      <p class="lead">It's easy to hear "88.6%" and assume the model is right almost all the time. It isn't, and this section explains why the number is lower in practice than it sounds.</p>
+      <div class="pull">A benchmark score is measured under ideal conditions. Your team's results will be lower.</div>
+    </div>
+    <div>
+      <div class="card warn"><div class="lbl">What 88.6% really means</div><p>At 88.6%, the model still gets about <strong>1 in 8 tasks wrong</strong>. And the tasks it's tested on are mostly easy ones, so on harder work the real rate is worse.</p></div>
+      <div class="card"><div class="lbl">The benchmark itself is unreliable</div><p>OpenAI <strong>stopped using SWE-bench Verified on Feb 23, 2026</strong> because the test questions had leaked into training data and many tests were broken. Treat scores above 85% as "everyone scores high here," not as a real difference.</p></div>
+    </div>
+  </div>
+  <div class="refline">Based on the report "Claude on SWE-bench: A Benchmark-to-Practice Guide" (May 2026). Cf. <b>OpenAI</b> (Feb 2026 audit); <b>Epoch AI</b>, <i>Why benchmarking is hard</i>.</div>
+  <aside class="notes">
+    The point of this opening is to defuse the hype before we get into detail. A benchmark is just a standardized exam: a fixed set of programming tasks, scored the same way for every model, so vendors can publish a single comparable number. Those numbers move fast and get amplified — a record score becomes a headline, then a tweet, then a slide in someone's strategy deck, and each hop drops the fine print.
+    The trap is hearing "88.6%" as "the model is almost always right." Two things break that read. First, even taken at face value, 88.6% means it gets it wrong about one time in eight — you would not ship a junior engineer who broke the build one commit in eight without review. Second, and worse, that 88.6% is on a specific benchmark whose tasks are mostly easy, which we will see in a few slides. So the real-world hit rate on your work is lower than the headline.
+    The framing to leave them with: a benchmark score is a ceiling measured under ideal lab conditions, not the floor your team will actually stand on. And the headline benchmark itself is on shaky ground — OpenAI publicly stopped trusting SWE-bench Verified in February 2026 because the tasks had leaked into training data and many tests were broken. We will come back to that.
+  </aside>
+</section>
+
+
+<!-- 3 — BENCHMARK FAMILY + SCORES -->
+<section>
+  <span class="acttag">Act I — Benchmarks</span>
+  <div class="kicker">The landscape</div>
+  <h2>The benchmark family &amp;&nbsp;frontier-model scores</h2>
+  <p class="lead" style="margin-bottom:.3em;">"SWE-bench" is not one test but a family of them. Each variant measures something different, so a score only means something once you know which one it came from.</p>
+  <table class="bench">
+    <colgroup><col class="c1"><col class="c2"><col class="c3"><col class="c4"><col class="c5"></colgroup>
+    <thead><tr><th>Variant</th><th>Size</th><th>What it measures</th><th class="num">Opus 4.7</th><th class="num">Opus 4.8</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Verified</strong></td><td class="num">500</td><td>Small Python bug fixes</td><td class="num">87.6%</td><td class="num hl">88.6%</td></tr>
+      <tr><td><strong>Pro</strong></td><td class="num">1,865</td><td>Long, multi-file tasks</td><td class="num">64.3%</td><td class="num hl">69.2%</td></tr>
+      <tr><td><strong>Multilingual</strong></td><td class="num">300</td><td>~9 programming languages</td><td class="num">80.5%</td><td class="num hl">84.4%</td></tr>
+      <tr><td><strong>Multimodal</strong></td><td class="num">517</td><td>JS + visual (83.5% need image)</td><td class="num">—</td><td class="num">—</td></tr>
+      <tr><td><strong>Lite / Bash-Only</strong></td><td class="num">300 / —</td><td>Cheaper / standard scaffold</td><td class="num">—</td><td class="num">—</td></tr>
+    </tbody>
+  </table>
+  <div class="pills">
+    <span class="pill">Verified lineage: <b>4.5 = 80.9%</b> (first &gt;80%)</span>
+    <span class="pill"><b>4.6 = 80.84%</b></span>
+    <span class="pill">Sonnet <b>4.5 = 77.2%</b></span>
+    <span class="pill t">4.8 conditions: <b>avg of 5 trials</b>, adaptive thinking, max effort</span>
+    <span class="pill">⚠ "Mythos Preview" <b>~93.9%</b> = preview, not validated</span>
+  </div>
+  <div class="refline"><b>Anthropic</b> Opus 4.5–4.8 system cards (2026, self-reported); <b>swebench.com</b>; <b>Scale AI</b> SWE-bench Pro. Cards changed methodology: 4.6 used 25 trials, 4.8 uses 5.</div>
+  <aside class="notes">
+    The single most useful habit this slide should instill: never accept a SWE-bench number without asking which variant it is. They are wildly different in difficulty. Verified is 500 hand-checked, mostly small Python bug fixes — that is where the famous high numbers come from. Pro is the opposite: about 1,865 long, multi-file tasks, deliberately built to resist memorization, and scores there are much lower and far more honest about real engineering. Multilingual spreads across roughly nine languages; Multimodal adds tasks that need an image to solve.
+    Read the two columns as a trend, not a leaderboard. On Verified, 4.7 to 4.8 barely moved, 87.6 to 88.6 — that test is saturated, everyone is bunched near the top, so it no longer separates models. The real progress shows up on the hard test: Pro jumped from 64.3 to 69.2, about five points. So when someone cites Verified to prove a model got dramatically better, be skeptical; the harder benchmark tells the truer story.
+    All these numbers come from Anthropic's own system cards, so they are self-reported under Anthropic's own setup. Be careful comparing across cards even for the same vendor: the 4.6 card averaged 25 trials, the 4.8 card only 5, so the methodology itself shifted. And ignore the ~93.9% "Mythos Preview" figure floating around — that is a preview number under heavy extra compute, not a validated production result.
+  </aside>
+</section>
+
+
+<!-- 4 — ANATOMY OF A TASK -->
+<section>
+  <div class="kicker">Mechanics</div>
+  <h2>How a single task actually works</h2>
+  <div class="taskflow">
+    <div class="tf"><div class="tfn">01 · INPUT</div><div class="tft">Broken code + issue</div><div class="tfd">Repo frozen just before the real fix, plus the bug report</div></div>
+    <div class="tf"><div class="tfn">02 · MODEL</div><div class="tft">Writes a patch</div><div class="tfd">Browses files, edits code, runs commands</div></div>
+    <div class="tf green"><div class="tfn">03 · TEST</div><div class="tft">Run in a sealed container</div><div class="tfd">Bug tests must pass; old tests must stay green</div></div>
+    <div class="tf score"><div class="tfn">04 · SCORE</div><div class="tft">Pass / fail</div><div class="tfd">All-or-nothing — both test sets must pass</div></div>
+  </div>
+  <div class="cols">
+    <div>
+      <p>Each task is a real bug from an open-source project. The model gets the codebase frozen just before a human fixed that bug, plus the original issue report, and has to write the fix itself.</p>
+      <p>The fix is then run against two sets of tests in a sealed, offline container:</p>
+      <ul>
+        <li>tests that were <strong>failing</strong> before and should now <strong>pass</strong> (proof the bug is fixed)</li>
+        <li>tests that were <strong>already passing</strong> and must <strong>stay green</strong> (proof nothing else broke)</li>
+      </ul>
+    </div>
+    <div>
+      <div class="card"><div class="lbl">Scoring is all-or-nothing</div><p>There is no partial credit. A genuinely sensible fix that happens not to match what the hidden test expects scores exactly zero.</p></div>
+      <div class="card warn"><div class="lbl">The tooling matters as much as the model</div><p>Just changing the "scaffold" — the harness that lets the model browse files and run commands — can move a score by 11–15 points. Two scores only compare if the setup was identical.</p></div>
+    </div>
+  </div>
+  <div class="refline"><b>Jimenez et al.</b> (Princeton), <i>SWE-bench: Can LMs Resolve Real-World GitHub Issues?</i>, ICLR 2024; 2,294 instances / 12 repos. Scaffold: <b>Epoch AI</b>, <i>Why benchmarking is hard</i>.</div>
+  <aside class="notes">
+    This slide demystifies what a "task" is, because everything later depends on it. The benchmark authors took thousands of real fixed bugs from popular open-source projects. For each one, they rewound the code to the exact state just before the fix, and they kept the original issue description a developer would have read. The model gets that starting state and that issue text, and has to produce the patch — the code change — on its own.
+    To grade it automatically and fairly, they rely on the project's own tests. Two groups matter. The "fail-to-pass" tests are the ones that exposed the bug: they failed before and must pass after, which proves the fix works. The "pass-to-pass" tests were already passing and must remain passing, which proves the model did not break something else to make the bug test go green. Everything runs in an isolated container with the network off and later code history removed, so the model cannot look up the real answer.
+    Two consequences to stress. First, scoring is binary — both test groups must pass or the task is a zero. There is no credit for a fix that is reasonable but simply takes a different valid approach than the hidden test demands; that is a real source of unfair failures we will revisit. Second, the "scaffold" — the surrounding software that lets the model open files, run the test suite, and try again — has an enormous effect. Independent analysis found that swapping only the scaffold, same model, shifts results by 11 to 15 points. That is why a bare leaderboard number is almost meaningless without knowing the harness behind it.
+  </aside>
+</section>
+
+
+<!-- 5 — TASK DISTRIBUTION -->
+<section>
+  <div class="kicker">What the benchmark is made of</div>
+  <h2>Most of the benchmark is&nbsp;easy</h2>
+  <p class="lead" style="margin-bottom:.3em;">Most of the tasks are small: about a third are one- or two-line changes, and very few take more than an hour. The high scores mostly reflect how easy the tasks are.</p>
+  <div class="stats">
+    <div class="stat"><div class="n">161</div><div class="l">of 500 tasks are a 1–2 line change (32%)</div></div>
+    <div class="stat"><div class="n">196</div><div class="l">"easy" &lt;15-min tasks · ~5 LOC each</div></div>
+    <div class="stat teal"><div class="n">45</div><div class="l">"hard" tasks over 1 hour</div></div>
+    <div class="stat gold"><div class="n">3</div><div class="l">tasks above 4 hours — whole set</div></div>
+  </div>
+  <div class="cols" style="margin-top:.25em;">
+    <div>
+      <table>
+        <thead><tr><th>Est. time</th><th class="num">Share</th><th class="num">Gold patch</th></tr></thead>
+        <tbody>
+          <tr><td>&lt;15 min</td><td class="num">39%</td><td class="num">~5 LOC</td></tr>
+          <tr><td>15 min–1 hr</td><td class="num">52%</td><td class="num">~14 LOC</td></tr>
+          <tr><td>1–4 hr</td><td class="num">8%</td><td class="num">~50 LOC</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <div class="pills">
+        <span class="pill"><b>87%</b> bug fixes</span>
+        <span class="pill"><b>9%</b> features</span>
+        <span class="pill"><b>4%</b> refactors</span>
+        <span class="pill"><b>78%</b> touch only functions</span>
+        <span class="pill">avg <b>1.87</b> functions / task</span>
+      </div>
+      <p class="sub" style="margin-top:8px;">As tasks span more files, success drops sharply — and even the "easy" label flatters reality: METR engineers found four supposedly sub-15-minute tasks actually took 8, 26, 67 and 84 minutes.</p>
+    </div>
+  </div>
+  <div class="refline"><b>Epoch AI</b>, <i>What skills does SWE-bench Verified evaluate?</i>; <b>OpenAI</b>, <i>Introducing SWE-bench Verified</i>; <b>Amazon</b> analysis; <b>METR</b> (arXiv 2507.09089); 161/500 — <b>SWE-bench Pro</b> authors.</div>
+  <aside class="notes">
+    This is the slide that recalibrates the 88%. When OpenAI built the cleaned-up Verified set, annotators estimated how long each task would take a skilled engineer. The result is lopsided: about 39% are under fifteen minutes, another 52% under an hour, only 8% take one to four hours, and a grand total of three tasks in the whole 500 exceed four hours. Put differently, 161 of the 500 — nearly a third — are one-or-two-line changes.
+    The patch sizes confirm it: the quick tasks change about five lines, the medium ones about fourteen, the hard ones about fifty. And the work itself is narrow — roughly 87% are bug fixes rather than new features or refactors, and about 78% only touch the insides of functions, averaging fewer than two functions per task. So this benchmark is overwhelmingly a test of small, localized repairs in existing code, not of designing or building anything.
+    Two cautions. As soon as a task spans several files, the line count roughly quadruples and model success falls off a cliff — which matters because real work is usually multi-file. And the time labels are optimistic anyway: when METR's own experienced engineers solved a sample, tasks marked "under fifteen minutes" took them up to an hour and a half. So when you map this to your team, the honest read is that models are strongest exactly where the benchmark is densest — tiny fixes — and weakest where the benchmark is thinnest, which is most of what your engineers actually do.
+  </aside>
+</section>
+
+
+<!-- 6 — EXAMPLE -->
+<section>
+  <div class="kicker">A concrete case</div>
+  <h2>What an "easy" task really looks like</h2>
+  <div class="exhibit">
+    <div class="eh"><span class="eid">django__django-11099</span><span class="ebadge">The easy-task archetype</span></div>
+    <pre><code><span class="cmt"># A URL route name could be a Python keyword (pass, class),</span>
+<span class="cmt"># which broke reverse(). The validator only checked isidentifier().</span>
+
+<span class="cmt"># django/core/validators.py</span>
+<span class="del">- if not name.isidentifier():</span>
+<span class="add">+ if not name.isidentifier() or <span class="kw">keyword</span>.iskeyword(name):</span>
+<span class="cmt"># + one import: import keyword · + one new test</span></code></pre>
+  </div>
+  <p>This is the shape most of the benchmark takes: <strong>one changed line, in one file, with a clear description and a ready-made test.</strong> The whole challenge is finding the right spot, not reasoning about a hard problem. When people hear "the model solves real GitHub issues," this is the kind of issue they should picture — and it is what drives those 85–90% scores.</p>
+  <div class="refline">Instances from the <b>SWE-bench</b> dataset / <b>swebench.com</b>. Repo skew: django = 850 of 2,294; top 5 repos &gt; 80%.</div>
+  <aside class="notes">
+    Make this concrete so the audience can see what "easy" really means. This is a genuine Django bug. URL routes can be given names, and the code that validated those names only checked that the name was a legal Python identifier. The problem: some legal identifiers are also reserved keywords like "pass" or "class," and using one as a route name broke the function that builds URLs in reverse. The human fix was a single line — also reject names that are Python keywords — plus one import and one test.
+    That is the archetype. One line, one file, the bug clearly described, and a test waiting to confirm the fix. There is almost no design judgment involved; the skill is navigating a large codebase to the right spot. A model that is good at search and pattern-matching does very well here, and tasks like this are what push the headline score into the high eighties. The sympy example is the same story with five lines instead of one.
+    Also worth flagging the narrowness: the tasks are not spread evenly across software. They come from a handful of mature Python libraries — Django alone is 850 of the original 2,294 tasks, and the top five projects are over 80% of the set. So the benchmark is really measuring "can the model fix small bugs in a few very famous Python libraries it has almost certainly seen during training," which sets up the contamination problem on the next slides.
+  </aside>
+</section>
+
+
+<!-- 7 — PROBLEMS 1: LEAKAGE + MISMATCH -->
+<section>
+  <div class="kicker warn">Problems with benchmarks · 1/2</div>
+  <h2>Data leakage &amp; broken tests</h2>
+  <div class="cols">
+    <div>
+      <h3>The tasks leaked into training</h3>
+      <p>When OpenAI audited 138 hard problems with six-plus engineers each, <strong>59.4% had material flaws</strong> in the test or the description, and <strong>35.5%</strong> used "narrow" tests that only accept one exact implementation. Models could even recite the human fix <strong>from memory</strong> — Opus naming the right file for <span class="term">astropy-13236</span>, Gemini reproducing <span class="term">django-11099</span> word for word.</p>
+      <div class="pills">
+        <span class="pill">Wang/Pradel/Liu: <b>7.8%</b> patches wrong → <b>−4.5 pts</b></span>
+        <span class="pill">SWE-Bench+: <b>31%</b> suspicious, <b>33%</b> leakage</span>
+      </div>
+    </div>
+    <div>
+      <h3>Why a "Verified" set had to be built</h3>
+      <p>The original benchmark was so noisy that 93 developers re-screened it: <strong>38.3%</strong> of issues were underspecified and <strong>61.1%</strong> had tests that might reject a valid fix. They threw out <strong>68.3%</strong>, leaving the 500 — and even those still carry an estimated <strong>5–10%</strong> bad tasks.</p>
+      <div class="card warn"><div class="lbl">And it only covers a sliver of real work</div><p>Nothing greenfield, no architecture, almost nothing multi-file, no ambiguous requirements, no front-end, DevOps, or code review. Half the issues predate 2020.</p></div>
+    </div>
+  </div>
+  <div class="refline"><b>OpenAI</b>, <i>Why SWE-bench Verified no longer measures frontier coding capabilities</i> (Feb 23 2026); <b>Wang, Pradel &amp; Liu</b> (2503.15223); <b>SWE-Bench+</b> (Aleithan et al., 2410.06992); <b>Epoch AI</b>.</div>
+  <aside class="notes">
+    This is the credibility problem with the headline benchmark, and it has two halves. The first is contamination: because these are old, public bugs from famous libraries, the fixes are sitting in the models' training data. OpenAI's February 2026 audit is the clearest evidence — they took 138 problems their model failed, had at least six engineers review each, and found that almost 60% had something materially wrong with the test or the problem statement. Over a third relied on "narrow" tests that demand one specific implementation and reject other correct fixes. And in several cases models could literally recall the human patch from memory: Opus naming the exact file and lines for an astropy bug, Gemini reproducing a Django fix character for character. Two academic studies put numbers on the damage — roughly 8% of "passing" patches are actually wrong, and after filtering weak tests one benchmark's real resolution rate collapsed from about 12% to 4%.
+    The second half is that the benchmark needed heavy cleanup just to be usable. The original set was noisy enough that a team of 93 developers re-screened it and discarded more than two-thirds, keeping the 500 "Verified" tasks. Even those still have an estimated 5–10% bad tasks by independent review. So when a model "fails" a task, sometimes the task is broken, not the model.
+    The takeaway for the room: a very high Verified score is partly memory and partly luck with flawed tests. It does not cleanly measure capability, and it tells you almost nothing about the parts of engineering the benchmark never touches — design, multi-file work, ambiguity, front-end, ops, review.
+  </aside>
+</section>
+
+
+<!-- 8 — PROBLEMS 2: OPTIMIZING TO THE TEST -->
+<section>
+  <div class="kicker warn">Problems with benchmarks · 2/2</div>
+  <h2>Vendors tune the whole system to&nbsp;the test</h2>
+  <div class="cols">
+    <div>
+      <p>The published number rarely reflects the model alone. Vendors wrap it in tooling tuned to the benchmark's tasks, and the best scores often come from running the model many times in parallel and keeping only the attempts that pass the visible tests. The eye-catching "preview" figures near 94% come from that kind of heavy extra computation, not a single normal run.</p>
+      <p class="sub">On private code the drop is steeper still: on Pro's commercial slice, Opus 4.1 falls from 22.7% to 17.8% and GPT-5 from 23.1% to 14.9% — because none of it was in training.</p>
+    </div>
+    <div>
+      <div class="stats" style="flex-direction:column;">
+        <div class="stat"><div class="n">~88%</div><div class="l">Verified — saturated, old public Python</div></div>
+        <div class="stat teal"><div class="n">~23%</div><div class="l">Pro public — long, multi-file tasks</div></div>
+      </div>
+      <div class="pull" style="font-size:1.05em;">From now on, look at Pro, not Verified.</div>
+    </div>
+  </div>
+  <div class="refline"><b>Scale AI</b> — SWE-bench Pro (1,865 tasks: 731 public / 858 held-out / 276 commercial, 41 repos); <b>Epoch AI</b> (scaffold); <b>Anthropic</b> system cards.</div>
+  <aside class="notes">
+    This slide explains why even an honest-looking number can be inflated, and points to the one you should trust instead. A reported score is really the score of an entire system: the model plus the harness around it plus how many attempts it was allowed. A common way to lift the number is to let the model try a task many times in parallel and then keep only the attempts that pass the tests you can see — which is closer to "best of twenty tries" than "got it right." The flashy preview numbers near 94% come from that kind of heavy extra compute, so they are not a fair picture of one ordinary run.
+    The cleanest evidence that the easy public benchmark overstates ability is the gap to the hard one. The same top models that score around 88% on Verified score only about 23% on the public part of SWE-bench Pro, which uses long, multi-file, contamination-resistant tasks. And when you move to Pro's commercial slice — real proprietary code the models never saw — they drop further still, Opus from roughly 23% to 18%, GPT-5 from 23% to 15%. That last drop is the most relevant one to your situation, because your codebase is private too.
+    So the practical instruction is simple: when you are judging whether a model is actually getting better at engineering, watch Pro, not Verified. Verified is saturated and contaminated; Pro is where the differences that matter still show up.
+  </aside>
+</section>
+
+
+<!-- 9 — MODEL PROBLEMS 1: PHASES -->
+<section>
+  <span class="acttag">Act II — Consequences</span>
+  <div class="kicker warn">Model failure modes · 1/2</div>
+  <h2>Where the agent gets lost: four&nbsp;phases</h2>
+  <p class="lead" style="margin-bottom:.2em;">Researchers grouped the failures into four stages of the work. Knowing which stage tends to fail tells you where a person needs to review.</p>
+  <div class="phases">
+    <div class="phase"><div class="dot">1</div><div class="pt">Find the bug</div><div class="pd">Can't locate the right place to change — worse in big repos</div></div>
+    <div class="phase"><div class="dot">2</div><div class="pt">Write the fix</div><div class="pd">Reasons wrongly about a change that spans several files</div></div>
+    <div class="phase"><div class="dot">3</div><div class="pt">Iterate</div><div class="pd">Gets stuck in long, unproductive retry loops</div></div>
+    <div class="phase"><div class="dot">4</div><div class="pt">Verify</div><div class="pd">Keeps re-trying the same failed idea instead of rethinking</div></div>
+  </div>
+  <div class="cols">
+    <div class="card warn"><div class="lbl">What the research found</div><p>A study of 150 failed tasks sorted the failures into 3 stages and 25 specific patterns. Most agent failures were faulty reasoning and getting stuck repeating themselves — not typos.</p></div>
+    <div class="card"><div class="lbl">Bigger models fail differently</div><p>On the hard benchmark, large models like Opus mostly get the <strong>logic</strong> wrong on multi-file edits, whereas smaller models trip on basic syntax and tool use.</p></div>
+  </div>
+  <div class="refline">Phase taxonomy: empirical study of 150 failed Verified instances — <b>arXiv 2509.13941</b>. Pro analysis: <b>Scale AI</b> (LLM-as-judge).</div>
+  <aside class="notes">
+    Now we pivot from "the benchmark is flattering" to "so where does the model actually break, and what do we do about it." Researchers went through 150 tasks that agents failed and found the failures fall into four natural stages of doing the work. First, localization: simply finding the right place in the codebase to change, which gets harder the larger the repo. Second, repair: even having found the spot, reasoning incorrectly about a fix that has to touch several files at once. Third, iteration: getting trapped in long, unproductive loops, trying variation after variation. Fourth, validation: what the authors call cognitive deadlock — the agent keeps re-attempting essentially the same failed approach instead of stepping back and rethinking.
+    The useful nuance is that model size changes the failure type. The big frontier models rarely make syntax errors anymore; when they fail a hard multi-file task, it is usually the logic or algorithm that is wrong. Smaller models still fail on the basics — syntax, using tools, managing what is in front of them.
+    Why this matters for delegation: it tells you where to put human attention. The model is reliable at the easy localized stuff, but on anything multi-file or requiring sustained reasoning it can produce confident, wrong logic and then loop on it. That is exactly the work where you want a person reviewing, and it sets up the next slide, which is about how these failures compound in day-to-day use.
+  </aside>
+</section>
+
+
+<!-- 10 — MODEL PROBLEMS 2 -->
+<section>
+  <div class="kicker warn">Model failure modes · 2/2</div>
+  <h2>Three failures that compound over&nbsp;time</h2>
+  <div class="cols tri">
+    <div class="card warn"><div class="lbl">Duplication</div><p>Because the agent sees only a slice of the codebase, it rewrites helpers that already exist instead of reusing them. Run several agents at once and you get many near-identical versions of the same function.</p></div>
+    <div class="card warn"><div class="lbl">Context rot</div><p>The more you put in front of a model, the worse it gets at using it. Across 18 models, accuracy fell as input grew, and facts buried in the middle were missed — a 30%+ drop.</p></div>
+    <div class="card warn"><div class="lbl">Drift</div><p>Each change looks fine alone, but over many edits the agent mixes library versions, bypasses your patterns, and quietly reshapes the architecture in inconsistent ways.</p></div>
+  </div>
+  <div class="cols" style="margin-top:.3em;">
+    <div class="card"><div class="lbl">This shows up in real work</div><p>In a controlled trial, experienced developers were <strong>19% slower</strong> using AI on code they knew well — yet believed they had been <strong>20% faster</strong>.</p></div>
+    <div class="card"><div class="lbl">Getting better, not solved</div><p>Opus 4.8 markedly improved long-context recall over 4.7, but the habits below still pay off — the problem is reduced, not gone.</p></div>
+  </div>
+  <div class="refline"><b>Chroma</b>, <i>Context Rot</i> (Hong, Troynikov, Huber, 2025); <b>Liu et al.</b>, <i>Lost in the Middle</i> (TACL 2024); <b>METR</b> (2507.09089); <b>OpenAI</b> Codex harness notes; <b>techdebt.best</b>.</div>
+  <aside class="notes">
+    These are the failures the benchmark never sees, because the benchmark is one isolated task while real work is the same codebase edited over and over. Three patterns compound. Duplication: the agent only ever sees a fragment of your code, so when it needs a helper it writes a new one rather than finding the one you already have; run several agents in parallel and you end up with multiple slightly different versions of the same utility. Context rot: counter-intuitively, stuffing more into the model's context makes it perform worse — a study across 18 frontier models showed accuracy declining as input grew, and the older "lost in the middle" finding showed facts placed in the middle of a long context get missed, a 30%-plus accuracy hit. In an agent session the context fills up with search results and dead ends, so it forgets things you told it and contradicts earlier decisions. Drift: each individual edit looks reasonable, but across dozens of them the agent mixes framework versions, ignores your conventions, and reshapes the architecture inconsistently.
+    The reality check is the METR trial: experienced developers working on code they knew well were actually 19% slower with AI assistance, even though they felt 20% faster. The felt speedup is real and seductive; the measured outcome was a slowdown, because the time goes into reviewing, correcting, and re-prompting.
+    Be fair about progress: Opus 4.8 is meaningfully better at holding long context than 4.7. But "better" is not "solved" — every mitigation on the recommendations slides still earns its keep. The message is not "don't use agents," it's "these specific failure modes are predictable, so design your workflow to catch them."
+  </aside>
+</section>
+
+
+<!-- 11 — COMMENTS / ANNOTATION -->
+<section>
+  <div class="kicker">A training artifact</div>
+  <h2>Why AI generates so many&nbsp;comments</h2>
+  <div class="cols">
+    <div>
+      <p class="lead">The model writes more comments and explanation than most developers would. This is mostly a result of how it was trained, not something your team asked for.</p>
+      <p>The reward models used in training tend to score longer answers higher, treating length as a sign of quality — a measured effect known as "length bias" or "verbosity bias." The model learns that more explanation reads as more helpful, and carries that habit into code, where it often adds little.</p>
+    </div>
+    <div>
+      <div class="card gold"><div class="lbl">Practical implication</div><p>The default style isn't neutral — it reflects training-time preferences. If your team values brevity, <strong>enforce it explicitly</strong>: conventions, linters, an instruction in CLAUDE.md.</p></div>
+    </div>
+  </div>
+  <div class="refline">"Length / verbosity bias" in RLHF reward models — <b>Saito et al.</b>, <i>Verbosity Bias in Preference Labeling by LLMs</i> (arXiv 2310.10076); see also Kim et al., <i>Mitigating Length Bias through a Causal Lens</i> (arXiv 2511.12573).</div>
+  <aside class="notes">
+    A small, relatable observation that opens the bigger theme of how training shapes output. Everyone has noticed AI writes more comments and explanation than a human normally would. The reason is documented: the reward models used to train these systems show a consistent "length bias" — they tend to rate longer answers more highly, effectively treating verbosity as a sign of quality. Saito and colleagues measured this directly in 2023, finding GPT-4 had a substantial bias toward longer completions, much larger than the human bias on the same data, and a string of follow-up papers in 2024 and 2025 confirmed it and proposed fixes. So the model generalized a habit — more explanation reads as more helpful — and carries it into code, where over-commenting is often noise.
+    The point for the audience is not "comments are bad." It is that the model's default style is not neutral; it is a fossil of how it was trained. So if your team has a house style — terse comments, particular naming, specific patterns — you cannot assume the model shares it. You have to state it explicitly and, better, enforce it with linters, because left alone the model reverts to its training-time defaults.
+    This is now a documented effect rather than a guess, so you can state it plainly. It mainly serves as an intuitive bridge into the next section, which is the real heart of it: context shapes everything the model produces.
+  </aside>
+</section>
+
+
+
+<!-- 12 — CONTEXT 1/5 -->
+<section>
+  <div class="kicker teal">Context shapes quality · 1/5</div>
+  <h2>Your question shapes the&nbsp;answer</h2>
+  <div class="cols">
+    <div>
+      <p class="lead">The same question in different languages yields different answers — <strong>the content and form of your prompt become part of the context</strong> the model builds on.</p>
+      <div class="card"><div class="lbl">Mechanism</div><p>The model predicts the continuation best fitting the <strong>entire supplied context</strong>. The language of the prompt tilts it toward a different data culture.</p></div>
+    </div>
+    <div>
+      <div class="chat">
+        <div class="convo-label">"What to eat for the holidays?" — in Polish</div>
+        <div class="bubble you"><span class="who">You · PL</span>Co powinienem zjeść w Wigilię?</div>
+        <div class="bubble ai"><span class="who">Model</span>Classically: <strong>beetroot soup with dumplings</strong>, carp, pierogi.</div>
+        <div class="convo-label" style="margin-top:6px;">same question — in Japanese</div>
+        <div class="bubble you"><span class="who">You · JP</span>クリスマスに何を食べるべき？</div>
+        <div class="bubble ai"><span class="who">Model</span>A <strong>bucket of KFC</strong> 🍗, of course — the Japanese holiday tradition.</div>
+      </div>
+    </div>
+  </div>
+  <div class="refline">Illustration of context-dependence; cf. <b>"LLMs Love Python"</b> (arXiv 2503.17181) on context bias and model preferences.</div>
+  <aside class="notes">
+    This section is the conceptual core: the model has no fixed "opinion," it produces whatever best fits the context you give it — and that has direct consequences for code quality. The holiday example makes it vivid and non-technical. Ask in Polish what to eat for the holidays and you get the Polish Christmas Eve answer — beetroot soup, carp, pierogi. Ask the identical question in Japanese and you get a bucket of KFC, which really is a Japanese Christmas tradition. Same question, different language, genuinely different answer — not because the model is confused, but because the language of your prompt pulls it toward a whole different body of training data.
+    The lesson to carry into code: every part of your prompt and your existing codebase is context that steers the answer. The framework you mention, the style of the code around the change, the libraries already imported — all of it tilts what the model produces. This is good news and bad news. Good, because you can deliberately shape output by controlling context. Bad, because if your context is inconsistent or unusual, the model will be pulled toward the generic mainstream instead of your intent — which is exactly what the next three slides unpack.
+  </aside>
+</section>
+
+
+<!-- 13 — CONTEXT 2/5 -->
+<section>
+  <div class="kicker teal">Context shapes quality · 2/5</div>
+  <h2>The pull of probability</h2>
+  <div class="cols">
+    <div>
+      <p>Why does the model understand a question despite typos and fix proper names by itself? It runs on <strong>highest probability</strong> — reproducing the most typical, "correct" form it has seen.</p>
+      <div class="card warn"><div class="lbl">The flip side</div><p>That same force pushes it toward the <strong>most popular</strong> solution — not necessarily the best one for your case.</p></div>
+    </div>
+    <div>
+      <div class="chat">
+        <div class="convo-label">a typo in a proper name</div>
+        <div class="bubble you"><span class="who">You</span>what popular movies did <strong>Jon Trawolda</strong> star in?</div>
+        <div class="bubble ai"><span class="who">Model</span>You mean <strong>John Travolta</strong> — e.g. "Pulp Fiction", "Grease" and "Saturday Night Fever".</div>
+      </div>
+      <p class="sub" style="margin-top:10px;">Helpful autocorrect and unwanted "averaging" are the <strong>same</strong> mechanism.</p>
+    </div>
+  </div>
+  <div class="refline">Illustration of next-token prediction (highest probability) — the base mechanism of language models.</div>
+  <aside class="notes">
+    This slide explains the underlying mechanism in plain terms, using a friendly example before turning it on its head. Under the hood the model just predicts the most likely next piece of text given everything so far. That is why it shrugs off typos: ask about "Jon Trawolda" and it confidently answers about John Travolta, because the most probable reading of that garbled name is the famous actor. We experience that as helpful autocorrect, and it is.
+    But flip it over and the same mechanism is a liability. "Most likely" means "most common in the training data," which means most popular — and the most popular option is not always the best one for your specific situation. The very force that fixes your typo also nudges the model toward the mainstream library, the conventional pattern, the default framework, even when you wanted something else. Autocorrect and unwanted averaging are literally the same behavior seen from two sides. Hold that thought, because the next slide shows it biting in a real engineering setting.
+  </aside>
+</section>
+
+
+<!-- 14 — CONTEXT 3/5 -->
+<section>
+  <div class="kicker teal">Context shapes quality · 3/5</div>
+  <h2>The niche-technology trap</h2>
+  <div class="cols">
+    <div>
+      <p>When you deliberately pick a less popular solution, the model <strong>"forgets" that choice</strong> and reverts to the mainstream — it has the highest probability.</p>
+      <div class="chat">
+        <div class="convo-label">a real, recurring example</div>
+        <div class="bubble you"><span class="who">You</span>This project uses <strong>pip + venv</strong>. Install the dependencies.</div>
+        <div class="bubble ai"><span class="who">Model</span>Sure — running <strong>uv</strong> <span style="opacity:.75">(even though <span class="term">uv</span> isn't in this project…)</span></div>
+      </div>
+    </div>
+    <div>
+      <ul class="teal">
+        <li>On a niche stack, <strong>repeat the decision</strong> in the project context</li>
+        <li>Expect silent swaps to a more popular tool / pattern</li>
+        <li>Enforce the choice with rules, not just a prompt request</li>
+      </ul>
+      <div class="card warn"><div class="lbl">Why it happens</div><p>Models favor well-established options over better alternatives — picking Python in <strong>90–97%</strong> of agnostic tasks, even <strong>58%</strong> when it's the wrong tool.</p></div>
+    </div>
+  </div>
+  <div class="refline">Bias toward popular tools/libraries — <b>"LLMs Love Python"</b> (arXiv 2503.17181). The <span class="term">uv</span> example: first-hand observation.</div>
+  <aside class="notes">
+    Here is the popularity bias hitting real work. The example is one many engineers will recognize: your project deliberately uses pip and venv, you say so, and the agent still reaches for uv — a newer, more fashionable tool — even though it is not in the project. It is not being careless; uv is simply higher-probability in recent training data, so the model drifts toward it.
+    There is research behind this beyond the anecdote: models show a strong pull toward popular defaults, choosing Python in the vast majority of language-agnostic tasks, and sticking with it most of the time even when it is the wrong tool for the job. The practical consequence is the rule of thumb on the slide: the further your stack sits from the mainstream — a niche library, an unusual framework, a deliberate non-default choice — the more the model will quietly try to "correct" you back to the popular option. So you have to repeat that decision in the project context, expect silent substitutions, and ideally enforce the choice with hard rules like linters or CI checks rather than hoping a single prompt sticks. A polite request in one message will not hold up over a long session.
+  </aside>
+</section>
+
+
+<!-- 15 — CONTEXT 4/5 -->
+<section>
+  <div class="kicker teal">Context shapes quality · 4/5</div>
+  <h2>Programming language &amp;&nbsp;code quality</h2>
+  <div class="cols">
+    <div>
+      <p>The model mostly <strong>mimics the code it has seen</strong>. Java/C# code tends to higher architectural quality (design patterns) than Python.</p>
+      <ul>
+        <li><strong>Corpus composition</strong> — Python is scripts &amp; notebooks; C#/Java is enterprise apps</li>
+        <li><strong>The compiler</strong> as a free guardrail enforcing contracts</li>
+      </ul>
+      <div class="card warn"><div class="lbl">A rule of thumb</div><p>Picture the <strong>average code for that language on GitHub</strong> — that is the model's yardstick of "correct" (= highest probability).</p></div>
+    </div>
+    <div>
+      <div class="card"><div class="lbl">The Python paradox</div><p>Python: <strong>highest raw correctness</strong> (most popular + benchmark contamination), yet <strong>looser architecture</strong>. Two different axes.</p></div>
+      <div class="pills">
+        <span class="pill">Claude on Java quality: <b>~95%</b> (multi-lang study)</span>
+        <span class="pill t">C# now has its own set: <b>SWE-Sharp-Bench</b></span>
+      </div>
+      <p class="tag-note">Well-grounded in mechanisms; not a single head-to-head study.</p>
+    </div>
+  </div>
+  <div class="refline">Java quality &amp; static typing: <b>arXiv 2502.01853</b>; <b>SWE-Sharp-Bench</b> (Microsoft Research, 2025); Python bias: <b>2503.17181</b>.</div>
+  <aside class="notes">
+    This extends the popularity idea from tools to whole languages, and it is a point engineers feel intuitively. The model mostly imitates the code it has seen, so the typical quality of a language's public code becomes the model's baseline for that language. Java and C# code in the wild tends to be enterprise application code — lots of structure, interfaces, design patterns — and both languages have a compiler that refuses to run until types and contracts line up. Python in the wild is heavily scripts, tutorials, and notebooks, looser by nature, with no compiler forcing discipline. So the model tends to emit more disciplined, better-structured code in Java or C# than in Python, even at the same task.
+    The rule of thumb is the useful takeaway: before you ask for code, picture what the average example of that language looks like on GitHub, because that average is roughly what the model treats as "correct." 
+    Then the honest caveat, the Python paradox: Python still posts the highest raw correctness scores, partly because it is the most represented language and partly because the benchmarks themselves are Python and contaminated. So "best benchmark scores" and "cleanest architecture" are two different axes — Python wins the first, statically-typed languages tend to win the second. I'd present the C#-beats-Python-on-architecture claim as well-grounded reasoning supported by adjacent studies, not a single head-to-head experiment, so I'm not overclaiming if someone asks.
+  </aside>
+</section>
+
+
+<!-- 16 — CONTEXT 5/5 -->
+<section>
+  <div class="kicker teal">Context shapes quality · 5/5</div>
+  <h2>Notebooks &amp; long-term&nbsp;maintenance</h2>
+  <div class="cols">
+    <div>
+      <h3>Jupyter notebooks</h3>
+      <p>Notebook code is demonstrably worse — <strong>~1.4× more style issues</strong>, and large studies found <strong>&gt;70% of public notebooks don't re-run</strong>. The model learned that style, so in notebooks it reproduces more mistakes.</p>
+    </div>
+    <div>
+      <h3>Maintenance over a long horizon</h3>
+      <p><strong>SWE-CI</strong> measures maintainability via a CI loop: <strong>100 tasks, avg 233 days &amp; 71 commits</strong> each. A hard frontier — though the Claude Opus series leads it.</p>
+    </div>
+  </div>
+  <div class="card gold"><div class="lbl">The lever</div><p>Even for data work, have it write <strong>standard modules</strong> (jupytext / Marimo), and point the agent at a statically-typed target when architecture matters.</p></div>
+  <div class="refline">Notebooks: <b>Grotov et al.</b>, <i>A Large-Scale Comparison…</i> (MSR 2022, arXiv 2203.16718); Pimentel et al. (reproducibility). Maintenance: <b>SWE-CI</b> (arXiv 2603.03823).</div>
+  <aside class="notes">
+    Two final context effects that are very actionable. First, Jupyter notebooks. Independent studies — predating AI entirely — show notebook code is measurably lower quality than equivalent script code: around 1.4 times more style problems, and more than 70% of public notebooks can't even be re-run top to bottom because of out-of-order execution and hidden state. Since the model learned from that corpus, it inherits those bad habits, so code it writes inside a notebook tends to be worse than code it writes as a normal module. The fix is easy: have it work in plain .py modules, using something like jupytext or Marimo if you want notebook-style interactivity, and only convert to a notebook for presentation at the end.
+    Second, long-term maintenance, which is the work most teams actually care about. A newer benchmark, SWE-CI, tests exactly this — maintaining a codebase across a continuous-integration loop, with tasks averaging 233 days and 71 commits of history. It confirms this is a genuinely hard frontier for current models, though the Claude Opus series currently leads it. So it is not that models can't maintain code; it's that maintenance is where they are weakest and where your checkpoints and reviews matter most.
+    The lever on the slide ties the section together: you can actively steer quality by choosing the environment and language you point the agent at. Prefer standard modules over notebooks, and prefer a statically-typed target when architecture matters. Context is something you control, so control it deliberately.
+  </aside>
+</section>
+
+
+<!-- 17 — RECOMMENDATIONS 1/2 -->
+<section>
+  <div class="kicker teal">Recommendations · 1/2</div>
+  <h2>Foundations of quality</h2>
+  <p class="lead" style="margin-bottom:.3em;">Each of these recreates a setting where the model works well, or blocks one of the failures from the previous section.</p>
+  <div class="cols tri">
+    <div class="card"><div class="lbl">01 · Scope</div><p><strong>Keep tasks small.</strong> One file, one clear goal recreates the model's strongest setting. Anthropic found unguided attempts succeed only about a third of the time.</p></div>
+    <div class="card"><div class="lbl">02 · Tests</div><p><strong>Use tests as a safety net.</strong> They give the model an external check on correctness — the same mechanism the benchmark uses. A pre-commit hook should block a red build.</p></div>
+    <div class="card"><div class="lbl">03 · Context</div><p><strong>Keep a lean project guide (CLAUDE.md).</strong> The model reliably follows only ~150–200 instructions, and its own system prompt already uses some — so keep yours short and high-value.</p></div>
+  </div>
+  <p class="sub" style="margin-top:.4em;">Each one targets a failure we saw: small tasks match the easy archetype; tests catch drift and regressions; a project guide prevents duplication.</p>
+  <div class="refline">Synthesis of the report; practices per <b>Anthropic</b>, <i>Claude Code best practices</i> (instruction limit, planning, pre-commit hooks).</div>
+  <aside class="notes">
+    Now the constructive half: what to actually do. The framing to land is that these are not hacks — each one re-creates a condition where we already know the model does well, or directly blocks a failure mode from earlier.
+    Scope: keep tasks small and well-defined. We saw the model is strongest on single-file, clearly-specified changes, so shape your work to look like that. Anthropic's own finding that unguided attempts succeed only about a third of the time is the argument for breaking work down and planning before editing. Tests: a good test suite is an external oracle of correctness — it is literally the mechanism the benchmark uses to grade, so give the model the same thing. A pre-commit hook that blocks a failing build means the agent cannot quietly ship a regression. Context: the project guide file, CLAUDE.md, is where you record canonical modules and conventions so the agent stops reinventing them — but keep it lean, because models reliably honor only roughly 150 to 200 instructions and the tool's own system prompt already eats into that budget. A bloated guide is worse than a short one.
+    Tie each back to a failure: small tasks counter the multi-file weakness; tests counter drift and regressions; the project guide counters duplication. That mapping is the whole point — the recommendations are not generic best practice, they are responses to the specific ways these models fail.
+  </aside>
+</section>
+
+
+<!-- 18 — RECOMMENDATIONS 2/2 -->
+<section>
+  <div class="kicker teal">Recommendations · 2/2</div>
+  <h2>Discipline for long sessions</h2>
+  <p class="lead" style="margin-bottom:.3em;">The first three keep one task on track. These three keep quality from dropping over a long session, when the same code is edited many times.</p>
+  <div class="cols tri">
+    <div class="card"><div class="lbl">04 · Rules</div><p><strong>Make conventions enforceable.</strong> Encode them as linters and tests, not prose. Write the error message so it tells the agent how to fix the violation, putting the correction back in front of it.</p></div>
+    <div class="card"><div class="lbl">05 · Hygiene</div><p><strong>Keep the context clean.</strong> Start a fresh session per task, step in around 60% of the window, and after two failed fixes clear and re-prompt rather than piling corrections onto a polluted history.</p></div>
+    <div class="card"><div class="lbl">06 · Checkpoints</div><p><strong>Commit often and checkpoint.</strong> Save a known-good state at each phase boundary so you can roll back before small errors compound. Teams run several isolated worktrees in parallel.</p></div>
+  </div>
+  <div class="refline">Synthesis of the report; mitigations draw on <b>Chroma</b> (Context Rot), <b>OpenAI</b> (Codex harness), <b>techdebt.best</b>, and <b>Anthropic</b> (Claude Code).</div>
+  <aside class="notes">
+    These three address the compounding failures — duplication, context rot, drift — that only show up over a long session. Rules: a convention written only in prose will be forgotten; the same convention encoded as a linter or a structural test is enforced every time. A nice refinement OpenAI uses is to write the linter's error message so it actually tells the agent how to fix the problem, which feeds the correction straight back into the agent's context. Hygiene: this is the direct countermeasure to context rot. Start a new session for each unrelated task so old noise doesn't accumulate; step in when the context window is around 60% full rather than letting it overflow; and the counter-intuitive but important one — after two failed correction attempts, clear the context and rewrite your original instruction instead of stacking "no, try this" messages, because each failed attempt stays in context as noise and makes the next attempt worse. Checkpoints: commit frequently and save a known-good state at each phase boundary, so when the agent goes off the rails on iteration twelve you can roll back to iteration eleven instead of untangling the mess. Mature teams run several isolated copies of the repo in parallel so they can explore approaches without contaminating each other.
+    The through-line for both recommendation slides: you are not hoping the model behaves; you are engineering an environment where good behavior is the path of least resistance and bad behavior gets caught automatically.
+  </aside>
+</section>
+
+
+<!-- 19 — DELEGATION -->
+<section>
+  <div class="kicker">Delegation</div>
+  <h2>How much AI, how much&nbsp;human</h2>
+  <p class="lead" style="margin-bottom:.3em;">The rule is simple: the further a task is from what the model does well, the more human review it needs.</p>
+  <div class="cols tri">
+    <div class="dcol">
+      <div class="dt">Light review · AI-first</div>
+      <h3>Hand to the agent</h3>
+      <ul>
+        <li>Single / few-file fixes (the Verified sweet spot: &lt;1 hr, &lt;15 LOC)</li>
+        <li>Existing test coverage</li>
+        <li>Mature, popular framework</li>
+        <li>Boilerplate, mechanical refactors</li>
+      </ul>
+    </div>
+    <div class="dcol amber">
+      <div class="dt">Heavy review · human in the loop</div>
+      <h3>Steer the agent</h3>
+      <ul>
+        <li>Changes &gt;3 files / &gt;50 LOC</li>
+        <li>Cross-module / cross-service logic</li>
+        <li>Unfamiliar / proprietary stack</li>
+        <li>Performance- or security-sensitive code</li>
+      </ul>
+    </div>
+    <div class="dcol red">
+      <div class="dt">Don't delegate · human at the wheel</div>
+      <h3>Keep it yourself</h3>
+      <ul>
+        <li>Architecture &amp; design from scratch</li>
+        <li>Stack &amp; library selection</li>
+        <li>Ambiguous requirements</li>
+        <li>Production infra, final review</li>
+      </ul>
+    </div>
+  </div>
+  <div class="card warn" style="margin-top:.3em;"><div class="lbl">Escalate oversight when…</div><p>duplicate-branch or follow-up-fix rates rise · AI-PR rejection climbs · reviewers say AI diffs take longer to review · sessions routinely exceed ~60% context. Loosen only after <strong>your own</strong> benchmark — not SWE-bench — shows stable quality.</p></div>
+  <div class="refline">Rubric — synthesis of the report mapping task type to oversight; net slowdown on complex tasks: <b>METR</b> (arXiv 2507.09089).</div>
+  <aside class="notes">
+    This is the slide to dwell on, because it converts everything else into a decision your team can use tomorrow. The principle is one sentence: the further a task sits from the model's proven strengths, the more human oversight it needs. That gives three tiers.
+    Hand it to the agent with light review when the task looks like the benchmark's sweet spot — a fix in one or a few files, under an hour of work, in a mature popular framework, ideally with tests already in place. Also boilerplate and mechanical refactors. Here a quick review is enough. Steer the agent with heavy, human-in-the-loop review when the task has the properties we saw models struggle with: more than a few files, logic spanning modules or services, an unfamiliar or proprietary stack, or anything performance- or security-sensitive. The agent can still help, but a person should be reviewing closely throughout. And keep it yourself when the work is the kind the benchmark never tests and models are weakest at: architecture and design from scratch, choosing the stack or libraries, ambiguous requirements that need conversations with stakeholders, production infrastructure, and the final review of any code — human or AI.
+    The bottom card is how you make this adaptive rather than static. Watch for warning signs: rising rates of fixes-to-fixes or duplicate branches, more AI pull requests getting rejected, reviewers reporting that AI diffs take longer to review than human ones, or sessions routinely blowing past about 60% context. If you see those, tighten oversight. And crucially, only loosen oversight once your own internal benchmark — built from your own real issues, not SWE-bench — shows the model is reliably good at a given class of work. Your codebase is the only benchmark that actually predicts your results.
+  </aside>
+</section>
+
+
+<!-- 20 — QUESTIONS -->
+<section class="qa">
+  <div class="kicker">Thank you</div>
+  <h1>Questions<em>?</em></h1>
+  <p class="qline">Claude &amp; coding benchmarks · for engineering leads</p>
+  <div class="qmark">?</div>
+</section>
+
+<!-- 21 — SOURCES -->
+<section>
+  <div class="kicker">Appendix</div>
+  <h2>Sources &amp; further reading</h2>
+  <div class="srcgrid">
+    <p><b>Jimenez, Yang et al.</b> — SWE-bench: Can LMs Resolve Real-World GitHub Issues? Princeton, ICLR 2024 · swebench.com</p>
+    <p><b>OpenAI</b> — Introducing SWE-bench Verified (Aug 2024)</p>
+    <p><b>OpenAI</b> — Why SWE-bench Verified no longer measures frontier coding capabilities (Feb 23, 2026)</p>
+    <p><b>Epoch AI</b> — Why benchmarking is hard; What skills does SWE-bench Verified evaluate?</p>
+    <p><b>Scale AI</b> — SWE-bench Pro leaderboard &amp; methodology (2025)</p>
+    <p>Failure taxonomy of agentic SWE-bench solutions — <b>arXiv 2509.13941</b></p>
+    <p><b>Wang, Pradel &amp; Liu</b> — Are "Solved Issues" Really Solved Correctly? <b>arXiv 2503.15223</b></p>
+    <p><b>Aleithan et al.</b> — SWE-Bench+ · <b>arXiv 2410.06992</b></p>
+    <p><b>Hong, Troynikov, Huber (Chroma)</b> — Context Rot (2025)</p>
+    <p><b>Liu et al.</b> — Lost in the Middle · TACL 2024</p>
+    <p><b>Becker, Rush, Barnes &amp; Rein (METR)</b> — Impact of Early-2025 AI on Developer Productivity · <b>arXiv 2507.09089</b></p>
+    <p>LLMs Love Python: bias for languages &amp; libraries · <b>arXiv 2503.17181</b></p>
+    <p>Security &amp; Quality in LLM-Generated Code (multi-language) · <b>arXiv 2502.01853</b></p>
+    <p><b>Microsoft Research</b> — SWE-Sharp-Bench (C#), 2025</p>
+    <p><b>Grotov et al.</b> — Python in Notebooks vs Scripts · MSR 2022, <b>arXiv 2203.16718</b></p>
+    <p><b>Chen et al.</b> — SWE-CI: Maintaining Codebases via CI · <b>arXiv 2603.03823</b></p>
+    <p><b>Cassano et al.</b> — MultiPL-T: high- to low-resource transfer · Proc. ACM PL 2024</p>
+    <p><b>techdebt.best</b> — AI Architecture Drift</p>
+    <p><b>Saito et al.</b> — Verbosity Bias in Preference Labeling by LLMs · <b>arXiv 2310.10076</b>; Kim et al. — Mitigating Length Bias through a Causal Lens · <b>arXiv 2511.12573</b></p>
+    <p><b>Anthropic</b> — Opus 4.5–4.8 system cards; Claude Code best practices</p>
+    <p><i>Primary basis:</i> internal report "Claude on SWE-bench: A Benchmark-to-Practice Guide for Engineering Leads" (May 2026)</p>
+  </div>
+  <div class="refline">All third-party figures self-reported or as published; cross-model scores comparable only under identical scaffolds. State as of May 29, 2026.</div>
+</section>
+
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/notes/notes.min.js"></script>
+<script>
+  Reveal.initialize({
+    hash:true, center:false, slideNumber:'c/t',
+    transition:'slide', transitionSpeed:'default',
+    width:1280, height:720, margin:0.025, controlsTutorial:true,
+    plugins:[ RevealNotes ]
+  });
+</script>
+</body>
+</html>

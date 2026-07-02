@@ -3,7 +3,7 @@ import { Button } from '@mantine/core';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import { useDeckStore, useSelectedPosition } from '../../state/deckStore';
 import { composeSlides } from '../../model/deck';
-import { themeUrl } from '../../api/client';
+import { REVEAL_CSS_RE, themeUrl } from '../../api/client';
 
 /**
  * Live preview: the real reveal.js runtime in a disposable iframe.
@@ -31,9 +31,7 @@ export function PreviewPane() {
       const dir = s.meta.path.includes('/')
         ? s.meta.path.slice(0, s.meta.path.lastIndexOf('/') + 1)
         : '';
-      const extra = s.meta.stylesheets.filter(
-        (href) => !/reveal\.css|theme\/[\w-]+\.css/.test(href),
-      );
+      const extra = s.meta.stylesheets.filter((href) => !REVEAL_CSS_RE.test(href));
       iframeRef.current?.contentWindow?.postMessage(
         {
           type: 'sync',
@@ -44,6 +42,8 @@ export function PreviewPane() {
           extraStylesheets: extra,
           width: s.meta.config.width,
           height: s.meta.config.height,
+          center: s.meta.config.center,
+          margin: s.meta.config.margin,
           h: posRef.current?.h ?? 0,
           v: posRef.current?.v ?? 0,
         },

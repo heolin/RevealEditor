@@ -66,18 +66,22 @@ export function Toolbar() {
         </ActionIcon>
       </Tooltip>
       <ToolbarInsert />
-      {themes.length > 0 && (
-        <Select
-          size="xs"
-          w={150}
-          value={meta.theme}
-          placeholder="custom theme"
-          data={themes}
-          onChange={(v) => v && setTheme(v)}
-          searchable
-          comboboxProps={{ withinPortal: true }}
-        />
-      )}
+      {themes.length > 0 &&
+        (meta.theme === null ? (
+          <Tooltip label="This deck uses its own custom styling — there is no standard theme link to switch">
+            <Select size="xs" w={150} placeholder="custom styling" data={[]} disabled />
+          </Tooltip>
+        ) : (
+          <Select
+            size="xs"
+            w={150}
+            value={meta.theme}
+            data={themes}
+            onChange={(v) => v && setTheme(v)}
+            searchable
+            comboboxProps={{ withinPortal: true }}
+          />
+        ))}
       <Tooltip label={`Switch editor to ${colorScheme === 'light' ? 'dark' : 'light'} mode`}>
         <ActionIcon variant="subtle" color="gray" onClick={toggleColorScheme}>
           {colorScheme === 'light' ? <IconMoon size={18} /> : <IconSun size={18} />}

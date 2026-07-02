@@ -10,7 +10,7 @@ function fakeDeck(): DeckData {
     themeHref: 'theme/black.css',
     stylesheets: [],
     managedCss: '',
-    config: { width: 960, height: 700 },
+    config: { width: 960, height: 700, center: true, margin: 0.04 },
     sections: [
       { source: '<section><h1>One</h1></section>', leading: '\n  ', attrsText: '', inner: '<h1>One</h1>' },
       { source: '<section><h1>Two</h1></section>', leading: '\n  ', attrsText: '', inner: '<h1>Two</h1>' },

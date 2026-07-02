@@ -5,6 +5,7 @@
  */
 import type { StageCtx } from './commands';
 import { commit } from './commands';
+import { useDeckStore } from '../state/deckStore';
 
 export interface StylePatch {
   [prop: string]: string | null;
@@ -57,11 +58,14 @@ export function toAbsolute(ctx: StageCtx, el: HTMLElement, designHeight: number)
  */
 export function ensureFreeLayoutSection(ctx: StageCtx, designHeight: number): void {
   if (!ctx.section.style.height) {
+    // center:false decks lay their sections out in block flow from the top —
+    // pinning must not impose flex centering on them.
+    const center = useDeckStore.getState().meta?.config.center ?? true;
     applyStyle(ctx.section, {
       height: `${designHeight}px`,
-      display: 'flex',
-      'flex-direction': 'column',
-      'justify-content': 'center',
+      ...(center
+        ? { display: 'flex', 'flex-direction': 'column', 'justify-content': 'center' }
+        : {}),
     });
   }
 }
