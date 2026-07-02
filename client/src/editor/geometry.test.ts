@@ -1,5 +1,32 @@
-import { describe, it, expect } from 'vitest';
+import { afterAll, beforeAll, describe, it, expect } from 'vitest';
 import type { StageCtx } from './commands';
+
+// jsdom has no layout. Elements the tests create get precise instance mocks
+// (see box()); elements created INSIDE geometry code (the group wrapper)
+// fall back to this style-driven prototype rect, accumulated through
+// positioned ancestors up to the section.
+const origGetRect = HTMLElement.prototype.getBoundingClientRect;
+beforeAll(() => {
+  HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
+    let left = parseInt(this.style?.left, 10) || 0;
+    let top = parseInt(this.style?.top, 10) || 0;
+    let p = this.parentElement;
+    while (p && p.tagName !== 'SECTION' && p !== document.body) {
+      left += parseInt(p.style?.left, 10) || 0;
+      top += parseInt(p.style?.top, 10) || 0;
+      p = p.parentElement;
+    }
+    return {
+      left,
+      top,
+      width: parseInt(this.style?.width, 10) || 0,
+      height: parseInt(this.style?.height, 10) || 0,
+    } as DOMRect;
+  };
+});
+afterAll(() => {
+  HTMLElement.prototype.getBoundingClientRect = origGetRect;
+});
 import {
   alignElements,
   distributeElements,

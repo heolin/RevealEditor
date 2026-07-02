@@ -3,7 +3,7 @@ import { ActionIcon, Divider, Group, Menu, Paper, Tooltip } from '@mantine/core'
 import { IconPlus } from '@tabler/icons-react';
 import { useEditorStore } from '../editorStore';
 import { useDeckStore } from '../../state/deckStore';
-import { applyStyle, isAbsolute, slideRect, snapEdges, snapValue } from '../geometry';
+import { isAbsolute, snapEdges, snapValue, stageRect, writeStageRect } from '../geometry';
 import { effectiveFragments } from '../fragments';
 import { isShapeEl, renderShapeInto } from '../shapes';
 import { isChartEl, refreshChart } from '../chart/chart';
@@ -248,7 +248,7 @@ function ResizeHandles({ el, scale }: { el: HTMLElement; scale: number }) {
     // events (iframes swallow them) and the resize goes dead.
     const grip = down.currentTarget as HTMLElement;
     grip.setPointerCapture(down.pointerId);
-    const start = slideRect(ctx, el);
+    const start = stageRect(ctx, el);
     const design = useDeckStore.getState().meta?.config ?? { width: 960, height: 700 };
     const edges = snapEdges(ctx, el, design.width, design.height);
     const isImg = el.tagName === 'IMG';
@@ -293,15 +293,15 @@ function ResizeHandles({ el, scale }: { el: HTMLElement; scale: number }) {
         .getState()
         .setSnapGuides(guideX != null || guideY != null ? { x: guideX, y: guideY } : null);
       const sized = isImg || isShapeEl(el) || isChartEl(el);
-      const patch: Record<string, string | null> = { width: `${Math.round(w)}px` };
+      const target: { left?: number; top?: number; width: number; height?: number } = { width: w };
       if (handle.includes('s') || handle.includes('n') || (sized && handle.length === 2)) {
-        patch.height = `${Math.round(h)}px`;
+        target.height = h;
       }
       if (absolute) {
-        patch.left = `${Math.round(left)}px`;
-        patch.top = `${Math.round(top)}px`;
+        target.left = left;
+        target.top = top;
       }
-      applyStyle(el, patch);
+      writeStageRect(ctx!, el, target);
       // Self-describing blocks re-bake their render at the new size.
       if (isShapeEl(el)) renderShapeInto(el);
       else if (isChartEl(el) && ctx) refreshChart(ctx, el);

@@ -40,26 +40,61 @@ export function isAbsolute(el: HTMLElement): boolean {
 }
 
 /**
- * Rect of an element relative to the slide SECTION — the containing block
- * for inline left/top. Use for reading/writing free-position coordinates.
- * Beware: a centered, unpinned section sits BELOW the slide origin
- * (--re-center-top), so this is NOT the visual/pointer coordinate space.
- */
-export function slideRect(ctx: StageCtx, el: HTMLElement) {
-  const s = ctx.section.getBoundingClientRect();
-  const r = el.getBoundingClientRect();
-  return { left: r.left - s.left, top: r.top - s.top, width: r.width, height: r.height };
-}
-
-/**
- * Rect relative to the .slides box — the slide origin, which never moves.
- * This IS the pointer/client coordinate space inside the stage iframe: use
- * it whenever comparing against clientX/Y or drawing overlay chrome.
+ * THE coordinate space: rects relative to the .slides box — the slide
+ * origin, which never moves. This is also the pointer/client space inside
+ * the stage iframe and the overlay's drawing space (× scale). ALL
+ * interactive geometry (drag, resize, snap, marquee, drop) happens here;
+ * writeStageRect converts to inline left/top at the write boundary.
  */
 export function stageRect(ctx: StageCtx, el: HTMLElement) {
   const origin = (ctx.section.parentElement ?? ctx.section).getBoundingClientRect();
   const r = el.getBoundingClientRect();
   return { left: r.left - origin.left, top: r.top - origin.top, width: r.width, height: r.height };
+}
+
+/**
+ * Stage-coords origin of the box an absolute element's inline left/top
+ * resolve against: the padding box of its nearest positioned ancestor (the
+ * section itself in the common case — it is always positioned by stage CSS,
+ * and by reveal.css in the runtime). Walks ancestors instead of
+ * offsetParent: SVG elements (shapes) don't have offsetParent.
+ */
+function containingOrigin(ctx: StageCtx, el: HTMLElement): { left: number; top: number } {
+  const view = ctx.doc.defaultView!;
+  let p = el.parentElement;
+  while (p && p !== ctx.section) {
+    if (view.getComputedStyle(p).position !== 'static') break;
+    p = p.parentElement;
+  }
+  const cb = p ?? ctx.section;
+  const r = stageRect(ctx, cb);
+  const cs = view.getComputedStyle(cb);
+  return {
+    left: r.left + (parseFloat(cs.borderLeftWidth) || 0),
+    top: r.top + (parseFloat(cs.borderTopWidth) || 0),
+  };
+}
+
+/**
+ * Write a stage-coords position/size as inline styles on an absolutely
+ * positioned element, converting to its containing block's space. The single
+ * write boundary between stage coordinates and CSS — call it AFTER
+ * position:absolute is set so the containing block is the real one.
+ */
+export function writeStageRect(
+  ctx: StageCtx,
+  el: HTMLElement,
+  rect: { left?: number; top?: number; width?: number; height?: number },
+): void {
+  const patch: StylePatch = {};
+  if (rect.left !== undefined || rect.top !== undefined) {
+    const origin = containingOrigin(ctx, el);
+    if (rect.left !== undefined) patch.left = `${Math.round(rect.left - origin.left)}px`;
+    if (rect.top !== undefined) patch.top = `${Math.round(rect.top - origin.top)}px`;
+  }
+  if (rect.width !== undefined) patch.width = `${Math.round(rect.width)}px`;
+  if (rect.height !== undefined) patch.height = `${Math.round(rect.height)}px`;
+  applyStyle(el, patch);
 }
 
 /** Convert a flow element to absolute positioning at its current visual spot. */
@@ -89,16 +124,16 @@ export function toAbsoluteAll(ctx: StageCtx, els: HTMLElement[], designHeight: n
   }
   const rects = targets.map((el) => stageRect(ctx, el));
   ensureFreeLayoutSection(ctx, designHeight);
-  targets.forEach((el, i) =>
+  targets.forEach((el, i) => {
     applyStyle(el, {
       position: 'absolute',
-      left: `${Math.round(rects[i].left)}px`,
-      top: `${Math.round(rects[i].top)}px`,
-      width: `${Math.round(rects[i].width)}px`,
       margin: '0',
       'align-self': null, // flex-item alignment is meaningless once absolute
-    }),
-  );
+    });
+    // Width only — height stays auto so text reflows as content changes.
+    const { left, top, width } = rects[i];
+    writeStageRect(ctx, el, { left, top, width });
+  });
   syncInlineCentering(ctx);
 }
 
@@ -335,21 +370,21 @@ export function alignElements(
 ): void {
   if (els.length === 0) return;
   toAbsoluteAll(ctx, els, design.height);
-  const rects = els.map((el) => slideRect(ctx, el));
+  const rects = els.map((el) => stageRect(ctx, el));
   const box =
     els.length >= 2
       ? unionRect(rects)
       : { left: 0, top: 0, width: design.width, height: design.height };
   els.forEach((el, i) => {
     const r = rects[i];
-    const patch: StylePatch = {};
-    if (edge === 'left') patch.left = `${Math.round(box.left)}px`;
-    if (edge === 'right') patch.left = `${Math.round(box.left + box.width - r.width)}px`;
-    if (edge === 'hcenter') patch.left = `${Math.round(box.left + (box.width - r.width) / 2)}px`;
-    if (edge === 'top') patch.top = `${Math.round(box.top)}px`;
-    if (edge === 'bottom') patch.top = `${Math.round(box.top + box.height - r.height)}px`;
-    if (edge === 'vcenter') patch.top = `${Math.round(box.top + (box.height - r.height) / 2)}px`;
-    applyStyle(el, patch);
+    const target: { left?: number; top?: number } = {};
+    if (edge === 'left') target.left = box.left;
+    if (edge === 'right') target.left = box.left + box.width - r.width;
+    if (edge === 'hcenter') target.left = box.left + (box.width - r.width) / 2;
+    if (edge === 'top') target.top = box.top;
+    if (edge === 'bottom') target.top = box.top + box.height - r.height;
+    if (edge === 'vcenter') target.top = box.top + (box.height - r.height) / 2;
+    writeStageRect(ctx, el, target);
   });
   commit(ctx);
 }
@@ -364,7 +399,7 @@ export function distributeElements(
   if (els.length < 3) return;
   toAbsoluteAll(ctx, els, design.height);
   const items = els
-    .map((el) => ({ el, rect: slideRect(ctx, el) }))
+    .map((el) => ({ el, rect: stageRect(ctx, el) }))
     .sort((a, b) => (axis === 'h' ? a.rect.left - b.rect.left : a.rect.top - b.rect.top));
   const first = items[0].rect;
   const last = items[items.length - 1].rect;
@@ -379,9 +414,7 @@ export function distributeElements(
   const gap = (span - totalSize) / (items.length - 1);
   let cursor = axis === 'h' ? first.left : first.top;
   for (const it of items) {
-    applyStyle(it.el, {
-      [axis === 'h' ? 'left' : 'top']: `${Math.round(cursor)}px`,
-    });
+    writeStageRect(ctx, it.el, axis === 'h' ? { left: cursor } : { top: cursor });
     cursor += (axis === 'h' ? it.rect.width : it.rect.height) + gap;
   }
   commit(ctx);
@@ -405,28 +438,22 @@ export function groupElements(
 ): HTMLElement | null {
   if (els.length < 2) return null;
   toAbsoluteAll(ctx, els, design.height);
-  const rects = els.map((el) => slideRect(ctx, el));
+  const rects = els.map((el) => stageRect(ctx, el));
   const box = unionRect(rects);
   const group = ctx.doc.createElement('div');
   group.className = GROUP_CLASS;
-  applyStyle(group, {
-    position: 'absolute',
-    left: `${Math.round(box.left)}px`,
-    top: `${Math.round(box.top)}px`,
-    width: `${Math.round(box.width)}px`,
-    height: `${Math.round(box.height)}px`,
-  });
+  applyStyle(group, { position: 'absolute' });
   // Insert where the first (topmost in DOM order) member sat.
   const anchor = els
     .slice()
     .sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1))[0];
   anchor.before(group);
+  writeStageRect(ctx, group, box);
+  // Members keep their stage rects; the group becoming their containing
+  // block is what rebases the written values — no manual math.
   els.forEach((el, i) => {
-    applyStyle(el, {
-      left: `${Math.round(rects[i].left - box.left)}px`,
-      top: `${Math.round(rects[i].top - box.top)}px`,
-    });
     group.appendChild(el);
+    writeStageRect(ctx, el, { left: rects[i].left, top: rects[i].top });
   });
   commit(ctx);
   return group;
@@ -438,13 +465,10 @@ export function ungroupElements(ctx: StageCtx, group: HTMLElement): HTMLElement[
     (c): c is HTMLElement => (c as HTMLElement).style !== undefined,
   );
   for (const child of children) {
-    const r = slideRect(ctx, child);
-    applyStyle(child, {
-      position: 'absolute',
-      left: `${Math.round(r.left)}px`,
-      top: `${Math.round(r.top)}px`,
-    });
+    const r = stageRect(ctx, child);
+    applyStyle(child, { position: 'absolute' });
     group.before(child);
+    writeStageRect(ctx, child, { left: r.left, top: r.top });
   }
   group.remove();
   commit(ctx);
@@ -474,7 +498,7 @@ export function snapEdges(ctx: StageCtx, moving: HTMLElement, designW: number, d
     // it silently skipped EVERY sibling, so only slide bounds ever snapped.
     if (el === moving || (el as HTMLElement).style === undefined) continue;
     if (el.tagName === 'ASIDE') continue;
-    const r = slideRect(ctx, el as HTMLElement);
+    const r = stageRect(ctx, el as HTMLElement);
     xs.push(r.left, r.left + r.width / 2, r.left + r.width);
     ys.push(r.top, r.top + r.height / 2, r.top + r.height);
   }

@@ -14,11 +14,11 @@ import {
   isLayoutContainer,
   marqueeHits,
   placeInFlow,
-  slideRect,
   snapEdges,
   snapRect,
   stageRect,
   toAbsoluteAll,
+  writeStageRect,
 } from './geometry';
 import { showAllFragments } from './fragments';
 import { nextCell } from './table';
@@ -217,8 +217,7 @@ ${stageHead(meta)}
       const cs = ctx.doc.defaultView!.getComputedStyle(container);
       const horizontal = cs.display.includes('flex') && cs.flexDirection.startsWith('row');
       let before: HTMLElement | null = null;
-      // stageRect, not slideRect: x/y are pointer coords, and on a centered
-      // unpinned section the section origin sits below the slide origin.
+      // stageRect: x/y are pointer coords, which ARE stage coords.
       for (const kid of kids) {
         const r = stageRect(ctx, kid);
         const mid = horizontal ? r.left + r.width / 2 : r.top + r.height / 2;
@@ -370,11 +369,11 @@ ${stageHead(meta)}
       }
 
       const ctx = ctxRef.current!;
-      const rect = slideRect(ctx, el);
+      const rect = stageRect(ctx, el);
       const others = [...useEditorStore.getState().extraSelected, useEditorStore.getState().selectedEl]
         .filter((o): o is HTMLElement => !!o && o.isConnected && o !== el)
         .map((o) => {
-          const r = slideRect(ctx, o);
+          const r = stageRect(ctx, o);
           return { el: o, startLeft: r.left, startTop: r.top };
         });
       press = {
@@ -424,11 +423,11 @@ ${stageHead(meta)}
             // One batch: all rects measured before the first conversion —
             // each conversion reflows the remaining flow content.
             toAbsoluteAll(ctx, [press.el, ...press.others.map((o) => o.el)], height);
-            const r = slideRect(ctx, press.el);
+            const r = stageRect(ctx, press.el);
             press.startLeft = r.left;
             press.startTop = r.top;
             press.others = press.others.map((o) => {
-              const or = slideRect(ctx, o.el);
+              const or = stageRect(ctx, o.el);
               return { ...o, startLeft: or.left, startTop: or.top };
             });
           }
@@ -448,15 +447,15 @@ ${stageHead(meta)}
             height: press.el.getBoundingClientRect().height,
           };
           const snap = snapRect(raw, snapEdges(ctx, press.el, width, height), SNAP_THRESHOLD);
-          applyStyle(press.el, {
-            left: `${Math.round(raw.left + snap.dx)}px`,
-            top: `${Math.round(raw.top + snap.dy)}px`,
+          writeStageRect(ctx, press.el, {
+            left: raw.left + snap.dx,
+            top: raw.top + snap.dy,
           });
           // Multi-select: the rest of the set rides along with the same delta.
           for (const o of press.others) {
-            applyStyle(o.el, {
-              left: `${Math.round(o.startLeft + dx + snap.dx)}px`,
-              top: `${Math.round(o.startTop + dy + snap.dy)}px`,
+            writeStageRect(ctx, o.el, {
+              left: o.startLeft + dx + snap.dx,
+              top: o.startTop + dy + snap.dy,
             });
           }
           useEditorStore.getState().setSnapGuides({ x: snap.x, y: snap.y });
@@ -581,10 +580,10 @@ ${stageHead(meta)}
           const step = e.shiftKey ? 10 : 1;
           const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
           const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
-          applyStyle(selected, {
-            left: `${(parseInt(selected.style.left, 10) || 0) + dx}px`,
-            top: `${(parseInt(selected.style.top, 10) || 0) + dy}px`,
-          });
+          // Measured, not parseInt(style.left): hand-authored positions may
+          // be % or unset — nudge from where the element actually IS.
+          const r = stageRect(ctx, selected);
+          writeStageRect(ctx, selected, { left: r.left + dx, top: r.top + dy });
           commit(ctx);
           return;
         }
