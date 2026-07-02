@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/vendor/reveal.js/dist/reveal.css">
   <link rel="stylesheet" id="re-theme" href="/vendor/reveal.js/dist/theme/black.css">
   <link rel="stylesheet" href="/vendor/reveal.js/plugin/highlight/monokai.css">
+  <style id="re-managed"></style>
   <style>html, body { margin: 0; height: 100%; background: #111; }</style>
 </head>
 <body>
@@ -25,6 +26,7 @@
     function applyHead(m) {
       if (m.baseHref) document.getElementById('re-base').href = m.baseHref;
       if (m.themeHref) document.getElementById('re-theme').href = m.themeHref;
+      document.getElementById('re-managed').textContent = m.managedCss || '';
       (m.extraStylesheets || []).forEach((href) => {
         if (extraLinks.has(href)) return;
         extraLinks.add(href);

@@ -24,6 +24,7 @@ import {
   IconStackPop,
   IconStackPush,
   IconStrikethrough,
+  IconTable,
   IconTrash,
 } from '@tabler/icons-react';
 import { useEditorStore } from '../editorStore';
@@ -32,6 +33,7 @@ import { api } from '../../api/client';
 import { handlerFor } from '../registry';
 import { applyStyle, changeZOrder, isAbsolute, returnToFlow, slideRect } from '../geometry';
 import { effectiveFragments } from '../fragments';
+import { insertTable } from '../table';
 import {
   commit,
   convertListToParagraphs,
@@ -464,6 +466,9 @@ export function InsertMenu({ after }: { after?: HTMLElement | null }) {
             }}
           >
             Code block
+          </Menu.Item>
+          <Menu.Item leftSection={<IconTable size={14} />} onClick={() => insertTable(ctx, after ?? null)}>
+            Table
           </Menu.Item>
         </Menu.Dropdown>
       </Menu>

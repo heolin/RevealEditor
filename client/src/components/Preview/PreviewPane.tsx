@@ -38,6 +38,7 @@ export function PreviewPane() {
         {
           type: 'sync',
           slidesHtml: composeSlides(s.columns, s.meta.layout),
+          managedCss: s.meta.managedCss,
           themeHref: themeUrl(s.meta.path, s.meta.theme, s.meta.themeHref),
           baseHref: `${location.origin}/files/${dir}`,
           extraStylesheets: extra,
@@ -55,10 +56,16 @@ export function PreviewPane() {
       timer = setTimeout(buildAndSend, 300);
     }
 
+    let lastCss: unknown = null;
     const unsubscribe = useDeckStore.subscribe((state) => {
-      if (state.columns !== lastColumns || state.meta?.theme !== lastTheme) {
+      if (
+        state.columns !== lastColumns ||
+        state.meta?.theme !== lastTheme ||
+        state.meta?.managedCss !== lastCss
+      ) {
         lastColumns = state.columns;
         lastTheme = state.meta?.theme;
+        lastCss = state.meta?.managedCss;
         schedule();
       }
     });

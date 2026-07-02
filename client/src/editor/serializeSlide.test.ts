@@ -104,13 +104,14 @@ describe('registry', () => {
     expect(handlerFor(block)).toBe(genericHandler);
   });
 
-  it('img and pre get their dedicated handlers', () => {
+  it('img/pre/table get their dedicated handlers', () => {
     expect(handlerFor(document.createElement('img')).type).toBe('image');
     expect(handlerFor(document.createElement('pre')).type).toBe('code');
+    expect(handlerFor(document.createElement('table')).type).toBe('table');
   });
 
-  it('svg/table/figure fall through to generic (until their handlers exist)', () => {
-    for (const tag of ['svg', 'table', 'figure']) {
+  it('svg/figure fall through to generic (until their handlers exist)', () => {
+    for (const tag of ['svg', 'figure']) {
       expect(handlerFor(document.createElement(tag)).type).toBe('generic');
     }
   });

@@ -45,6 +45,8 @@ interface DeckState {
   moveSlideToSlot(slideId: string, columnId: string, index: number): void;
   moveSlideToGap(slideId: string, gapIndex: number): void;
   setTheme(theme: string): void;
+  /** Replace the editor-managed style block contents (table presets, tokens). */
+  setManagedCss(css: string): void;
   /** Commit edited slide markup from the editing engine (no-op if unchanged). */
   updateSlideSource(slideId: string, source: string): void;
 
@@ -280,6 +282,12 @@ export const useDeckStore = create<DeckState>()(
         set({ meta: { ...meta, theme, themeHref: null }, dirty: true });
       },
 
+      setManagedCss(css) {
+        const { meta } = get();
+        if (!meta || meta.managedCss === css) return;
+        set({ meta: { ...meta, managedCss: css }, dirty: true });
+      },
+
       updateSlideSource(slideId, source) {
         const { columns } = get();
         const current = columns
@@ -304,6 +312,7 @@ export const useDeckStore = create<DeckState>()(
           const res = await api.saveDeck(meta.path, {
             slidesHtml: composeSlides(columns, meta.layout),
             theme: meta.theme ?? undefined,
+            managedCss: meta.managedCss || undefined,
             baseMtime: mtime,
             force: opts?.force,
           });

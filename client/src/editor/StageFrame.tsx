@@ -10,6 +10,7 @@ import { handlerFor, textEditableFrom } from './registry';
 import { hydrateCodeBlocks } from './codeHighlight';
 import { applyStyle, isAbsolute, slideRect, snapEdges, snapRect, toAbsolute } from './geometry';
 import { showAllFragments } from './fragments';
+import { nextCell } from './table';
 import {
   type StageCtx,
   commit,
@@ -106,6 +107,7 @@ ${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}
     endSession(true);
     const editor = useEditorStore.getState();
     editor.select(el);
+    const isCell = el.tagName === 'TD' || el.tagName === 'TH';
     sessionRef.current = new TextSession(el, {
       onCommit: () => commit(ctx),
       onExit: () => {
@@ -113,6 +115,14 @@ ${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}
           useEditorStore.getState().setSessionEl(null);
         }
       },
+      onTab: isCell
+        ? (shift) => {
+            const next = nextCell(el as HTMLTableCellElement, shift ? -1 : 1);
+            if (!next) return false;
+            startSession(next);
+            return true;
+          }
+        : undefined,
     });
     editor.setSessionEl(el);
     if (caretPoint) placeCaretAt(ctx.doc, caretPoint.x, caretPoint.y);

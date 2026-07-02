@@ -30,6 +30,7 @@ export function hasInlineOnlyContent(el: Element): boolean {
 const TEXT_TAGS = new Set([
   'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
   'P', 'BLOCKQUOTE', 'FIGCAPTION', 'LI',
+  'TD', 'TH', 'CAPTION',
 ]);
 
 export const textHandler: ElementHandler = {
@@ -44,6 +45,16 @@ export const textHandler: ElementHandler = {
     }
     return false;
   },
+  capabilities: { textEdit: true, delete: true, resize: 'width' },
+};
+
+/** Tables: cell content edits via text sessions; structure via table commands. */
+export const tableHandler: ElementHandler = {
+  type: 'table',
+  priority: 30,
+  match: (el) => el.tagName === 'TABLE',
+  // textEdit=true delegates to the clicked cell (textEditableFrom skips the
+  // table element itself — a contenteditable TABLE would be destructive).
   capabilities: { textEdit: true, delete: true, resize: 'width' },
 };
 
@@ -70,9 +81,13 @@ export const genericHandler: ElementHandler = {
   capabilities: { textEdit: false, delete: true, resize: 'both' },
 };
 
-const HANDLERS: ElementHandler[] = [codeHandler, imageHandler, textHandler, genericHandler].sort(
-  (a, b) => b.priority - a.priority,
-);
+const HANDLERS: ElementHandler[] = [
+  tableHandler,
+  codeHandler,
+  imageHandler,
+  textHandler,
+  genericHandler,
+].sort((a, b) => b.priority - a.priority);
 
 export function handlerFor(el: Element): ElementHandler {
   return HANDLERS.find((h) => h.match(el))!;
@@ -94,6 +109,11 @@ export function textEditableFrom(
 ): HTMLElement | null {
   let el: Element | null = target;
   while (el && el !== boundary) {
+    // A table's textEdit capability means "edit cells", never the table node.
+    if (el.tagName === 'TABLE') {
+      el = el.parentElement;
+      continue;
+    }
     const handler = handlerFor(el);
     if (handler.capabilities.textEdit) {
       // Whole-list editing: prefer the list over the individual <li>.

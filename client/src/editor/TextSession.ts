@@ -10,6 +10,8 @@ export interface TextSessionOptions {
   onCommit(): void;
   /** Called exactly once after the session tears down. */
   onExit(): void;
+  /** Tab pressed (table cells navigate). Return true when handled. */
+  onTab?(shift: boolean): boolean;
   debounceMs?: number;
 }
 
@@ -27,7 +29,7 @@ const ALLOWED_INPUT_PREFIXES = [
 
 export class TextSession {
   readonly el: HTMLElement;
-  private opts: Required<TextSessionOptions>;
+  private opts: TextSessionOptions & { debounceMs: number };
   private timer: ReturnType<typeof setTimeout> | null = null;
   private dirtySinceCommit = false;
   private exited = false;
@@ -89,6 +91,11 @@ export class TextSession {
         e.preventDefault();
         e.stopPropagation();
         this.exit();
+      } else if (e.key === 'Tab' && this.opts.onTab) {
+        if (this.opts.onTab(e.shiftKey)) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
       }
     });
 
