@@ -152,6 +152,11 @@ function ResizeHandles({ el, scale }: { el: HTMLElement; scale: number }) {
     down.preventDefault();
     down.stopPropagation();
     if (!ctx) return;
+    // Capture the pointer on the handle: without it, the moment the pointer
+    // crosses onto the stage iframe the parent window stops receiving
+    // events (iframes swallow them) and the resize goes dead.
+    const grip = down.currentTarget as HTMLElement;
+    grip.setPointerCapture(down.pointerId);
     const start = slideRect(ctx, el);
     const isImg = el.tagName === 'IMG';
     const ratio = start.width / Math.max(1, start.height);
@@ -185,12 +190,15 @@ function ResizeHandles({ el, scale }: { el: HTMLElement; scale: number }) {
       useEditorStore.getState().bump();
     }
     function onUp() {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
+      grip.removeEventListener('pointermove', onMove);
+      grip.removeEventListener('pointerup', onUp);
+      grip.removeEventListener('pointercancel', onUp);
       if (ctx) commit(ctx);
     }
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
+    // With capture active, all pointer events retarget to the grip.
+    grip.addEventListener('pointermove', onMove);
+    grip.addEventListener('pointerup', onUp);
+    grip.addEventListener('pointercancel', onUp);
   }
 
   return (

@@ -32,14 +32,13 @@ export function slideRect(ctx: StageCtx, el: HTMLElement) {
 
 /**
  * Convert a flow element to absolute positioning at its current visual spot.
- * Pins the section's height so the section box matches the slide box in the
- * real presentation too — without this, reveal's vertical centering would
- * shift absolute coordinates between editor and runtime.
+ * The rect is measured BEFORE the section is pinned — pinning must never
+ * move the element being grabbed.
  */
 export function toAbsolute(ctx: StageCtx, el: HTMLElement, designHeight: number): void {
   if (isAbsolute(el)) return;
-  ensureFreeLayoutSection(ctx, designHeight);
   const rect = slideRect(ctx, el);
+  ensureFreeLayoutSection(ctx, designHeight);
   applyStyle(el, {
     position: 'absolute',
     left: `${Math.round(rect.left)}px`,
@@ -49,9 +48,21 @@ export function toAbsolute(ctx: StageCtx, el: HTMLElement, designHeight: number)
   });
 }
 
+/**
+ * Pin the section to the slide's design height so absolute coordinates mean
+ * the same thing in the runtime (reveal vertically centers content-sized
+ * sections). The inline flex centering keeps the REMAINING flow content
+ * centered — in the editor and, because it's inline, in the presentation —
+ * so pinning is visually a no-op for everything else.
+ */
 export function ensureFreeLayoutSection(ctx: StageCtx, designHeight: number): void {
   if (!ctx.section.style.height) {
-    applyStyle(ctx.section, { height: `${designHeight}px` });
+    applyStyle(ctx.section, {
+      height: `${designHeight}px`,
+      display: 'flex',
+      'flex-direction': 'column',
+      'justify-content': 'center',
+    });
   }
 }
 
@@ -66,6 +77,18 @@ export function returnToFlow(ctx: StageCtx, el: HTMLElement): void {
     margin: null,
     'z-index': null,
   });
+  // Last absolute element gone → unpin the section (restores pure flow).
+  const anyAbsolute = Array.from(ctx.section.children).some(
+    (c) => c instanceof HTMLElement && c.style.position === 'absolute',
+  );
+  if (!anyAbsolute) {
+    applyStyle(ctx.section, {
+      height: null,
+      display: null,
+      'flex-direction': null,
+      'justify-content': null,
+    });
+  }
   commit(ctx);
 }
 

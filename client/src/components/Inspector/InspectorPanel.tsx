@@ -30,8 +30,10 @@ import {
   setFragmentVariant,
   showAllFragments,
 } from '../../editor/fragments';
-import { readShapeSpec, writeShapeSpec } from '../../editor/shapes';
-import { readChartSpec } from '../../editor/chart/chart';
+import { isShapeEl, readShapeSpec, renderShapeInto, writeShapeSpec } from '../../editor/shapes';
+import { isChartEl, readChartSpec, refreshChart } from '../../editor/chart/chart';
+import { applyStyle, isAbsolute, returnToFlow } from '../../editor/geometry';
+import { commit as commitCommand } from '../../editor/commands';
 import {
   TABLE_PRESETS,
   type TablePreset,
@@ -255,8 +257,71 @@ function ElementSection({ el }: { el: HTMLElement }) {
           <TableFields table={table as HTMLTableElement} el={el} />
         </>
       )}
+      {isAbsolute(el) && (
+        <>
+          <Divider />
+          <PositionFields el={el} />
+        </>
+      )}
       <Divider />
       <FragmentFields el={table && el !== (table as HTMLElement) ? (table as HTMLElement) : el} />
+    </>
+  );
+}
+
+function PositionFields({ el }: { el: HTMLElement }) {
+  const ctx = useEditorStore((s) => s.ctx)!;
+  const num = (v: string) => parseInt(v, 10) || 0;
+
+  function setStyleProp(prop: string, value: string) {
+    applyStyle(el, { [prop]: value });
+    if (isShapeEl(el)) renderShapeInto(el);
+    else if (isChartEl(el)) refreshChart(ctx, el);
+    commitCommand(ctx);
+  }
+
+  return (
+    <>
+      <Text size="xs" fw={700} c="dimmed" tt="uppercase">
+        Position
+      </Text>
+      <Group gap={4} grow>
+        <NumberInput
+          label="X"
+          size="xs"
+          value={num(el.style.left)}
+          onChange={(v) => typeof v === 'number' && setStyleProp('left', `${v}px`)}
+        />
+        <NumberInput
+          label="Y"
+          size="xs"
+          value={num(el.style.top)}
+          onChange={(v) => typeof v === 'number' && setStyleProp('top', `${v}px`)}
+        />
+      </Group>
+      <Group gap={4} grow>
+        <NumberInput
+          label="Width"
+          size="xs"
+          value={num(el.style.width)}
+          min={16}
+          onChange={(v) => typeof v === 'number' && setStyleProp('width', `${v}px`)}
+        />
+        {el.style.height ? (
+          <NumberInput
+            label="Height"
+            size="xs"
+            value={num(el.style.height)}
+            min={16}
+            onChange={(v) => typeof v === 'number' && setStyleProp('height', `${v}px`)}
+          />
+        ) : (
+          <div />
+        )}
+      </Group>
+      <Button size="compact-xs" variant="light" onClick={() => returnToFlow(ctx, el)}>
+        Back to layout (unpin)
+      </Button>
     </>
   );
 }

@@ -78,8 +78,6 @@ ${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}
     height: 100%;
     top: 0;
   }
-  /* A pinned-height section flows from the top in the runtime — mirror it. */
-  .reveal .slides > section.present[style*="height"] { justify-content: flex-start; }
   aside.notes { display: none !important; }
   [contenteditable]:focus { outline: none; }
   .reveal .slides section :where(h1,h2,h3,h4,h5,h6,p,ul,ol,blockquote,img,pre,div,figure,table) {
@@ -165,6 +163,7 @@ ${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}
       el: HTMLElement;
       wasSelected: boolean;
       target: Element;
+      pointerId: number;
       x: number;
       y: number;
       dragging: boolean;
@@ -172,8 +171,17 @@ ${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}
       startTop: number;
     } | null = null;
 
+    /** A drag that loses its pointer must still land: commit and clear. */
+    function finalizePress() {
+      const p = press;
+      press = null;
+      useEditorStore.getState().setSnapGuides(null);
+      if (p?.dragging && ctxRef.current) commit(ctxRef.current);
+    }
+
     doc.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
+      if (press) finalizePress(); // stale gesture (missed pointerup)
       const target = e.target as Element;
       const editor = useEditorStore.getState();
       const session = sessionRef.current;
@@ -197,6 +205,7 @@ ${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}
         el,
         wasSelected: withinSelected,
         target,
+        pointerId: e.pointerId,
         x: e.clientX,
         y: e.clientY,
         dragging: false,
@@ -213,6 +222,14 @@ ${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}
         const dy = e.clientY - press.y;
         if (!press.dragging && Math.hypot(dx, dy) >= DRAG_THRESHOLD) {
           press.dragging = true;
+          // Pointer capture keeps the gesture alive even when the pointer
+          // leaves the iframe — without it, pointerup outside is lost and
+          // the element "sticks to the mouse" with the move never committed.
+          try {
+            (press.target as HTMLElement).setPointerCapture?.(press.pointerId);
+          } catch {
+            /* capture is best-effort */
+          }
           toAbsolute(ctx, press.el, height);
           const r = slideRect(ctx, press.el);
           press.startLeft = r.left;
@@ -262,6 +279,8 @@ ${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}
         activate(p.el, { x: e.clientX, y: e.clientY }, p.target);
       }
     });
+
+    doc.addEventListener('pointercancel', finalizePress);
 
     doc.addEventListener('dblclick', (e) => {
       const target = e.target as Element;
