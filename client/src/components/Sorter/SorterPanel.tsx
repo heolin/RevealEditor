@@ -75,17 +75,17 @@ export function SorterPanel() {
           </div>
         ))}
       </DndContext>
+      <button
+        type="button"
+        className="sorter-add-slide"
+        title="Add slide at the end"
+        onClick={() => useDeckStore.getState().addSlideAtEnd()}
+      >
+        <IconPlus size={22} />
+      </button>
       {columns.length === 0 && (
         <div className="sorter-empty">
           <p>Deck is empty.</p>
-          <ActionIcon
-            variant="light"
-            size="lg"
-            title="Add first slide"
-            onClick={() => useDeckStore.getState().addSlideAtEnd()}
-          >
-            <IconPlus size={18} />
-          </ActionIcon>
         </div>
       )}
     </div>

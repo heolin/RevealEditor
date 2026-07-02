@@ -161,6 +161,23 @@ html, body, #root { height: 100%; margin: 0; }
   display: flex;
   align-items: center;
 }
+.sorter-add-slide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  margin-top: 2px;
+  background: #1a1b1e;
+  color: #909296;
+  border: 1px dashed #3f4147;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.sorter-add-slide:hover {
+  color: var(--re-accent);
+  border-color: var(--re-accent);
+}
 .sorter-empty {
   display: flex;
   flex-direction: column;

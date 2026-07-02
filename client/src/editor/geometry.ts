@@ -74,8 +74,10 @@ export function toAbsoluteAll(ctx: StageCtx, els: HTMLElement[], designHeight: n
       top: `${Math.round(rects[i].top)}px`,
       width: `${Math.round(rects[i].width)}px`,
       margin: '0',
+      'align-self': null, // flex-item alignment is meaningless once absolute
     }),
   );
+  syncInlineCentering(ctx);
 }
 
 /**
@@ -102,6 +104,32 @@ export function ensureFreeLayoutSection(ctx: StageCtx, designHeight: number): vo
       '--re-center-top',
       '0px',
     );
+    syncInlineCentering(ctx);
+  }
+}
+
+/** Inline-level replaced elements (images, shape svgs) that block flow
+ * centers via text-align lose that in a pinned section's flex column —
+ * align-self restores it, inline, so the presented file matches too.
+ * Idempotent: pinned+centered adds it to flow children, unpinned strips it. */
+function syncInlineCentering(ctx: StageCtx): void {
+  const view = ctx.doc.defaultView!;
+  const cs = view.getComputedStyle(ctx.section);
+  const pinnedFlex = !!ctx.section.style.height && cs.display.includes('flex');
+  const centered = cs.textAlign === 'center';
+  for (const child of Array.from(ctx.section.children)) {
+    const el = child as HTMLElement;
+    if (el.style === undefined) continue;
+    const replaced =
+      ['IMG', 'VIDEO', 'IFRAME'].includes(el.tagName) || el.hasAttribute('data-re-shape');
+    if (!replaced) continue;
+    if (pinnedFlex && centered) {
+      if (el.style.position !== 'absolute' && !el.style.alignSelf) {
+        applyStyle(el, { 'align-self': 'center' });
+      }
+    } else if (el.style.alignSelf === 'center') {
+      applyStyle(el, { 'align-self': null }); // inert outside flex — keep files clean
+    }
   }
 }
 
@@ -139,6 +167,7 @@ export function returnToFlow(ctx: StageCtx, el: HTMLElement): void {
     'z-index': null,
   });
   maybeUnpinSection(ctx);
+  syncInlineCentering(ctx);
   commit(ctx);
 }
 
@@ -156,6 +185,7 @@ export function placeInFlow(
   applyStyle(el, { position: null, left: null, top: null, margin: null, 'z-index': null });
   parent.insertBefore(el, before);
   maybeUnpinSection(ctx);
+  syncInlineCentering(ctx);
   commit(ctx);
 }
 
