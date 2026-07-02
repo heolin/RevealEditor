@@ -9,7 +9,15 @@
   <link rel="stylesheet" href="/vendor/reveal.js/plugin/highlight/monokai.css">
   <style id="re-user"></style>
   <style id="re-managed"></style>
-  <style>html, body { margin: 0; height: 100%; background: #111; }</style>
+  <style>
+    html, body { margin: 0; height: 100%; background: #111; }
+    /* Editor-driven navigation snaps instantly — per-slide data-transition
+       attributes override reveal config, so a CSS kill-switch it is. */
+    .reveal[data-re-instant] .slides section,
+    .reveal[data-re-instant] .backgrounds .slide-background {
+      transition: none !important;
+    }
+  </style>
 </head>
 <body>
   <div class="reveal">
@@ -58,6 +66,14 @@
       } catch (e) { /* display-only */ }
     }
 
+    /** Jump without playing slide transitions (manual stepping still animates). */
+    function instantSlide(h, v) {
+      const root = document.querySelector('.reveal');
+      root.setAttribute('data-re-instant', '');
+      deck.slide(h, v);
+      setTimeout(() => root.removeAttribute('data-re-instant'), 120);
+    }
+
     // Sync application must be SERIALIZED: a second sync replacing .slides
     // innerHTML while Reveal.initialize() is still awaiting leaves reveal
     // registered against detached nodes — wrong slide counts, clamped
@@ -92,7 +108,7 @@
           return;
         }
       }
-      if (typeof m.h === 'number') deck.slide(m.h, m.v || 0);
+      if (typeof m.h === 'number') instantSlide(m.h, m.v || 0);
     }
 
     window.addEventListener('message', async (event) => {
@@ -117,7 +133,7 @@
           busy = false;
         }
       } else if (m.type === 'navigate' && deck && !busy) {
-        deck.slide(m.h, m.v || 0);
+        instantSlide(m.h, m.v || 0);
       }
     });
 
