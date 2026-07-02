@@ -31,13 +31,16 @@ function boxFor(el: HTMLElement, scale: number): Box {
 export function EditorOverlay({ scale }: { scale: number }) {
   useEditorStore((s) => s.docVersion);
   const selectedEl = useEditorStore((s) => s.selectedEl);
+  const extraSelected = useEditorStore((s) => s.extraSelected);
   const hoveredEl = useEditorStore((s) => s.hoveredEl);
   const sessionEl = useEditorStore((s) => s.sessionEl);
   const snapGuides = useEditorStore((s) => s.snapGuides);
+  const marquee = useEditorStore((s) => s.marquee);
   const ctx = useEditorContext();
 
   const target = sessionEl ?? selectedEl;
   const connected = target?.isConnected ? target : null;
+  const extras = extraSelected.filter((el) => el.isConnected);
 
   return (
     <div className="editor-overlay">
@@ -45,6 +48,20 @@ export function EditorOverlay({ scale }: { scale: number }) {
         <div className="hover-outline" style={boxFor(hoveredEl, scale)} />
       )}
       <FragmentBadges scale={scale} />
+      {extras.map((el, i) => (
+        <div key={i} className="selection-box secondary" style={boxFor(el, scale)} />
+      ))}
+      {marquee && (
+        <div
+          className="marquee-box"
+          style={{
+            left: marquee.x * scale,
+            top: marquee.y * scale,
+            width: marquee.w * scale,
+            height: marquee.h * scale,
+          }}
+        />
+      )}
       {connected && (
         <>
           <div
@@ -53,7 +70,7 @@ export function EditorOverlay({ scale }: { scale: number }) {
           >
             {sessionEl && <span className="selection-label">EDIT</span>}
           </div>
-          {!sessionEl && <ResizeHandles el={connected} scale={scale} />}
+          {!sessionEl && extras.length === 0 && <ResizeHandles el={connected} scale={scale} />}
           <FloatingToolbar ctx={ctx} box={boxFor(connected, scale)} />
         </>
       )}

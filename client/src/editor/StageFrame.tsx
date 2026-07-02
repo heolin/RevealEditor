@@ -134,12 +134,43 @@ ${stageHead(meta)}
       dragging: boolean;
       startLeft: number;
       startTop: number;
+      /** Other selected members dragged along (multi-select). */
+      others: { el: HTMLElement; startLeft: number; startTop: number }[];
     } | null = null;
+
+    /** Marquee rubber-band selection, started from empty canvas. */
+    let marquee: { x0: number; y0: number; active: boolean } | null = null;
+
+    function applyMarquee(x1: number, y1: number) {
+      if (!marquee) return;
+      const rect = {
+        x: Math.min(marquee.x0, x1),
+        y: Math.min(marquee.y0, y1),
+        w: Math.abs(x1 - marquee.x0),
+        h: Math.abs(y1 - marquee.y0),
+      };
+      useEditorStore.getState().setMarquee(rect);
+      const hits = Array.from(section.children).filter((c): c is HTMLElement => {
+        if (c.tagName === 'ASIDE' || (c as HTMLElement).style === undefined) return false;
+        const r = slideRect(ctxRef.current!, c as HTMLElement);
+        return (
+          r.left < rect.x + rect.w &&
+          r.left + r.width > rect.x &&
+          r.top < rect.y + rect.h &&
+          r.top + r.height > rect.y
+        );
+      });
+      useEditorStore.getState().selectMany(hits);
+    }
 
     /** A drag that loses its pointer must still land: commit and clear. */
     function finalizePress() {
       const p = press;
       press = null;
+      if (marquee) {
+        marquee = null;
+        useEditorStore.getState().setMarquee(null);
+      }
       useEditorStore.getState().setSnapGuides(null);
       if (p?.dragging && ctxRef.current) commit(ctxRef.current);
     }
@@ -188,7 +219,13 @@ ${stageHead(meta)}
         endSession(true);
       }
       if (!section.contains(target) || target === section) {
-        editor.select(null);
+        // Empty canvas: potential marquee; selection clears on clean click.
+        marquee = { x0: e.clientX, y0: e.clientY, active: false };
+        try {
+          (target as HTMLElement).setPointerCapture?.(e.pointerId);
+        } catch {
+          /* best-effort */
+        }
         return;
       }
       const selected = editor.selectedEl;
@@ -196,9 +233,27 @@ ${stageHead(meta)}
         !!selected && selected.isConnected && (selected === target || selected.contains(target));
       const el = withinSelected ? selected! : childOf(section, target);
       if (!el) return;
-      if (!withinSelected) editor.select(el);
 
-      const rect = slideRect(ctxRef.current!, el);
+      // Shift-click toggles set membership — no drag, no activation.
+      if (e.shiftKey) {
+        editor.toggleSelect(withinSelected ? selected! : el);
+        return;
+      }
+      if (!withinSelected) {
+        // Clicking a member of a multi-selection keeps the set (drag all).
+        const inSet = editor.extraSelected.includes(el);
+        if (!inSet) editor.select(el);
+        else editor.toggleSelect(el), editor.toggleSelect(el); // promote to primary
+      }
+
+      const ctx = ctxRef.current!;
+      const rect = slideRect(ctx, el);
+      const others = [...useEditorStore.getState().extraSelected, useEditorStore.getState().selectedEl]
+        .filter((o): o is HTMLElement => !!o && o.isConnected && o !== el)
+        .map((o) => {
+          const r = slideRect(ctx, o);
+          return { el: o, startLeft: r.left, startTop: r.top };
+        });
       press = {
         el,
         wasSelected: withinSelected,
@@ -209,11 +264,19 @@ ${stageHead(meta)}
         dragging: false,
         startLeft: rect.left,
         startTop: rect.top,
+        others,
       };
     });
 
     doc.addEventListener('pointermove', (e) => {
       const ctx = ctxRef.current;
+      if (marquee && ctx) {
+        if (!marquee.active && Math.hypot(e.clientX - marquee.x0, e.clientY - marquee.y0) >= DRAG_THRESHOLD) {
+          marquee.active = true;
+        }
+        if (marquee.active) applyMarquee(e.clientX, e.clientY);
+        return;
+      }
       // Drag tracking (iframe coordinates ARE slide-space px — no scale math).
       if (press && ctx) {
         const dx = e.clientX - press.x;
@@ -229,9 +292,14 @@ ${stageHead(meta)}
             /* capture is best-effort */
           }
           toAbsolute(ctx, press.el, height);
+          for (const o of press.others) toAbsolute(ctx, o.el, height);
           const r = slideRect(ctx, press.el);
           press.startLeft = r.left;
           press.startTop = r.top;
+          press.others = press.others.map((o) => {
+            const or = slideRect(ctx, o.el);
+            return { ...o, startLeft: or.left, startTop: or.top };
+          });
         }
         if (press.dragging) {
           e.preventDefault();
@@ -246,7 +314,15 @@ ${stageHead(meta)}
             left: `${Math.round(raw.left + snap.dx)}px`,
             top: `${Math.round(raw.top + snap.dy)}px`,
           });
+          // Multi-select: the rest of the set rides along with the same delta.
+          for (const o of press.others) {
+            applyStyle(o.el, {
+              left: `${Math.round(o.startLeft + dx + snap.dx)}px`,
+              top: `${Math.round(o.startTop + dy + snap.dy)}px`,
+            });
+          }
           useEditorStore.getState().setSnapGuides({ x: snap.x, y: snap.y });
+          if (press.others.length > 0) useEditorStore.getState().bump();
           return;
         }
       }
@@ -264,6 +340,13 @@ ${stageHead(meta)}
 
     doc.addEventListener('pointerup', (e) => {
       const ctx = ctxRef.current;
+      if (marquee) {
+        const wasActive = marquee.active;
+        marquee = null;
+        useEditorStore.getState().setMarquee(null);
+        if (!wasActive) useEditorStore.getState().select(null); // clean click on canvas
+        return;
+      }
       const p = press;
       press = null;
       if (!p || !ctx) return;

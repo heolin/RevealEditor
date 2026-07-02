@@ -200,6 +200,16 @@ html, body, #root { height: 100%; margin: 0; }
 .selection-box.editing {
   border-style: dashed;
 }
+.selection-box.secondary {
+  border-width: 1.5px;
+  opacity: 0.75;
+}
+.marquee-box {
+  position: absolute;
+  border: 1px solid var(--re-accent);
+  background: rgba(79, 143, 247, 0.08);
+  z-index: 6;
+}
 .selection-label {
   position: absolute;
   top: -18px;

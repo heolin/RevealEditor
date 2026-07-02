@@ -171,6 +171,45 @@ test('code block: insert, edit in modal, styled on canvas, clean in file', async
   expect(file).not.toContain('hljs'); // display-only class never saved
 });
 
+test('multi-select: shift-click, align, group, ungroup round-trip', async ({ page }) => {
+  await createDeck(page, 'e2e-multi');
+  // Two elements: the template h1 plus an inserted paragraph.
+  await openInsertMenu(page);
+  await page.getByRole('menuitem', { name: 'Text', exact: true }).click();
+  const stage = stageFrame(page);
+  const h1 = stage.locator('#re-stage h1');
+  const p = stage.locator('#re-stage p');
+  await expect(p).toBeVisible();
+
+  await h1.click();
+  await p.click({ modifiers: ['Shift'] });
+  // Two selection boxes visible (primary + secondary).
+  await expect(page.locator('.selection-box')).toHaveCount(2);
+
+  // Align left edges via the ribbon.
+  await page.getByRole('button', { name: 'Align left edges' }).click();
+  const left = async (loc: typeof h1) => loc.evaluate((el) => el.style.left);
+  expect(await left(h1)).toBe(await left(p));
+
+  // Group them.
+  await page.getByRole('button', { name: 'Group', exact: true }).click();
+  await expect(stage.locator('#re-stage .re-group')).toHaveCount(1);
+  await save(page);
+  let file = await fileContents(page, 'e2e-multi.html');
+  expect(file).toContain('re-group');
+
+  // Ungroup restores flat structure with slide coordinates. Click empty
+  // canvas first — clicking a selected group drills into its children.
+  await stage.locator('#re-stage').click({ position: { x: 5, y: 5 } });
+  await stage.locator('#re-stage .re-group').click();
+  await page.keyboard.press('ControlOrMeta+Shift+g');
+  await expect(stage.locator('#re-stage .re-group')).toHaveCount(0);
+  await save(page);
+  file = await fileContents(page, 'e2e-multi.html');
+  expect(file).not.toContain('re-group');
+  expect(file).toMatch(/<h1[^>]*position: absolute/);
+});
+
 test('insert menu closes after selection; undo never blanks the deck', async ({ page }) => {
   await openDemo(page);
   await openInsertMenu(page);

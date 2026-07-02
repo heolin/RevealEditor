@@ -1,7 +1,16 @@
 import {
   IconArrowBackUp,
   IconArrowForwardUp,
+  IconBoxMultiple,
   IconCopy,
+  IconLayoutAlignBottom,
+  IconLayoutAlignCenter,
+  IconLayoutAlignLeft,
+  IconLayoutAlignMiddle,
+  IconLayoutAlignRight,
+  IconLayoutAlignTop,
+  IconLayoutDistributeHorizontal,
+  IconLayoutDistributeVertical,
   IconPinnedOff,
   IconStackPop,
   IconStackPush,
@@ -9,10 +18,33 @@ import {
 } from '@tabler/icons-react';
 import type { Action, EditorContext } from './types';
 import { copyElement, cutElement, deleteElement, duplicateElement, pasteElement, hasClipboard } from '../commands';
-import { changeZOrder, returnToFlow } from '../geometry';
+import {
+  type AlignEdge,
+  alignElements,
+  changeZOrder,
+  distributeElements,
+  groupElements,
+  isGroupEl,
+  returnToFlow,
+  ungroupElements,
+} from '../geometry';
 import { useDeckStore } from '../../state/deckStore';
+import { useEditorStore } from '../editorStore';
 
 const hasSelection = (ctx: EditorContext) => !!ctx.stage && !!ctx.selection && !ctx.session;
+
+function design(ctx: EditorContext): { width: number; height: number } {
+  return ctx.deck?.config ?? { width: 960, height: 700 };
+}
+
+const ALIGN_DEFS: { edge: AlignEdge; title: string; icon: Action['icon'] }[] = [
+  { edge: 'left', title: 'Align left edges', icon: IconLayoutAlignLeft },
+  { edge: 'hcenter', title: 'Align horizontal centers', icon: IconLayoutAlignCenter },
+  { edge: 'right', title: 'Align right edges', icon: IconLayoutAlignRight },
+  { edge: 'top', title: 'Align top edges', icon: IconLayoutAlignTop },
+  { edge: 'vcenter', title: 'Align vertical centers', icon: IconLayoutAlignMiddle },
+  { edge: 'bottom', title: 'Align bottom edges', icon: IconLayoutAlignBottom },
+];
 
 export const arrangeActions: Action[] = [
   {
@@ -80,6 +112,62 @@ export const arrangeActions: Action[] = [
     when: (ctx) => hasSelection(ctx) && ctx.isAbsolute,
     run: (ctx) => ctx.stage && ctx.selection && returnToFlow(ctx.stage, ctx.selection),
   },
+  ...ALIGN_DEFS.map(
+    ({ edge, title, icon }): Action => ({
+      id: `arrange.align.${edge}`,
+      title,
+      icon,
+      kind: 'button',
+      group: 'arrange',
+      when: hasSelection,
+      run: (ctx) => ctx.stage && alignElements(ctx.stage, ctx.selections, edge, design(ctx)),
+    }),
+  ),
+  {
+    id: 'arrange.distributeH',
+    title: 'Distribute horizontally',
+    icon: IconLayoutDistributeHorizontal,
+    kind: 'button',
+    group: 'arrange',
+    when: (ctx) => hasSelection(ctx) && ctx.selections.length >= 3,
+    run: (ctx) => ctx.stage && distributeElements(ctx.stage, ctx.selections, 'h', design(ctx)),
+  },
+  {
+    id: 'arrange.distributeV',
+    title: 'Distribute vertically',
+    icon: IconLayoutDistributeVertical,
+    kind: 'button',
+    group: 'arrange',
+    when: (ctx) => hasSelection(ctx) && ctx.selections.length >= 3,
+    run: (ctx) => ctx.stage && distributeElements(ctx.stage, ctx.selections, 'v', design(ctx)),
+  },
+  {
+    id: 'arrange.group',
+    title: 'Group',
+    icon: IconBoxMultiple,
+    kind: 'button',
+    group: 'arrange',
+    shortcut: 'mod+g',
+    when: (ctx) => hasSelection(ctx) && ctx.selections.length >= 2,
+    run: (ctx) => {
+      if (!ctx.stage) return;
+      const group = groupElements(ctx.stage, ctx.selections, design(ctx));
+      if (group) useEditorStore.getState().select(group);
+    },
+  },
+  {
+    id: 'arrange.ungroup',
+    title: 'Ungroup',
+    kind: 'button',
+    group: 'arrange',
+    shortcut: 'mod+shift+g',
+    when: (ctx) => hasSelection(ctx) && !!ctx.selection && isGroupEl(ctx.selection),
+    run: (ctx) => {
+      if (!ctx.stage || !ctx.selection) return;
+      const children = ungroupElements(ctx.stage, ctx.selection);
+      useEditorStore.getState().selectMany(children);
+    },
+  },
   {
     id: 'arrange.delete',
     title: 'Delete',
@@ -88,7 +176,11 @@ export const arrangeActions: Action[] = [
     group: 'arrange',
     shortcut: ['delete', 'backspace'],
     when: (ctx) => hasSelection(ctx) && (ctx.handler?.capabilities.delete ?? true),
-    run: (ctx) => ctx.stage && ctx.selection && deleteElement(ctx.stage, ctx.selection),
+    run: (ctx) => {
+      if (!ctx.stage) return;
+      // Delete the whole selection set (multi-select aware).
+      for (const el of ctx.selections) deleteElement(ctx.stage, el);
+    },
   },
 ];
 

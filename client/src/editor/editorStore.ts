@@ -12,7 +12,12 @@ import type { StageCtx } from './commands';
 interface EditorState {
   /** Live stage context for commands/toolbars; null when no stage mounted. */
   ctx: StageCtx | null;
+  /** Primary selection (last clicked) — single-selection consumers use this. */
   selectedEl: HTMLElement | null;
+  /** Additional selected elements (shift-click / marquee). */
+  extraSelected: HTMLElement[];
+  /** Marquee rectangle during rubber-band selection, slide-space px. */
+  marquee: { x: number; y: number; w: number; h: number } | null;
   hoveredEl: HTMLElement | null;
   /** Element hosting the active contenteditable text session. */
   sessionEl: HTMLElement | null;
@@ -37,6 +42,11 @@ interface EditorState {
   setCtx(ctx: StageCtx | null): void;
   setStartSession(fn: (el: HTMLElement) => void): void;
   select(el: HTMLElement | null): void;
+  /** Shift-click toggle: adds to / removes from the selection set. */
+  toggleSelect(el: HTMLElement): void;
+  /** Replace the whole selection set (marquee). */
+  selectMany(els: HTMLElement[]): void;
+  setMarquee(rect: { x: number; y: number; w: number; h: number } | null): void;
   hover(el: HTMLElement | null): void;
   setSessionEl(el: HTMLElement | null): void;
   setCodeEditEl(el: HTMLElement | null): void;
@@ -53,6 +63,8 @@ interface EditorState {
 export const useEditorStore = create<EditorState>()((set) => ({
   ctx: null,
   selectedEl: null,
+  extraSelected: [],
+  marquee: null,
   hoveredEl: null,
   sessionEl: null,
   codeEditEl: null,
@@ -67,7 +79,27 @@ export const useEditorStore = create<EditorState>()((set) => ({
 
   setCtx: (ctx) => set({ ctx }),
   setStartSession: (fn) => set({ startSession: fn }),
-  select: (el) => set((s) => ({ selectedEl: el, docVersion: s.docVersion + 1 })),
+  select: (el) =>
+    set((s) => ({ selectedEl: el, extraSelected: [], docVersion: s.docVersion + 1 })),
+  toggleSelect: (el) =>
+    set((s) => {
+      const all = [s.selectedEl, ...s.extraSelected].filter(
+        (e): e is HTMLElement => !!e && e.isConnected,
+      );
+      const next = all.includes(el) ? all.filter((e) => e !== el) : [...all, el];
+      return {
+        selectedEl: next[next.length - 1] ?? null,
+        extraSelected: next.slice(0, -1),
+        docVersion: s.docVersion + 1,
+      };
+    }),
+  selectMany: (els) =>
+    set((s) => ({
+      selectedEl: els[els.length - 1] ?? null,
+      extraSelected: els.slice(0, -1),
+      docVersion: s.docVersion + 1,
+    })),
+  setMarquee: (rect) => set((s) => ({ marquee: rect, docVersion: s.docVersion + 1 })),
   hover: (el) => set((s) => (s.hoveredEl === el ? s : { hoveredEl: el, docVersion: s.docVersion + 1 })),
   setSessionEl: (el) => set((s) => ({ sessionEl: el, docVersion: s.docVersion + 1 })),
   setCodeEditEl: (el) => set((s) => ({ codeEditEl: el, docVersion: s.docVersion + 1 })),
@@ -80,6 +112,8 @@ export const useEditorStore = create<EditorState>()((set) => ({
   reset: () =>
     set((s) => ({
       selectedEl: null,
+      extraSelected: [],
+      marquee: null,
       hoveredEl: null,
       sessionEl: null,
       codeEditEl: null,

@@ -10,9 +10,10 @@ import type { DeckMeta } from '../../state/deckStore';
 function fakeCtx(overrides: Partial<EditorContext> = {}): EditorContext {
   const section = document.createElement('section');
   const stage: StageCtx = { doc: document, section, slideId: 's1', markClean: () => undefined };
-  return {
+  const merged: EditorContext = {
     stage,
     selection: null,
+    selections: [],
     handler: null,
     session: null,
     isAbsolute: false,
@@ -21,6 +22,10 @@ function fakeCtx(overrides: Partial<EditorContext> = {}): EditorContext {
     deck: null,
     ...overrides,
   };
+  if (!overrides.selections) {
+    merged.selections = merged.selection ? [merged.selection] : [];
+  }
+  return merged;
 }
 
 function selected(tag: string, absolute = false): EditorContext {

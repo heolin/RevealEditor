@@ -10,11 +10,15 @@ export function buildEditorContext(): EditorContext {
   const e = useEditorStore.getState();
   const d = useDeckStore.getState();
   const selection = e.selectedEl?.isConnected ? e.selectedEl : null;
+  const selections = [...e.extraSelected, e.selectedEl].filter(
+    (el): el is HTMLElement => !!el && el.isConnected,
+  );
   const slide =
     d.columns.flatMap((c) => c.slides).find((s) => s.id === d.selectedSlideId) ?? null;
   return {
     stage: e.ctx,
     selection,
+    selections,
     handler: selection ? handlerFor(selection) : null,
     session: e.sessionEl ? 'text' : e.codeEditEl ? 'code' : e.chartEditEl ? 'chart' : null,
     isAbsolute: selection ? isAbsolute(selection) : false,

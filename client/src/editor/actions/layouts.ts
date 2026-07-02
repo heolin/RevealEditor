@@ -29,7 +29,17 @@ const DEFAULTS: Record<SurfaceId, SurfaceLayout> = {
     ],
     ['format.heading', 'format.fontFamily', 'format.fontSize', 'format.textColor'],
     ['format.bold', 'format.italic', 'format.align.left', 'format.align.center', 'format.align.right'],
-    ['arrange.front', 'arrange.back', 'arrange.unpin'],
+    [
+      'arrange.align.left',
+      'arrange.align.hcenter',
+      'arrange.align.right',
+      'arrange.align.top',
+      'arrange.align.vcenter',
+      'arrange.align.bottom',
+      'arrange.distributeH',
+      'arrange.distributeV',
+    ],
+    ['arrange.group', 'arrange.front', 'arrange.back', 'arrange.unpin'],
   ],
 
   /** Floating toolbar: the quick subset that follows the selection. */
@@ -68,6 +78,17 @@ const DEFAULTS: Record<SurfaceId, SurfaceLayout> = {
       'table.deleteCol',
     ],
     ['arrange.duplicate', 'arrange.copy', 'arrange.cut', 'arrange.paste'],
+    ['arrange.group', 'arrange.ungroup'],
+    [
+      'arrange.align.left',
+      'arrange.align.hcenter',
+      'arrange.align.right',
+      'arrange.align.top',
+      'arrange.align.vcenter',
+      'arrange.align.bottom',
+      'arrange.distributeH',
+      'arrange.distributeV',
+    ],
     ['arrange.front', 'arrange.back', 'arrange.unpin'],
     // insert.image is deliberately absent: its file input would unmount when
     // the menu closes, dropping the picker callback.

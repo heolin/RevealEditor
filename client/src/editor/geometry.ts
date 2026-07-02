@@ -104,6 +104,147 @@ export function changeZOrder(ctx: StageCtx, el: HTMLElement, dir: 1 | -1): void 
   commit(ctx);
 }
 
+/* ---------- multi-element operations ---------- */
+
+export type AlignEdge = 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom';
+
+function unionRect(rects: { left: number; top: number; width: number; height: number }[]) {
+  const left = Math.min(...rects.map((r) => r.left));
+  const top = Math.min(...rects.map((r) => r.top));
+  const right = Math.max(...rects.map((r) => r.left + r.width));
+  const bottom = Math.max(...rects.map((r) => r.top + r.height));
+  return { left, top, width: right - left, height: bottom - top };
+}
+
+/**
+ * Align elements: ≥2 align to the selection's bounding box, a single element
+ * aligns to the slide. Flow elements are converted to absolute first — align
+ * implies free positioning.
+ */
+export function alignElements(
+  ctx: StageCtx,
+  els: HTMLElement[],
+  edge: AlignEdge,
+  design: { width: number; height: number },
+): void {
+  if (els.length === 0) return;
+  for (const el of els) toAbsolute(ctx, el, design.height);
+  const rects = els.map((el) => slideRect(ctx, el));
+  const box =
+    els.length >= 2
+      ? unionRect(rects)
+      : { left: 0, top: 0, width: design.width, height: design.height };
+  els.forEach((el, i) => {
+    const r = rects[i];
+    const patch: StylePatch = {};
+    if (edge === 'left') patch.left = `${Math.round(box.left)}px`;
+    if (edge === 'right') patch.left = `${Math.round(box.left + box.width - r.width)}px`;
+    if (edge === 'hcenter') patch.left = `${Math.round(box.left + (box.width - r.width) / 2)}px`;
+    if (edge === 'top') patch.top = `${Math.round(box.top)}px`;
+    if (edge === 'bottom') patch.top = `${Math.round(box.top + box.height - r.height)}px`;
+    if (edge === 'vcenter') patch.top = `${Math.round(box.top + (box.height - r.height) / 2)}px`;
+    applyStyle(el, patch);
+  });
+  commit(ctx);
+}
+
+/** Equal gaps along an axis; needs ≥3 elements. Order comes from position. */
+export function distributeElements(
+  ctx: StageCtx,
+  els: HTMLElement[],
+  axis: 'h' | 'v',
+  design: { width: number; height: number },
+): void {
+  if (els.length < 3) return;
+  for (const el of els) toAbsolute(ctx, el, design.height);
+  const items = els
+    .map((el) => ({ el, rect: slideRect(ctx, el) }))
+    .sort((a, b) => (axis === 'h' ? a.rect.left - b.rect.left : a.rect.top - b.rect.top));
+  const first = items[0].rect;
+  const last = items[items.length - 1].rect;
+  const span =
+    axis === 'h'
+      ? last.left + last.width - first.left
+      : last.top + last.height - first.top;
+  const totalSize = items.reduce(
+    (n, it) => n + (axis === 'h' ? it.rect.width : it.rect.height),
+    0,
+  );
+  const gap = (span - totalSize) / (items.length - 1);
+  let cursor = axis === 'h' ? first.left : first.top;
+  for (const it of items) {
+    applyStyle(it.el, {
+      [axis === 'h' ? 'left' : 'top']: `${Math.round(cursor)}px`,
+    });
+    cursor += (axis === 'h' ? it.rect.width : it.rect.height) + gap;
+  }
+  commit(ctx);
+}
+
+export const GROUP_CLASS = 're-group';
+
+export function isGroupEl(el: Element): boolean {
+  return el.classList.contains(GROUP_CLASS);
+}
+
+/**
+ * Group: wrap in an absolutely positioned <div class="re-group"> sized to the
+ * union box; children are rebased to group-relative coordinates. Plain HTML —
+ * groups survive and present anywhere.
+ */
+export function groupElements(
+  ctx: StageCtx,
+  els: HTMLElement[],
+  design: { width: number; height: number },
+): HTMLElement | null {
+  if (els.length < 2) return null;
+  for (const el of els) toAbsolute(ctx, el, design.height);
+  const rects = els.map((el) => slideRect(ctx, el));
+  const box = unionRect(rects);
+  const group = ctx.doc.createElement('div');
+  group.className = GROUP_CLASS;
+  applyStyle(group, {
+    position: 'absolute',
+    left: `${Math.round(box.left)}px`,
+    top: `${Math.round(box.top)}px`,
+    width: `${Math.round(box.width)}px`,
+    height: `${Math.round(box.height)}px`,
+  });
+  // Insert where the first (topmost in DOM order) member sat.
+  const anchor = els
+    .slice()
+    .sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1))[0];
+  anchor.before(group);
+  els.forEach((el, i) => {
+    applyStyle(el, {
+      left: `${Math.round(rects[i].left - box.left)}px`,
+      top: `${Math.round(rects[i].top - box.top)}px`,
+    });
+    group.appendChild(el);
+  });
+  commit(ctx);
+  return group;
+}
+
+/** Ungroup: rebase children back to slide coordinates and unwrap. */
+export function ungroupElements(ctx: StageCtx, group: HTMLElement): HTMLElement[] {
+  const children = Array.from(group.children).filter(
+    (c): c is HTMLElement => (c as HTMLElement).style !== undefined,
+  );
+  for (const child of children) {
+    const r = slideRect(ctx, child);
+    applyStyle(child, {
+      position: 'absolute',
+      left: `${Math.round(r.left)}px`,
+      top: `${Math.round(r.top)}px`,
+    });
+    group.before(child);
+  }
+  group.remove();
+  commit(ctx);
+  return children;
+}
+
 /* ---------- snapping ---------- */
 
 export interface SnapResult {

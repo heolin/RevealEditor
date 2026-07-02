@@ -12,7 +12,10 @@ import type { DeckMeta } from '../../state/deckStore';
 /** One computed truth about "what is the user on" — see docs/TOOLBARS.md. */
 export interface EditorContext {
   stage: StageCtx | null;
+  /** Primary selection (last clicked). */
   selection: HTMLElement | null;
+  /** Full selection set: [.., primary last]; empty when nothing selected. */
+  selections: HTMLElement[];
   handler: ElementHandler | null;
   session: 'text' | 'code' | 'chart' | null;
   isAbsolute: boolean;
