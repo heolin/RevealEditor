@@ -316,7 +316,10 @@ client/src/editor/
 
 Adding a feature must be one of:
 
-1. **New element handler** (+ sessions/inspector sections it declares) — new content types.
+0. **New action** in the command registry (see [TOOLBARS.md](./TOOLBARS.md)) —
+   new commands appear on every surface (top panel, floating toolbar, context
+   menu, keyboard) from one declaration.
+1. **New element handler** (+ sessions/inspector sections/actions it declares) — new content types.
 2. **New inspector section** on an existing handler — new properties of existing content.
 3. **New command** — new operations (align/distribute, group).
 4. **New panel** consuming the store (layers panel, warnings, raw-HTML view).

@@ -64,9 +64,9 @@ architecture can be designed for all of it — even features we build later.
 | Blockquotes | T1 | |
 | Plain-text paste (strip Word/Docs formatting) | T1 | Paste-with-formatting as explicit alternative (T2) |
 | Text alignment per block (left/center/right) | T1 | Inline `text-align` |
-| Text color & highlight color | T2 | Inline styles; theme-aware palette suggestions |
-| Font size per block (steps + free input) | T2 | Inline style in slide-space px |
-| Font family override per block | T3 | Needs font availability strategy |
+| Text color & highlight color | T2 | Inline styles; design-system tokens as swatches — via action system ([TOOLBARS.md](TOOLBARS.md) P2) |
+| Font size per block (steps + free input) | T2 | Inline `font-size` in em — via action system P2 |
+| Font family override per block | T2 | Families detected from deck CSS + generic stacks — via action system P2 (was T3; unblocked by toolbar refactor) |
 | `r-fit-text` toggle (auto-fit headline) | T2 | Rendered at natural size in canvas with badge; true size in preview |
 | Text inside shapes | T2 | See Shapes |
 | Find & replace across deck | T3 | |
@@ -259,7 +259,8 @@ parameters stored as JSON (`data-re-shape`) for re-editing. They render everywhe
 | Undo/redo across all edit types (text, structure, style, slide ops) | T1 | Single app-level history |
 | Element clipboard: copy/cut/paste elements within & across slides | T1 | Duplicate = Ctrl+D / Alt-drag |
 | Keyboard shortcuts (save, undo, delete, nudge, duplicate, navigation) | T1 | |
-| Context menus (right-click on element / slide / sorter) | T2 | |
+| Context menus (right-click on element / slide / sorter) | T2 | Canvas menu in [TOOLBARS.md](TOOLBARS.md) P3; sorter later |
+| Configurable toolbar/command system (top panel + floating + context + keyboard from one action registry) | T2 | Design: [TOOLBARS.md](TOOLBARS.md) |
 | Raw HTML view/edit of current slide (escape hatch, CodeMirror) | T2 | Power-user trust feature: see & edit exactly what will be saved |
 | Multi-select (shift-click, marquee) | T2 | Marquee T2; shift-click T1 |
 | Accessibility of the editor itself (keyboard operability, focus management) | T2 | |
