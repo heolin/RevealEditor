@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <base id="re-base" href="/">
+  <title>Preview</title>
+  <link rel="stylesheet" href="/vendor/reveal.js/dist/reveal.css">
+  <link rel="stylesheet" id="re-theme" href="/vendor/reveal.js/dist/theme/black.css">
+  <link rel="stylesheet" href="/vendor/reveal.js/plugin/highlight/monokai.css">
+  <style>html, body { margin: 0; height: 100%; background: #111; }</style>
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides"></div>
+  </div>
+  <script src="/vendor/reveal.js/dist/reveal.js"></script>
+  <script src="/vendor/reveal.js/plugin/highlight/highlight.js"></script>
+  <script src="/vendor/reveal.js/plugin/notes/notes.js"></script>
+  <script>
+    // Disposable reveal.js runtime. Receives slides via postMessage; nothing is
+    // ever read back from this document — one-way data flow by design.
+    let deck = null;
+    const extraLinks = new Set();
+
+    function applyHead(m) {
+      if (m.baseHref) document.getElementById('re-base').href = m.baseHref;
+      if (m.themeHref) document.getElementById('re-theme').href = m.themeHref;
+      (m.extraStylesheets || []).forEach((href) => {
+        if (extraLinks.has(href)) return;
+        extraLinks.add(href);
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = href;
+        document.head.appendChild(link);
+      });
+    }
+
+    function rehighlight() {
+      try {
+        const hl = deck && deck.getPlugin('highlight');
+        if (hl && hl.hljs) {
+          document.querySelectorAll('.reveal pre code').forEach((el) => {
+            if (!el.dataset.highlighted) hl.hljs.highlightElement(el);
+          });
+        }
+      } catch (e) { /* display-only */ }
+    }
+
+    window.addEventListener('message', async (event) => {
+      const m = event.data || {};
+      if (m.type === 'sync') {
+        applyHead(m);
+        document.querySelector('.slides').innerHTML = m.slidesHtml;
+        if (!deck) {
+          deck = new Reveal(document.querySelector('.reveal'), {
+            hash: false,
+            embedded: false,
+            width: m.width || 960,
+            height: m.height || 700,
+            plugins: [RevealHighlight, RevealNotes],
+          });
+          await deck.initialize();
+        } else {
+          try {
+            deck.sync();
+            rehighlight();
+          } catch (e) {
+            location.reload(); // parent re-sends on harness-loaded
+            return;
+          }
+        }
+        if (typeof m.h === 'number') deck.slide(m.h, m.v || 0);
+      } else if (m.type === 'navigate' && deck) {
+        deck.slide(m.h, m.v || 0);
+      }
+    });
+
+    window.parent.postMessage({ type: 'harness-loaded' }, '*');
+  </script>
+</body>
+</html>

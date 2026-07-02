@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RevealEditor demo deck</title>
+  <!-- hand-written comment that must survive editing -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.2.1/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.2.1/dist/theme/black.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.2.1/plugin/highlight/monokai.css">
+  <style>
+    /* user's own custom styles — the editor must never touch these */
+    .brand { color: #e7ad52; letter-spacing: 0.05em; }
+  </style>
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+      <section>
+        <h1 class="brand">RevealEditor</h1>
+        <p>A demo deck with <em>hand-written</em> markup.</p>
+        <aside class="notes">Welcome everyone — intro slide.</aside>
+      </section>
+      <section data-background-color="#1a2633">
+        <h2>Fragments</h2>
+        <ul>
+          <li class="fragment">First point</li>
+          <li class="fragment fade-up">Second point</li>
+          <li class="fragment highlight-red" data-fragment-index="3">Emphasized last</li>
+        </ul>
+      </section>
+      <section>
+        <section>
+          <h2>Vertical stack — top</h2>
+          <p>Press down to continue.</p>
+        </section>
+        <section>
+          <h2>Vertical stack — bottom</h2>
+          <blockquote>&ldquo;Nested slides work too.&rdquo;</blockquote>
+        </section>
+      </section>
+      <section>
+        <h2>Code</h2>
+        <pre><code class="language-js" data-trim data-line-numbers="1-2|4">
+const deck = new Reveal();
+deck.initialize();
+
+console.log('highlight steps');
+        </code></pre>
+      </section>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.2.1/dist/reveal.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.2.1/plugin/highlight/highlight.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.2.1/plugin/notes/notes.js"></script>
+  <script>
+    Reveal.initialize({
+      hash: true,
+      // user comment inside config — must survive byte-for-byte
+      plugins: [RevealHighlight, RevealNotes]
+    });
+  </script>
+</body>
+</html>

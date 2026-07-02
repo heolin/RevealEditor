@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset='utf-8'>
+<title>Weirdly formatted deck</title>
+<link rel='stylesheet' href='lib/reveal.css'/>
+<link rel='stylesheet' href='lib/theme/serif.css' id='theme'/>
+<!-- comment
+     spanning lines -->
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+   <!-- a comment between sections -->
+   <section data-transition='zoom'
+            data-background-image='bg.png'><h1>Cramped</h1><p>All on
+one line-ish</p></section>
+
+   <section>
+     <section class="custom deep">
+       <div class="wrapper"><svg viewBox="0 0 10 10"><rect width="10" height="10"/></svg></div>
+     </section>
+     <section><p>second &amp; last</p></section>
+   </section>
+<section><pre><code class="language-python" data-trim>
+def hello():
+    return "significant   whitespace"
+</code></pre></section>
+</div>
+</div>
+<script src='lib/reveal.js'></script>
+<script>
+  Reveal.initialize( {
+      width: 1280, height: 720,
+      controls:true } );
+</script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+import { useEffect } from 'react';
+import { useDeckStore } from './state/deckStore';
+import { api } from './api/client';
+import { DeckList } from './components/DeckList';
+import { Toolbar } from './components/Toolbar';
+import { SorterPanel } from './components/Sorter/SorterPanel';
+import { SlideCanvas } from './components/Canvas/SlideCanvas';
+import { PreviewPane } from './components/Preview/PreviewPane';
+import { ConflictDialog } from './components/ConflictDialog';
+
+export function App() {
+  const meta = useDeckStore((s) => s.meta);
+  const conflict = useDeckStore((s) => s.conflict);
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const state = useDeckStore.getState();
+      if (!state.meta) return;
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        void state.save();
+      } else if (mod && !e.shiftKey && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        useDeckStore.temporal.getState().undo();
+      } else if (
+        (mod && e.shiftKey && e.key.toLowerCase() === 'z') ||
+        (mod && e.key.toLowerCase() === 'y')
+      ) {
+        e.preventDefault();
+        useDeckStore.temporal.getState().redo();
+      } else if (e.key === 'Delete' && state.selectedSlideId) {
+        const target = e.target as HTMLElement;
+        if (target.closest('input, textarea, [contenteditable]')) return;
+        e.preventDefault();
+        state.deleteSlide(state.selectedSlideId);
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  if (!meta) return <DeckList />;
+
+  return (
+    <div className="editor-layout">
+      <Toolbar />
+      <div className="editor-body">
+        <SorterPanel />
+        <SlideCanvas />
+        <PreviewPane />
+      </div>
+      {conflict && <ConflictDialog />}
+    </div>
+  );
+}
+
+export async function openDeck(path: string) {
+  const deck = await api.getDeck(path);
+  useDeckStore.getState().load(deck);
+}
