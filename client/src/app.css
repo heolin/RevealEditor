@@ -1,4 +1,18 @@
-:root {
+:root,
+:root[data-theme='light'] {
+  --bg: #f4f5f7;
+  --bg-panel: #ffffff;
+  --bg-raised: #eceef2;
+  --border: #d7dbe3;
+  --text: #1e2430;
+  --text-muted: #687080;
+  --accent: #3b7de9;
+  --danger: #d64540;
+  --shadow: rgba(30, 40, 60, 0.18);
+  --error-bg: #fbe9e8;
+}
+
+:root[data-theme='dark'] {
   --bg: #16181d;
   --bg-panel: #1e2128;
   --bg-raised: #262a33;
@@ -7,6 +21,8 @@
   --text-muted: #8a90a0;
   --accent: #4f8ff7;
   --danger: #e5534b;
+  --shadow: rgba(0, 0, 0, 0.5);
+  --error-bg: #52201d;
 }
 
 * { box-sizing: border-box; }
@@ -60,6 +76,7 @@ input, select {
   margin-bottom: 24px;
 }
 .deck-list-page h1 { font-size: 22px; margin: 0; }
+.header-actions { display: flex; gap: 8px; }
 .deck-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .deck-item {
   width: 100%;
@@ -74,7 +91,7 @@ input, select {
 .deck-title { font-size: 15px; font-weight: 600; }
 .deck-meta { color: var(--text-muted); font-size: 12px; }
 .error-banner {
-  background: #52201d;
+  background: var(--error-bg);
   border: 1px solid var(--danger);
   border-radius: 6px;
   padding: 10px 14px;
@@ -212,7 +229,7 @@ input, select {
 }
 .canvas-stage {
   overflow: hidden;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 4px 24px var(--shadow);
   border-radius: 4px;
 }
 

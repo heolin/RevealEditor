@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, type DeckSummary } from '../api/client';
+import { useUiTheme } from '../state/uiTheme';
 import { openDeck } from '../App';
 
 export function DeckList() {
@@ -7,6 +8,7 @@ export function DeckList() {
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [themes, setThemes] = useState<string[]>([]);
+  const [uiTheme, toggleUiTheme] = useUiTheme();
 
   async function refresh() {
     try {
@@ -41,9 +43,17 @@ export function DeckList() {
     <div className="deck-list-page">
       <header>
         <h1>RevealEditor</h1>
-        <button className="primary" onClick={() => setCreating(true)}>
-          New presentation
-        </button>
+        <div className="header-actions">
+          <button
+            onClick={toggleUiTheme}
+            title={`Switch editor to ${uiTheme === 'light' ? 'dark' : 'light'} mode`}
+          >
+            {uiTheme === 'light' ? '🌙' : '☀️'}
+          </button>
+          <button className="primary" onClick={() => setCreating(true)}>
+            New presentation
+          </button>
+        </div>
       </header>
       {error && <div className="error-banner">{error}</div>}
       {decks === null ? (

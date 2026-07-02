@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useDeckStore } from '../state/deckStore';
+import { useUiTheme } from '../state/uiTheme';
 import { api } from '../api/client';
 
 export function Toolbar() {
@@ -10,6 +11,7 @@ export function Toolbar() {
   const close = useDeckStore((s) => s.close);
   const setTheme = useDeckStore((s) => s.setTheme);
   const [themes, setThemes] = useState<string[]>([]);
+  const [uiTheme, toggleUiTheme] = useUiTheme();
 
   useEffect(() => {
     api.listThemes().then(setThemes).catch(() => setThemes([]));
@@ -45,6 +47,12 @@ export function Toolbar() {
           ))}
         </select>
       )}
+      <button
+        onClick={toggleUiTheme}
+        title={`Switch editor to ${uiTheme === 'light' ? 'dark' : 'light'} mode`}
+      >
+        {uiTheme === 'light' ? '🌙' : '☀️'}
+      </button>
       <button
         onClick={() => window.open(`/files/${meta.path}`, '_blank')}
         title="Open the real file — exactly what your audience sees"
