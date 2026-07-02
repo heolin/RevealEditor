@@ -125,27 +125,11 @@ html, body, #root { height: 100%; margin: 0; }
   color: var(--mantine-color-dimmed);
 }
 .slide-thumb {
-  aspect-ratio: 960 / 700;
   border-radius: 4px;
   overflow: hidden;
   position: relative;
+  background: var(--re-raised);
 }
-.slide-thumb-content {
-  width: 960px;
-  height: 700px;
-  transform: scale(0.165);
-  transform-origin: top left;
-  text-align: center;
-  padding: 40px;
-  pointer-events: none;
-  user-select: none;
-  font-family: sans-serif;
-}
-.slide-thumb-content h1 { font-size: 88px; margin: 20px 0; }
-.slide-thumb-content h2 { font-size: 64px; margin: 20px 0; }
-.slide-thumb-content p, .slide-thumb-content li { font-size: 38px; }
-.slide-thumb-content pre { font-size: 24px; text-align: left; }
-.slide-thumb-content aside { display: none; }
 .slide-actions {
   display: none;
   position: absolute;
@@ -328,7 +312,7 @@ html, body, #root { height: 100%; margin: 0; }
 /* ---------- Chart editor ---------- */
 
 .chart-preview {
-  background: #1e1e1d;
+  border: 1px solid var(--re-border);
   border-radius: 6px;
   padding: 8px;
   display: flex;

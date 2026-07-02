@@ -16,7 +16,14 @@ import {
 import { IconPlus, IconTrash, IconX } from '@tabler/icons-react';
 import { useEditorStore } from '../editorStore';
 import { type ChartSpec, renderChart, seriesColor } from './renderChart';
-import { chartMode, defaultChartSpec, parseDelimited, readChartSpec, writeChartSpec } from './chart';
+import {
+  chartMode,
+  defaultChartSpec,
+  parseDelimited,
+  readChartSpec,
+  slideBackgroundColor,
+  writeChartSpec,
+} from './chart';
 
 const CHART_TYPES = [
   { value: 'bar', label: 'Bar' },
@@ -292,6 +299,9 @@ export function ChartModal() {
         <Stack gap="sm" w={580} style={{ flexShrink: 0 }}>
           <div
             className="chart-preview"
+            // Preview on the slide's ACTUAL background so ink/palette read
+            // exactly as they will on the slide.
+            style={{ background: slideBackgroundColor(ctx) }}
             // eslint-disable-next-line react/no-danger
             dangerouslySetInnerHTML={{ __html: preview }}
           />

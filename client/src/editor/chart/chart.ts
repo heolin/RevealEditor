@@ -26,17 +26,34 @@ export function readChartSpec(el: Element): ChartSpec | null {
   }
 }
 
+/** The slide's effective background color (per-slide attr, else theme). */
+export function slideBackgroundColor(ctx: StageCtx): string {
+  const attr = ctx.section.getAttribute('data-background-color');
+  if (attr) return attr;
+  // Custom-styled decks paint the viewport themselves — read what actually
+  // renders rather than guessing from the theme map.
+  const painted = ctx.doc.defaultView?.getComputedStyle(ctx.doc.body).backgroundColor;
+  if (painted && painted !== 'rgba(0, 0, 0, 0)' && painted !== 'transparent') return painted;
+  return themeColors(useDeckStore.getState().meta?.theme ?? null).bg;
+}
+
 /** Ink mode from the slide's effective background (theme or per-slide color). */
 export function chartMode(ctx: StageCtx): 'light' | 'dark' {
-  const bg =
-    ctx.section.getAttribute('data-background-color') ??
-    themeColors(useDeckStore.getState().meta?.theme ?? null).bg;
-  const m = bg.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
-  if (!m) return 'dark';
-  let hex = m[1];
-  if (hex.length === 3) hex = hex.split('').map((c) => c + c).join('');
-  const n = parseInt(hex, 16);
-  const lum = (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
+  const bg = slideBackgroundColor(ctx);
+  let r: number, g: number, b: number;
+  const hex = bg.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  const rgb = bg.match(/^rgba?\((\d+)[,\s]+(\d+)[,\s]+(\d+)/i);
+  if (hex) {
+    let h = hex[1];
+    if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+    const n = parseInt(h, 16);
+    r = (n >> 16) & 255; g = (n >> 8) & 255; b = n & 255;
+  } else if (rgb) {
+    r = +rgb[1]; g = +rgb[2]; b = +rgb[3];
+  } else {
+    return 'dark';
+  }
+  const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
   return lum > 0.5 ? 'light' : 'dark';
 }
 

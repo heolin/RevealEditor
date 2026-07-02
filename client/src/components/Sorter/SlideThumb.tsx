@@ -1,37 +1,58 @@
-import { useMemo } from 'react';
-import { slideElement } from '../../model/deck';
-import { themeColors } from '../../model/themeColors';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useDeckStore } from '../../state/deckStore';
+import { thumbDoc } from '../../editor/stageDoc';
 
 /**
- * Cheap static thumbnail: the slide's markup scaled way down, colored to
- * roughly match the deck theme. Theme-faithful rendering lives in the
- * canvas; thumbnails only need to be recognizable.
+ * Theme-faithful miniature: the slide rendered in the same document shell as
+ * the canvas (reveal.css + theme + the deck's own styles), scaled way down in
+ * an inert iframe. Stylesheets are HTTP-cached, so N thumbnails share the
+ * network cost of one.
  */
 export function SlideThumb({ source }: { source: string }) {
-  const theme = useDeckStore((s) => s.meta?.theme ?? null);
-  const colors = themeColors(theme);
+  const meta = useDeckStore((s) => s.meta);
+  const hostRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
 
-  const { html, bg } = useMemo(() => {
-    const el = slideElement(source);
-    if (!el) return { html: '', bg: undefined as string | undefined };
-    el.querySelectorAll('aside.notes').forEach((n) => n.remove());
-    return {
-      html: el.innerHTML,
-      bg:
-        el.getAttribute('data-background-color') ??
-        el.getAttribute('data-background') ??
-        undefined,
-    };
-  }, [source]);
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    const observer = new ResizeObserver(() => setWidth(host.clientWidth));
+    observer.observe(host);
+    return () => observer.disconnect();
+  }, []);
+
+  const srcDoc = useMemo(
+    () => (meta ? thumbDoc(meta, source) : ''),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [source, meta?.path, meta?.theme, meta?.themeHref, meta?.stylesheets, meta?.headStyles, meta?.managedCss],
+  );
+
+  if (!meta) return null;
+  const { width: designW, height: designH } = meta.config;
+  const scale = width > 0 ? width / designW : 0;
 
   return (
-    <div className="slide-thumb" style={{ background: bg ?? colors.bg }}>
-      <div
-        className="slide-thumb-content"
-        style={{ color: colors.text }}
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
+    <div
+      ref={hostRef}
+      className="slide-thumb"
+      style={{ aspectRatio: `${designW} / ${designH}` }}
+    >
+      {scale > 0 && (
+        <iframe
+          title="Slide thumbnail"
+          srcDoc={srcDoc}
+          tabIndex={-1}
+          loading="lazy"
+          style={{
+            width: designW,
+            height: designH,
+            transform: `scale(${scale})`,
+            transformOrigin: 'top left',
+            border: 'none',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -4,7 +4,7 @@ import type { DeckMeta } from '../state/deckStore';
 import { useDeckStore } from '../state/deckStore';
 import { useEditorStore } from './editorStore';
 import { slideElement } from '../model/deck';
-import { REVEAL_CSS_RE, resolveDeckUrl, themeUrl } from '../api/client';
+import { stageHead, stageLayoutCss } from './stageDoc';
 import { TextSession } from './TextSession';
 import { handlerFor, textEditableFrom } from './registry';
 import { hydrateCodeBlocks } from './codeHighlight';
@@ -38,43 +38,11 @@ export function StageFrame({ slide, meta }: { slide: Slide | null; meta: DeckMet
   const { width, height, center } = meta.config;
 
   const srcDoc = useMemo(() => {
-    const dir = meta.path.includes('/')
-      ? meta.path.slice(0, meta.path.lastIndexOf('/') + 1)
-      : '';
-    const userSheets = meta.stylesheets
-      .filter((href) => !REVEAL_CSS_RE.test(href))
-      .map((href) => `<link rel="stylesheet" href="${resolveDeckUrl(meta.path, href)}">`)
-      .join('\n');
-    // The deck's own <style> blocks — custom decks carry their design here.
-    const userStyles = meta.headStyles.map((css) => `<style>${css}</style>`).join('\n');
-    const theme = themeUrl(meta.path, meta.theme, meta.themeHref);
     return `<!doctype html>
 <html>
 <head>
-<meta charset="utf-8">
-<base href="/files/${dir}">
-<link rel="stylesheet" href="/vendor/reveal.js/dist/reveal.css">
-${theme ? `<link rel="stylesheet" href="${theme}">` : '<!-- custom-styled deck: no theme injected -->'}
-<link rel="stylesheet" href="/vendor/reveal.js/plugin/highlight/monokai.css">
-${userSheets}
-${userStyles}
-${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}
-<style>
-  html, body { margin: 0; overflow: hidden; width: 100%; height: 100%; }
-  .reveal { position: relative; width: 100%; height: 100%; overflow: hidden; }
-  .reveal .slides { position: absolute; inset: 0; width: ${width}px; height: ${height}px; }
-  /* Replicate reveal's layout statically — the runtime never runs here.
-     position:relative makes the section the containing block for absolutely
-     positioned elements, exactly like reveal's own layout. center:false
-     decks flow from the top in block layout, like the runtime renders them. */
-  .reveal .slides > section.present {
-    position: relative;
-    ${center ? 'display: flex !important;\n    flex-direction: column;\n    justify-content: center;' : 'display: block !important;'}
-    width: 100%;
-    height: 100%;
-    top: 0;
-  }
-  aside.notes { display: none !important; }
+${stageHead(meta)}
+<style>${stageLayoutCss(meta)}
   [contenteditable]:focus { outline: none; }
   .reveal .slides section :where(h1,h2,h3,h4,h5,h6,p,ul,ol,blockquote,img,pre,div,figure,table) {
     cursor: default;
@@ -85,6 +53,7 @@ ${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}
 <div class="reveal"><div class="slides"><section class="present" id="re-stage"></section></div></div>
 </body>
 </html>`;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meta.path, meta.theme, meta.themeHref, meta.stylesheets, meta.headStyles, meta.managedCss, width, height, center]);
 
   function endSession(commitFirst: boolean) {
@@ -198,6 +167,11 @@ ${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}
     });
 
     doc.addEventListener('pointerdown', (e) => {
+      // Mantine popovers/menus in the parent close on outside mousedown, but
+      // clicks inside this iframe never reach the parent document — forward
+      // one so open pickers/dropdowns close like they would anywhere else.
+      document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      (document.activeElement as HTMLElement | null)?.blur?.();
       if (e.button !== 0) return;
       if (useEditorStore.getState().contextMenu) useEditorStore.getState().setContextMenu(null);
       if (press) finalizePress(); // stale gesture (missed pointerup)
