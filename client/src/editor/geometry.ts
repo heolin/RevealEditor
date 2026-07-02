@@ -6,6 +6,21 @@
 import type { StageCtx } from './commands';
 import { commit } from './commands';
 import { useDeckStore } from '../state/deckStore';
+import { ensureManagedBlock } from './managedCss';
+
+export const FREE_CSS_MARKER = '/* re:free */';
+/**
+ * Centering for pinned (free-layout) sections, as a stylesheet rule — NOT
+ * inline: reveal.js overwrites each section's inline `display` to show/hide
+ * slides, so inline flex silently dies when presenting. The !important
+ * stylesheet rule outranks reveal's plain inline write, and the
+ * :not([style*="display: none"]) guard keeps reveal's hiding working.
+ */
+export const FREE_CSS = `.reveal .slides section[data-re-free]:not([style*="display: none"]) {
+  display: flex !important;
+  flex-direction: column;
+  justify-content: center;
+}`;
 
 export interface StylePatch {
   [prop: string]: string | null;
@@ -64,7 +79,14 @@ export function toAbsolute(ctx: StageCtx, el: HTMLElement, designHeight: number)
  */
 export function toAbsoluteAll(ctx: StageCtx, els: HTMLElement[], designHeight: number): void {
   const targets = els.filter((el) => !isAbsolute(el));
-  if (targets.length === 0) return;
+  if (targets.length === 0) {
+    // Nothing to convert, but touching a free element on a legacy-pinned
+    // slide is still the moment to migrate its centering to the runtime-
+    // proof form and re-sync the flow-children compensations.
+    migrateLegacyPin(ctx);
+    syncInlineCentering(ctx);
+    return;
+  }
   const rects = targets.map((el) => stageRect(ctx, el));
   ensureFreeLayoutSection(ctx, designHeight);
   targets.forEach((el, i) =>
@@ -92,12 +114,11 @@ export function ensureFreeLayoutSection(ctx: StageCtx, designHeight: number): vo
     // center:false decks lay their sections out in block flow from the top —
     // pinning must not impose flex centering on them.
     const center = useDeckStore.getState().meta?.config.center ?? true;
-    applyStyle(ctx.section, {
-      height: `${designHeight}px`,
-      ...(center
-        ? { display: 'flex', 'flex-direction': 'column', 'justify-content': 'center' }
-        : {}),
-    });
+    applyStyle(ctx.section, { height: `${designHeight}px` });
+    if (center) {
+      ctx.section.setAttribute('data-re-free', '');
+      ensureManagedBlock(FREE_CSS_MARKER, FREE_CSS);
+    }
     // Pinned sections sit at the slide origin — clear the centering offset
     // so free-position coordinates match the runtime exactly.
     (ctx.section.parentElement as HTMLElement | null)?.style.setProperty(
@@ -105,7 +126,26 @@ export function ensureFreeLayoutSection(ctx: StageCtx, designHeight: number): vo
       '0px',
     );
     syncInlineCentering(ctx);
+  } else {
+    migrateLegacyPin(ctx);
   }
+}
+
+/**
+ * Legacy pinning wrote the flex inline — which reveal.js stomps at runtime
+ * (it rewrites sections' inline display to show/hide slides), so those decks
+ * silently lost centering when presenting. Migrate to the attribute +
+ * managed-CSS form whenever a free-layout action touches the slide.
+ */
+export function migrateLegacyPin(ctx: StageCtx): void {
+  if (!ctx.section.style.height || ctx.section.style.display !== 'flex') return;
+  applyStyle(ctx.section, {
+    display: null,
+    'flex-direction': null,
+    'justify-content': null,
+  });
+  ctx.section.setAttribute('data-re-free', '');
+  ensureManagedBlock(FREE_CSS_MARKER, FREE_CSS);
 }
 
 /** A pinned section's flex column breaks two block-flow behaviors that
@@ -120,7 +160,11 @@ export function ensureFreeLayoutSection(ctx: StageCtx, designHeight: number): vo
 function syncInlineCentering(ctx: StageCtx): void {
   const view = ctx.doc.defaultView!;
   const cs = view.getComputedStyle(ctx.section);
-  const pinnedFlex = !!ctx.section.style.height && cs.display.includes('flex');
+  // Attribute (or legacy inline flex), not computed display: the managed
+  // stylesheet may not have reached the stage document yet at pin time.
+  const pinnedFlex =
+    !!ctx.section.style.height &&
+    (ctx.section.hasAttribute('data-re-free') || ctx.section.style.display === 'flex');
   const centered = cs.textAlign === 'center';
   for (const child of Array.from(ctx.section.children)) {
     const el = child as HTMLElement;
@@ -157,11 +201,13 @@ function maybeUnpinSection(ctx: StageCtx): void {
       'flex-direction': null,
       'justify-content': null,
     });
+    ctx.section.removeAttribute('data-re-free');
   }
 }
 
 /** Strip free positioning and return the element to flow layout. */
 export function returnToFlow(ctx: StageCtx, el: HTMLElement): void {
+  migrateLegacyPin(ctx);
   // Sized media keep their dimensions: for an image/shape/chart the inline
   // width IS its scale — unpinning restores flow, it must not undo a resize.
   // Text-like elements drop the width toAbsolute measured onto them.

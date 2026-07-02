@@ -64,8 +64,18 @@ ${stageHead(meta)}
 <div class="reveal"><div class="slides"><section class="present" id="re-stage"></section></div></div>
 </body>
 </html>`;
+    // managedCss deliberately absent: it changes DURING gestures (pinning a
+    // section adds the free-layout rule) and a srcDoc rebuild would reload
+    // the iframe mid-drag — the effect below patches the style in place.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [meta.path, meta.theme, meta.themeHref, meta.stylesheets, meta.headStyles, meta.managedCss, width, height, center]);
+  }, [meta.path, meta.theme, meta.themeHref, meta.stylesheets, meta.headStyles, width, height, center]);
+
+  const managedCss = meta.managedCss;
+  useEffect(() => {
+    const doc = iframeRef.current?.contentDocument;
+    const el = doc?.querySelector('style[data-re-managed]');
+    if (el && el.textContent !== managedCss) el.textContent = managedCss;
+  }, [managedCss]);
 
   function endSession(commitFirst: boolean) {
     const session = sessionRef.current;

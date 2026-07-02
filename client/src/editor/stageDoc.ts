@@ -29,7 +29,7 @@ ${theme ? `<link rel="stylesheet" href="${theme}">` : '<!-- custom-styled deck: 
 <link rel="stylesheet" href="/vendor/reveal.js/plugin/highlight/monokai.css">
 ${userSheets}
 ${userStyles}
-${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}`;
+<style data-re-managed>${meta.managedCss}</style>`;
 }
 
 export function stageLayoutCss(meta: StageMeta): string {
@@ -51,12 +51,18 @@ export function stageLayoutCss(meta: StageMeta): string {
        section padding (benchmarks: 48px) otherwise overflow right. */
     box-sizing: border-box;
   }
-  /* Pinned (free-layout) sections carry inline height + flex — top stays 0,
-     and their inline flex centering must WIN over our block !important
-     (otherwise remaining flow content jumps to the top in the canvas while
-     the runtime, where inline styles rule, keeps it centered). */
+  /* Pinned (free-layout) sections carry inline height — top stays 0. Their
+     centering is the data-re-free managed rule (see geometry FREE_CSS); the
+     [style*="display: flex"] variant covers legacy decks saved before the
+     attribute form (reveal stomps inline display at runtime, so new pins
+     never write it). Both must WIN over our block !important. */
   .reveal .slides > section[style*="height"] { top: 0; }
-  .reveal .slides > section[style*="display: flex"] { display: flex !important; }
+  .reveal .slides > section[data-re-free],
+  .reveal .slides > section[style*="display: flex"] {
+    display: flex !important;
+    flex-direction: column;
+    justify-content: center;
+  }
   .reveal .slides section .fragment {
     visibility: visible !important;
     opacity: 1 !important;

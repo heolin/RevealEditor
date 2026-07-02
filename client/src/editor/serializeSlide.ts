@@ -9,6 +9,10 @@ import { restoreRawCode } from './codeHighlight';
 
 const EDITOR_ATTRS = ['contenteditable', 'spellcheck', 'draggable'];
 
+/** data-re-* attrs that are part of the FILE FORMAT, not editor state:
+ *  shape/chart spec JSON and the free-layout section marker. */
+const PERSISTENT_RE_ATTRS = ['data-re-shape', 'data-re-chart', 'data-re-free'];
+
 export function serializeSlide(stageSection: HTMLElement): string {
   const clone = stageSection.cloneNode(true) as HTMLElement;
 
@@ -22,7 +26,9 @@ export function serializeSlide(stageSection: HTMLElement): string {
   for (const el of [clone, ...clone.querySelectorAll('*')]) {
     for (const attr of EDITOR_ATTRS) el.removeAttribute(attr);
     for (const name of el.getAttributeNames()) {
-      if (name.startsWith('data-re-')) el.removeAttribute(name);
+      if (name.startsWith('data-re-') && !PERSISTENT_RE_ATTRS.includes(name)) {
+        el.removeAttribute(name);
+      }
     }
     // Fragment preview state is runtime-only (M3 stepper writes these).
     stripClass(el, 'visible');

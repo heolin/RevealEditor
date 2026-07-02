@@ -38,6 +38,18 @@ describe('serializeSlide', () => {
     expect(out).not.toContain('style=""');
   });
 
+  it('keeps file-format data-re attrs: shape/chart specs, free-layout marker', () => {
+    const s = stage(
+      '<svg data-re-shape=\'{"kind":"rect"}\' class="re-shape"></svg>' +
+        '<figure data-re-chart=\'{"type":"bar"}\'></figure>',
+    );
+    s.setAttribute('data-re-free', '');
+    const out = serializeSlide(s);
+    expect(out).toContain('data-re-shape');
+    expect(out).toContain('data-re-chart');
+    expect(out).toContain('data-re-free');
+  });
+
   it('strips fragment preview classes but keeps fragment itself', () => {
     const s = stage('<p class="fragment visible current-fragment fade-up">x</p>');
     expect(serializeSlide(s)).toBe(
