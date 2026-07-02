@@ -70,7 +70,9 @@ export function EditorOverlay({ scale }: { scale: number }) {
           <div
             className={`selection-box${sessionEl ? ' editing' : ''}`}
             style={boxFor(connected, scale)}
-          />
+          >
+            {sessionEl && <span className="selection-label">EDIT</span>}
+          </div>
           <FloatingToolbar el={connected} box={boxFor(connected, scale)} editing={!!sessionEl} />
         </>
       )}

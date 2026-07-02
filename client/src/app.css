@@ -184,6 +184,16 @@ html, body, #root { height: 100%; margin: 0; }
 .selection-box.editing {
   border-style: dashed;
 }
+.selection-label {
+  position: absolute;
+  top: -18px;
+  right: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--re-accent);
+  user-select: none;
+}
 .floating-toolbar {
   position: absolute;
   pointer-events: auto;
