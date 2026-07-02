@@ -10,6 +10,9 @@ import {
   Tooltip,
 } from '@mantine/core';
 import {
+  IconAlignCenter,
+  IconAlignLeft,
+  IconAlignRight,
   IconBold,
   IconChartBar,
   IconCode,
@@ -268,6 +271,13 @@ function FloatingToolbar({ el, box, editing }: { el: HTMLElement; box: Box; edit
   const isList = tag === 'UL' || tag === 'OL';
   const handler = handlerFor(el);
   const keepFocus = (e: React.MouseEvent) => e.preventDefault();
+  const showAlign = handler.type === 'text' || handler.type === 'table';
+  const currentAlign = el.style.textAlign || '';
+
+  function setAlign(align: 'left' | 'center' | 'right') {
+    applyStyle(el, { 'text-align': currentAlign === align ? null : align });
+    commit(ctx!);
+  }
 
   const top = box.top - TOOLBAR_HEIGHT - 6 >= 0 ? box.top - TOOLBAR_HEIGHT - 6 : box.top + box.height + 6;
   const left = Math.max(4, box.left);
@@ -401,6 +411,40 @@ function FloatingToolbar({ el, box, editing }: { el: HTMLElement; box: Box; edit
                 onClick={() => insertList(ctx, true)}
               >
                 <IconListNumbers size={16} />
+              </ActionIcon>
+            </Tooltip>
+          </>
+        )}
+        {showAlign && (
+          <>
+            <Tooltip label="Align left">
+              <ActionIcon
+                variant={currentAlign === 'left' ? 'light' : 'subtle'}
+                color={currentAlign === 'left' ? 'blue' : 'gray'}
+                onMouseDown={keepFocus}
+                onClick={() => setAlign('left')}
+              >
+                <IconAlignLeft size={16} />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label="Align center">
+              <ActionIcon
+                variant={currentAlign === 'center' ? 'light' : 'subtle'}
+                color={currentAlign === 'center' ? 'blue' : 'gray'}
+                onMouseDown={keepFocus}
+                onClick={() => setAlign('center')}
+              >
+                <IconAlignCenter size={16} />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label="Align right">
+              <ActionIcon
+                variant={currentAlign === 'right' ? 'light' : 'subtle'}
+                color={currentAlign === 'right' ? 'blue' : 'gray'}
+                onMouseDown={keepFocus}
+                onClick={() => setAlign('right')}
+              >
+                <IconAlignRight size={16} />
               </ActionIcon>
             </Tooltip>
           </>

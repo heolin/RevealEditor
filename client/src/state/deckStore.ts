@@ -38,6 +38,7 @@ interface DeckState {
   close(): void;
   select(slideId: string | null): void;
 
+  addSlideAtEnd(): void;
   addSlideAfterColumn(columnId: string): void;
   addSlideBelow(slideId: string): void;
   duplicateSlide(slideId: string): void;
@@ -151,6 +152,18 @@ export const useDeckStore = create<DeckState>()(
 
       select(slideId) {
         set({ selectedSlideId: slideId });
+      },
+
+      addSlideAtEnd() {
+        const { columns, meta } = get();
+        if (!meta) return;
+        const indent = meta.layout.sectionIndent;
+        const slide = makeSlide(indent);
+        set({
+          columns: [...columns, makeColumn(indent, [slide])],
+          selectedSlideId: slide.id,
+          dirty: true,
+        });
       },
 
       addSlideAfterColumn(columnId) {

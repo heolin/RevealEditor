@@ -104,6 +104,38 @@ export function decksRouter(ws: Workspace): Router {
     }
   });
 
+  router.post('/deck/rename', async (req, res, next) => {
+    try {
+      const { path: relPath, newPath } = req.body as { path?: string; newPath?: string };
+      if (!relPath || !newPath || !newPath.endsWith('.html')) {
+        return res.status(400).json({ error: 'path and newPath (.html) required' });
+      }
+      if (await ws.exists(newPath)) {
+        return res.status(409).json({ error: 'Target already exists' });
+      }
+      await ws.ensureDirFor(newPath);
+      await fs.rename(ws.resolve(relPath), ws.resolve(newPath));
+      res.json({ path: newPath });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post('/deck/duplicate', async (req, res, next) => {
+    try {
+      const { path: relPath } = req.body as { path?: string };
+      if (!relPath) return res.status(400).json({ error: 'path required' });
+      const base = relPath.replace(/\.html$/, '');
+      let target = `${base}-copy.html`;
+      for (let i = 2; await ws.exists(target); i++) target = `${base}-copy-${i}.html`;
+      await fs.copyFile(ws.resolve(relPath), ws.resolve(target));
+      const mtime = await ws.mtime(target);
+      res.status(201).json({ path: target, mtime });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   router.delete('/deck', async (req, res, next) => {
     try {
       const relPath = deckPathParam(req);

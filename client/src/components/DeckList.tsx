@@ -6,6 +6,7 @@ import {
   Card,
   Container,
   Group,
+  Menu,
   Modal,
   Select,
   Stack,
@@ -15,7 +16,15 @@ import {
   Tooltip,
   useMantineColorScheme,
 } from '@mantine/core';
-import { IconMoon, IconPlus, IconSun } from '@tabler/icons-react';
+import {
+  IconCopy,
+  IconDots,
+  IconMoon,
+  IconPencil,
+  IconPlus,
+  IconSun,
+  IconTrash,
+} from '@tabler/icons-react';
 import { api, type DeckSummary } from '../api/client';
 import { openDeck } from '../App';
 
@@ -23,11 +32,17 @@ export function DeckList() {
   const [decks, setDecks] = useState<DeckSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [renaming, setRenaming] = useState<DeckSummary | null>(null);
+  const [deleting, setDeleting] = useState<DeckSummary | null>(null);
   const [themes, setThemes] = useState<string[]>([]);
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
 
-  useEffect(() => {
+  function refresh() {
     api.listDecks().then(setDecks).catch((err) => setError(String(err)));
+  }
+
+  useEffect(() => {
+    refresh();
     api.listThemes().then(setThemes).catch(() => setThemes(['black', 'white']));
   }, []);
 
@@ -83,14 +98,118 @@ export function DeckList() {
               className="deck-item"
               onClick={() => void openDeck(d.path)}
             >
-              <Text fw={600}>{d.title}</Text>
-              <Text size="xs" c="dimmed">
-                {d.path} · {d.slideCount} slides
-              </Text>
+              <Group justify="space-between" wrap="nowrap">
+                <div style={{ minWidth: 0 }}>
+                  <Text fw={600}>{d.title}</Text>
+                  <Text size="xs" c="dimmed" truncate>
+                    {d.path} · {d.slideCount} slides
+                  </Text>
+                </div>
+                <Menu withinPortal position="bottom-end">
+                  <Menu.Target>
+                    <ActionIcon
+                      variant="subtle"
+                      color="gray"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <IconDots size={16} />
+                    </ActionIcon>
+                  </Menu.Target>
+                  <Menu.Dropdown onClick={(e) => e.stopPropagation()}>
+                    <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => setRenaming(d)}>
+                      Rename file…
+                    </Menu.Item>
+                    <Menu.Item
+                      leftSection={<IconCopy size={14} />}
+                      onClick={async () => {
+                        try {
+                          await api.duplicateDeck(d.path);
+                          refresh();
+                        } catch (err) {
+                          setError(String(err));
+                        }
+                      }}
+                    >
+                      Duplicate
+                    </Menu.Item>
+                    <Menu.Divider />
+                    <Menu.Item
+                      color="red"
+                      leftSection={<IconTrash size={14} />}
+                      onClick={() => setDeleting(d)}
+                    >
+                      Delete…
+                    </Menu.Item>
+                  </Menu.Dropdown>
+                </Menu>
+              </Group>
             </Card>
           ))}
         </Stack>
       )}
+
+      <Modal
+        opened={renaming !== null}
+        onClose={() => setRenaming(null)}
+        title={`Rename ${renaming?.path ?? ''}`}
+      >
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!renaming) return;
+            const newPath = String(new FormData(e.currentTarget).get('newPath') || '').trim();
+            if (!newPath || newPath === renaming.path) return setRenaming(null);
+            try {
+              await api.renameDeck(renaming.path, newPath.endsWith('.html') ? newPath : `${newPath}.html`);
+              setRenaming(null);
+              refresh();
+            } catch (err) {
+              setError(String(err));
+            }
+          }}
+        >
+          <Stack gap="sm">
+            <TextInput name="newPath" defaultValue={renaming?.path} data-autofocus label="New file name" />
+            <Text size="xs" c="dimmed">
+              Renaming within the same folder keeps relative asset links working.
+            </Text>
+            <Group justify="flex-end">
+              <Button variant="default" onClick={() => setRenaming(null)}>
+                Cancel
+              </Button>
+              <Button type="submit">Rename</Button>
+            </Group>
+          </Stack>
+        </form>
+      </Modal>
+
+      <Modal opened={deleting !== null} onClose={() => setDeleting(null)} title="Delete presentation">
+        <Stack gap="sm">
+          <Text size="sm">
+            Delete <b>{deleting?.title}</b> ({deleting?.path})? The file is removed from disk.
+          </Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setDeleting(null)}>
+              Cancel
+            </Button>
+            <Button
+              color="red"
+              onClick={async () => {
+                if (!deleting) return;
+                try {
+                  await api.deleteDeck(deleting.path);
+                  setDeleting(null);
+                  refresh();
+                } catch (err) {
+                  setError(String(err));
+                }
+              }}
+            >
+              Delete
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
 
       <Modal opened={creating} onClose={() => setCreating(false)} title="New presentation">
         <form onSubmit={onCreate}>

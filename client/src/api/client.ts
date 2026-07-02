@@ -81,6 +81,16 @@ export const api = {
     }),
   deleteDeck: (path: string) =>
     request<{ ok: true }>(`/api/deck${q(path)}`, { method: 'DELETE' }),
+  renameDeck: (path: string, newPath: string) =>
+    request<{ path: string }>('/api/deck/rename', {
+      method: 'POST',
+      body: JSON.stringify({ path, newPath }),
+    }),
+  duplicateDeck: (path: string) =>
+    request<{ path: string }>('/api/deck/duplicate', {
+      method: 'POST',
+      body: JSON.stringify({ path }),
+    }),
   listThemes: () => request<string[]>('/api/themes'),
   uploadAsset: async (deckPath: string, file: File): Promise<{ url: string }> => {
     const form = new FormData();

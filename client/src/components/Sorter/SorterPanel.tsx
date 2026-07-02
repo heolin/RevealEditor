@@ -4,6 +4,8 @@ import {
   IconArrowDown,
   IconArrowRight,
   IconCopy,
+  IconEyeOff,
+  IconPlus,
   IconTrash,
 } from '@tabler/icons-react';
 import {
@@ -73,7 +75,19 @@ export function SorterPanel() {
           </div>
         ))}
       </DndContext>
-      {columns.length === 0 && <p className="muted pad">Deck is empty.</p>}
+      {columns.length === 0 && (
+        <div className="sorter-empty">
+          <p>Deck is empty.</p>
+          <ActionIcon
+            variant="light"
+            size="lg"
+            title="Add first slide"
+            onClick={() => useDeckStore.getState().addSlideAtEnd()}
+          >
+            <IconPlus size={18} />
+          </ActionIcon>
+        </div>
+      )}
     </div>
   );
 }
@@ -144,6 +158,11 @@ function SorterSlide({
       {...attributes}
     >
       {indexLabel && <span className="slide-sub-index">{indexLabel}</span>}
+      {/^<section[^>]*data-visibility=["']?hidden/.test(slide.source) && (
+        <span className="hidden-badge" title="Hidden slide (skipped when presenting)">
+          <IconEyeOff size={11} />
+        </span>
+      )}
       <SlideThumb source={slide.source} />
       <div className="slide-actions" onPointerDown={(e) => e.stopPropagation()}>
         <Tooltip label="Add slide after">

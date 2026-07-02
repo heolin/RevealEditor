@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { Button } from '@mantine/core';
+import { IconPlus } from '@tabler/icons-react';
 import { useDeckStore } from '../../state/deckStore';
 import { StageFrame } from '../../editor/StageFrame';
 import { EditorOverlay } from '../../editor/overlay/EditorOverlay';
@@ -28,6 +30,23 @@ export function SlideCanvas() {
     observer.observe(pane);
     return () => observer.disconnect();
   }, [width, height]);
+
+  if (!slide) {
+    return (
+      <div className="canvas-pane" ref={paneRef}>
+        <div className="canvas-empty">
+          <p>No slide selected.</p>
+          <Button
+            variant="light"
+            leftSection={<IconPlus size={16} />}
+            onClick={() => useDeckStore.getState().addSlideAtEnd()}
+          >
+            Add a slide
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="canvas-pane" ref={paneRef}>
