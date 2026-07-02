@@ -170,7 +170,6 @@ input, select {
 }
 .slide-thumb {
   aspect-ratio: 960 / 700;
-  background: #191919;
   border-radius: 4px;
   overflow: hidden;
   position: relative;
@@ -180,7 +179,6 @@ input, select {
   height: 700px;
   transform: scale(0.165);
   transform-origin: top left;
-  color: #eee;
   text-align: center;
   padding: 40px;
   pointer-events: none;

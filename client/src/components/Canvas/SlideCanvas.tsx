@@ -44,6 +44,8 @@ export function SlideCanvas() {
 ${userSheets}
 ${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}
 <style>
+  /* Reveal themes paint the slide background on .reveal-viewport — a class the
+     runtime adds to <body>. The runtime never runs here, so add it ourselves. */
   html, body { margin: 0; overflow: hidden; width: 100%; height: 100%; }
   .reveal { position: relative; width: 100%; height: 100%; overflow: hidden; }
   .reveal .slides { position: absolute; inset: 0; width: ${width}px; height: ${height}px; }
@@ -65,7 +67,7 @@ ${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}
   aside.notes { display: none !important; }
 </style>
 </head>
-<body>
+<body class="reveal-viewport">
 <div class="reveal"><div class="slides"><section class="present" id="re-stage"></section></div></div>
 </body>
 </html>`;
@@ -94,8 +96,13 @@ ${meta.managedCss ? `<style>${meta.managedCss}</style>` : ''}
       }
     }
     stage.innerHTML = parsed.innerHTML;
-    const bg = parsed.getAttribute('data-background-color');
-    doc.documentElement.style.background = bg ?? '';
+    // Per-slide background override (the runtime renders these into separate
+    // background divs; statically, painting the viewport is equivalent).
+    const bg =
+      parsed.getAttribute('data-background-color') ??
+      parsed.getAttribute('data-background') ??
+      '';
+    doc.body.style.background = bg;
   }, [slide, frameReady]);
 
   useEffect(() => {
