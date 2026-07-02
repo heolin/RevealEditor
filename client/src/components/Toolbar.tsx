@@ -17,6 +17,8 @@ import {
   IconSun,
 } from '@tabler/icons-react';
 import { useDeckStore } from '../state/deckStore';
+import { useEditorStore } from '../editor/editorStore';
+import { InsertMenu } from '../editor/overlay/EditorOverlay';
 import { api } from '../api/client';
 
 export function Toolbar() {
@@ -63,6 +65,7 @@ export function Toolbar() {
           <IconArrowForwardUp size={18} />
         </ActionIcon>
       </Tooltip>
+      <ToolbarInsert />
       {themes.length > 0 && (
         <Select
           size="xs"
@@ -95,4 +98,10 @@ export function Toolbar() {
       </Button>
     </Group>
   );
+}
+
+/** Insert menu in the main toolbar — appends after the current selection. */
+function ToolbarInsert() {
+  const selectedEl = useEditorStore((s) => s.selectedEl);
+  return <InsertMenu after={selectedEl} />;
 }

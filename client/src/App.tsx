@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import { useDeckStore } from './state/deckStore';
+import { useEditorStore } from './editor/editorStore';
+import { deleteElement } from './editor/commands';
 import { api } from './api/client';
 import { DeckList } from './components/DeckList';
 import { Toolbar } from './components/Toolbar';
@@ -32,6 +34,13 @@ export function App() {
       } else if (e.key === 'Delete' && state.selectedSlideId) {
         const target = e.target as HTMLElement;
         if (target.closest('input, textarea, [contenteditable]')) return;
+        // An element selection on the canvas takes precedence over the slide.
+        const editor = useEditorStore.getState();
+        if (editor.selectedEl && editor.ctx) {
+          e.preventDefault();
+          deleteElement(editor.ctx, editor.selectedEl);
+          return;
+        }
         e.preventDefault();
         state.deleteSlide(state.selectedSlideId);
       }

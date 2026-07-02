@@ -1,0 +1,167 @@
+/**
+ * The single mutation funnel. Every change to slide content goes through a
+ * command here: mutate the live stage DOM, then commit (serialize → store,
+ * which snapshots history and marks the deck dirty). Nothing else in the
+ * codebase mutates slide DOM.
+ */
+import { serializeSlide } from './serializeSlide';
+import { useDeckStore } from '../state/deckStore';
+import { useEditorStore } from './editorStore';
+
+export interface StageCtx {
+  doc: Document;
+  /** The stage <section> hosting the current slide. */
+  section: HTMLElement;
+  slideId: string;
+  /** Lets the stage recognize its own commits and skip the DOM rebuild. */
+  markClean(source: string): void;
+}
+
+export function commit(ctx: StageCtx): void {
+  const source = serializeSlide(ctx.section);
+  ctx.markClean(source);
+  useDeckStore.getState().updateSlideSource(ctx.slideId, source);
+  useEditorStore.getState().bump();
+}
+
+/* ---------- inline formatting (within a text session) ---------- */
+
+export function execInline(ctx: StageCtx, command: 'bold' | 'italic' | 'strikeThrough'): void {
+  ctx.doc.execCommand(command);
+}
+
+export function insertList(ctx: StageCtx, ordered: boolean): void {
+  ctx.doc.execCommand(ordered ? 'insertOrderedList' : 'insertUnorderedList');
+}
+
+export function setLink(ctx: StageCtx, href: string): void {
+  const existing = linkAtSelection(ctx);
+  if (existing) {
+    // Editing an existing link preserves all its other attributes.
+    existing.setAttribute('href', href);
+  } else {
+    ctx.doc.execCommand('createLink', false, href);
+  }
+  commit(ctx);
+}
+
+export function removeLink(ctx: StageCtx): void {
+  const existing = linkAtSelection(ctx);
+  if (existing) {
+    while (existing.firstChild) existing.parentNode!.insertBefore(existing.firstChild, existing);
+    existing.remove();
+  } else {
+    ctx.doc.execCommand('unlink');
+  }
+  commit(ctx);
+}
+
+export function linkAtSelection(ctx: StageCtx): HTMLAnchorElement | null {
+  const sel = ctx.doc.getSelection();
+  const node = sel?.anchorNode;
+  if (!node) return null;
+  const el = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+  const a = el?.closest('a');
+  return a && ctx.section.contains(a) ? (a as HTMLAnchorElement) : null;
+}
+
+/* ---------- block-level operations ---------- */
+
+/** Change an element's tag, copying ALL attributes and children verbatim. */
+export function renameElement(ctx: StageCtx, el: HTMLElement, tag: string): HTMLElement {
+  const repl = ctx.doc.createElement(tag);
+  for (const attr of el.attributes) repl.setAttribute(attr.name, attr.value);
+  while (el.firstChild) repl.appendChild(el.firstChild);
+  el.replaceWith(repl);
+  commit(ctx);
+  return repl;
+}
+
+/** Convert a text block to a list (its content becomes the first <li>). */
+export function convertToList(ctx: StageCtx, el: HTMLElement, ordered: boolean): HTMLElement {
+  const list = ctx.doc.createElement(ordered ? 'ol' : 'ul');
+  const li = ctx.doc.createElement('li');
+  while (el.firstChild) li.appendChild(el.firstChild);
+  list.appendChild(li);
+  el.replaceWith(list);
+  commit(ctx);
+  return list;
+}
+
+/** Convert a list back to paragraphs (one per <li>). */
+export function convertListToParagraphs(ctx: StageCtx, list: HTMLElement): HTMLElement | null {
+  let first: HTMLElement | null = null;
+  const items = Array.from(list.querySelectorAll(':scope > li'));
+  for (const li of items) {
+    const p = ctx.doc.createElement('p');
+    while (li.firstChild) p.appendChild(li.firstChild);
+    list.parentNode!.insertBefore(p, list);
+    if (!first) first = p;
+  }
+  list.remove();
+  commit(ctx);
+  return first;
+}
+
+export function deleteElement(ctx: StageCtx, el: HTMLElement): void {
+  el.remove();
+  useEditorStore.getState().select(null);
+  commit(ctx);
+}
+
+export function duplicateElement(ctx: StageCtx, el: HTMLElement): HTMLElement {
+  const clone = el.cloneNode(true) as HTMLElement;
+  el.after(clone);
+  useEditorStore.getState().select(clone);
+  commit(ctx);
+  return clone;
+}
+
+/**
+ * Generic snippet insertion — images, code blocks, design-system components
+ * all route through here. Inserted after `after`, or appended to the slide.
+ */
+export function insertHtmlSnippet(
+  ctx: StageCtx,
+  html: string,
+  after?: HTMLElement | null,
+): HTMLElement | null {
+  const tpl = ctx.doc.createElement('template');
+  tpl.innerHTML = html;
+  const el = tpl.content.firstElementChild as HTMLElement | null;
+  if (!el) return null;
+  const node = ctx.doc.importNode(el, true);
+  if (after && after.parentNode && ctx.section.contains(after)) {
+    after.after(node);
+  } else {
+    ctx.section.appendChild(node);
+  }
+  useEditorStore.getState().select(node);
+  commit(ctx);
+  return node;
+}
+
+/* ---------- element clipboard ---------- */
+
+let internalClipboard: string | null = null;
+
+export function copyElement(el: HTMLElement): void {
+  const clone = el.cloneNode(true) as HTMLElement;
+  clone.removeAttribute('contenteditable');
+  clone.removeAttribute('spellcheck');
+  internalClipboard = clone.outerHTML;
+  void navigator.clipboard?.writeText(internalClipboard).catch(() => undefined);
+}
+
+export function cutElement(ctx: StageCtx, el: HTMLElement): void {
+  copyElement(el);
+  deleteElement(ctx, el);
+}
+
+export function pasteElement(ctx: StageCtx, after?: HTMLElement | null): void {
+  if (internalClipboard) insertHtmlSnippet(ctx, internalClipboard, after);
+}
+
+export function hasClipboard(): boolean {
+  return internalClipboard !== null;
+}

@@ -151,9 +151,44 @@ html, body, #root { height: 100%; margin: 0; }
   background: var(--re-bg);
 }
 .canvas-stage {
-  overflow: hidden;
+  position: relative;
+  overflow: visible;
   box-shadow: 0 4px 24px var(--re-shadow);
   border-radius: 4px;
+}
+.canvas-stage > div:first-child {
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+/* ---------- Editor overlay ---------- */
+
+.editor-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 5;
+}
+.hover-outline {
+  position: absolute;
+  border: 1px dashed var(--re-accent);
+  border-radius: 2px;
+  opacity: 0.7;
+}
+.selection-box {
+  position: absolute;
+  border: 2px solid var(--re-accent);
+  border-radius: 2px;
+}
+.selection-box.editing {
+  border-style: dashed;
+}
+.floating-toolbar {
+  position: absolute;
+  pointer-events: auto;
+  z-index: 10;
+  white-space: nowrap;
 }
 
 /* ---------- Preview ---------- */

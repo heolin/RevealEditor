@@ -45,6 +45,8 @@ interface DeckState {
   moveSlideToSlot(slideId: string, columnId: string, index: number): void;
   moveSlideToGap(slideId: string, gapIndex: number): void;
   setTheme(theme: string): void;
+  /** Commit edited slide markup from the editing engine (no-op if unchanged). */
+  updateSlideSource(slideId: string, source: string): void;
 
   save(opts?: { force?: boolean }): Promise<void>;
   dismissConflict(): void;
@@ -273,6 +275,22 @@ export const useDeckStore = create<DeckState>()(
         const { meta } = get();
         if (!meta) return;
         set({ meta: { ...meta, theme, themeHref: null }, dirty: true });
+      },
+
+      updateSlideSource(slideId, source) {
+        const { columns } = get();
+        const current = columns
+          .flatMap((c) => c.slides)
+          .find((s) => s.id === slideId);
+        if (!current || current.source === source) return;
+        const next = columns.map((col) => {
+          const idx = col.slides.findIndex((s) => s.id === slideId);
+          if (idx < 0) return col;
+          const slides = [...col.slides];
+          slides[idx] = { ...slides[idx], source };
+          return touched({ ...col, slides });
+        });
+        set({ columns: next, dirty: true });
       },
 
       async save(opts) {
