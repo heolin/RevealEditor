@@ -19,7 +19,10 @@ import {
   IconList,
   IconListNumbers,
   IconPhoto,
+  IconPinnedOff,
   IconPlus,
+  IconStackPop,
+  IconStackPush,
   IconStrikethrough,
   IconTrash,
 } from '@tabler/icons-react';
@@ -27,7 +30,10 @@ import { useEditorStore } from '../editorStore';
 import { useDeckStore } from '../../state/deckStore';
 import { api } from '../../api/client';
 import { handlerFor } from '../registry';
+import { applyStyle, changeZOrder, isAbsolute, returnToFlow, slideRect } from '../geometry';
+import { effectiveFragments } from '../fragments';
 import {
+  commit,
   convertListToParagraphs,
   convertToList,
   deleteElement,
@@ -60,6 +66,7 @@ export function EditorOverlay({ scale }: { scale: number }) {
   const selectedEl = useEditorStore((s) => s.selectedEl);
   const hoveredEl = useEditorStore((s) => s.hoveredEl);
   const sessionEl = useEditorStore((s) => s.sessionEl);
+  const snapGuides = useEditorStore((s) => s.snapGuides);
 
   const target = sessionEl ?? selectedEl;
   const connected = target?.isConnected ? target : null;
@@ -69,6 +76,7 @@ export function EditorOverlay({ scale }: { scale: number }) {
       {hoveredEl?.isConnected && hoveredEl !== connected && (
         <div className="hover-outline" style={boxFor(hoveredEl, scale)} />
       )}
+      <FragmentBadges scale={scale} />
       {connected && (
         <>
           <div
@@ -77,10 +85,119 @@ export function EditorOverlay({ scale }: { scale: number }) {
           >
             {sessionEl && <span className="selection-label">EDIT</span>}
           </div>
+          {!sessionEl && <ResizeHandles el={connected} scale={scale} />}
           <FloatingToolbar el={connected} box={boxFor(connected, scale)} editing={!!sessionEl} />
         </>
       )}
+      {snapGuides?.x != null && (
+        <div className="snap-guide vertical" style={{ left: snapGuides.x * scale }} />
+      )}
+      {snapGuides?.y != null && (
+        <div className="snap-guide horizontal" style={{ top: snapGuides.y * scale }} />
+      )}
     </div>
+  );
+}
+
+function FragmentBadges({ scale }: { scale: number }) {
+  const ctx = useEditorStore((s) => s.ctx);
+  const sessionEl = useEditorStore((s) => s.sessionEl);
+  if (!ctx || sessionEl) return null;
+  const fragments = effectiveFragments(ctx.section);
+  return (
+    <>
+      {fragments.map((el, i) => {
+        const box = boxFor(el, scale);
+        return (
+          <button
+            key={i}
+            className="fragment-badge"
+            style={{ left: box.left - 9, top: box.top - 9 }}
+            title="Fragment — click to select"
+            onClick={() => useEditorStore.getState().select(el)}
+          >
+            {i + 1}
+          </button>
+        );
+      })}
+    </>
+  );
+}
+
+const HANDLE_CURSORS: Record<string, string> = {
+  n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize',
+  ne: 'nesw-resize', sw: 'nesw-resize', nw: 'nwse-resize', se: 'nwse-resize',
+};
+
+function ResizeHandles({ el, scale }: { el: HTMLElement; scale: number }) {
+  const ctx = useEditorStore((s) => s.ctx);
+  if (!ctx) return null;
+  const capability = handlerFor(el).capabilities.resize;
+  if (capability === 'none') return null;
+  const absolute = isAbsolute(el);
+  const handles =
+    capability === 'width'
+      ? absolute ? ['e', 'w'] : ['e']
+      : absolute ? ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'] : ['e', 's', 'se'];
+
+  const box = boxFor(el, scale);
+
+  function startResize(handle: string, down: React.PointerEvent) {
+    down.preventDefault();
+    down.stopPropagation();
+    if (!ctx) return;
+    const start = slideRect(ctx, el);
+    const isImg = el.tagName === 'IMG';
+    const ratio = start.width / Math.max(1, start.height);
+    const x0 = down.clientX;
+    const y0 = down.clientY;
+
+    function onMove(e: PointerEvent) {
+      const dx = (e.clientX - x0) / scale;
+      const dy = (e.clientY - y0) / scale;
+      let { left, top, width: w, height: h } = start;
+      if (handle.includes('e')) w = start.width + dx;
+      if (handle.includes('w')) { w = start.width - dx; left = start.left + dx; }
+      if (handle.includes('s')) h = start.height + dy;
+      if (handle.includes('n')) { h = start.height - dy; top = start.top + dy; }
+      if (isImg && (e.shiftKey || handle.length === 2)) h = w / ratio; // aspect lock on corners
+      w = Math.max(16, w);
+      h = Math.max(16, h);
+      const patch: Record<string, string | null> = { width: `${Math.round(w)}px` };
+      if (handle.includes('s') || handle.includes('n') || (isImg && handle.length === 2)) {
+        patch.height = `${Math.round(h)}px`;
+      }
+      if (absolute) {
+        patch.left = `${Math.round(left)}px`;
+        patch.top = `${Math.round(top)}px`;
+      }
+      applyStyle(el, patch);
+      useEditorStore.getState().bump();
+    }
+    function onUp() {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      if (ctx) commit(ctx);
+    }
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }
+
+  return (
+    <>
+      {handles.map((h) => {
+        const style: React.CSSProperties = { cursor: HANDLE_CURSORS[h] };
+        if (h.includes('n')) style.top = box.top - 4;
+        else if (h.includes('s')) style.top = box.top + box.height - 4;
+        else style.top = box.top + box.height / 2 - 4;
+        if (h.includes('w')) style.left = box.left - 4;
+        else if (h.includes('e')) style.left = box.left + box.width - 4;
+        else style.left = box.left + box.width / 2 - 4;
+        return (
+          <div key={h} className="resize-handle" style={style} onPointerDown={(e) => startResize(h, e)} />
+        );
+      })}
+    </>
   );
 }
 
@@ -262,6 +379,25 @@ function FloatingToolbar({ el, box, editing }: { el: HTMLElement; box: Box; edit
                   <IconListNumbers size={16} />
                 </ActionIcon>
               </Tooltip>
+            )}
+            {isAbsolute(el) && (
+              <>
+                <Tooltip label="Bring forward">
+                  <ActionIcon variant="subtle" color="gray" onClick={() => changeZOrder(ctx, el, 1)}>
+                    <IconStackPop size={16} />
+                  </ActionIcon>
+                </Tooltip>
+                <Tooltip label="Send backward">
+                  <ActionIcon variant="subtle" color="gray" onClick={() => changeZOrder(ctx, el, -1)}>
+                    <IconStackPush size={16} />
+                  </ActionIcon>
+                </Tooltip>
+                <Tooltip label="Return to flow layout (remove free positioning)">
+                  <ActionIcon variant="subtle" color="gray" onClick={() => returnToFlow(ctx, el)}>
+                    <IconPinnedOff size={16} />
+                  </ActionIcon>
+                </Tooltip>
+              </>
             )}
             <InsertMenu after={el} />
             <Tooltip label="Duplicate (Ctrl+D)">

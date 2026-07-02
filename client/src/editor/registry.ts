@@ -13,6 +13,8 @@ export interface ElementHandler {
     /** Double-click opens a contenteditable text session. */
     textEdit: boolean;
     delete: boolean;
+    /** Which resize handles the selection box offers. */
+    resize: 'none' | 'width' | 'both';
   };
 }
 
@@ -42,7 +44,7 @@ export const textHandler: ElementHandler = {
     }
     return false;
   },
-  capabilities: { textEdit: true, delete: true },
+  capabilities: { textEdit: true, delete: true, resize: 'width' },
 };
 
 /** <pre><code> blocks — edited via the code editor modal, never contenteditable. */
@@ -50,14 +52,14 @@ export const codeHandler: ElementHandler = {
   type: 'code',
   priority: 20,
   match: (el) => el.tagName === 'PRE',
-  capabilities: { textEdit: false, delete: true },
+  capabilities: { textEdit: false, delete: true, resize: 'width' },
 };
 
 export const imageHandler: ElementHandler = {
   type: 'image',
   priority: 20,
   match: (el) => el.tagName === 'IMG',
-  capabilities: { textEdit: false, delete: true },
+  capabilities: { textEdit: false, delete: true, resize: 'both' },
 };
 
 /** Never claims text editing; subtree is preserved untouched. */
@@ -65,7 +67,7 @@ export const genericHandler: ElementHandler = {
   type: 'generic',
   priority: -Infinity,
   match: () => true,
-  capabilities: { textEdit: false, delete: true },
+  capabilities: { textEdit: false, delete: true, resize: 'both' },
 };
 
 const HANDLERS: ElementHandler[] = [codeHandler, imageHandler, textHandler, genericHandler].sort(

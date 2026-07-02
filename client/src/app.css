@@ -200,6 +200,41 @@ html, body, #root { height: 100%; margin: 0; }
   z-index: 10;
   white-space: nowrap;
 }
+.resize-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: var(--re-panel);
+  border: 1.5px solid var(--re-accent);
+  border-radius: 2px;
+  pointer-events: auto;
+  z-index: 8;
+}
+.snap-guide {
+  position: absolute;
+  background: #e64980;
+  z-index: 7;
+}
+.snap-guide.vertical { top: 0; bottom: 0; width: 1px; }
+.snap-guide.horizontal { left: 0; right: 0; height: 1px; }
+.fragment-badge {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--re-accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 6;
+  padding: 0;
+}
 
 /* ---------- Center / right columns ---------- */
 

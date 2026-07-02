@@ -6,17 +6,30 @@ import {
   Group,
   NumberInput,
   Select,
+  Slider,
   Stack,
   Switch,
   Text,
   TextInput,
 } from '@mantine/core';
-import { IconUpload } from '@tabler/icons-react';
+import { IconArrowDown, IconArrowUp, IconUpload } from '@tabler/icons-react';
 import { useEditorStore } from '../../editor/editorStore';
 import { useDeckStore } from '../../state/deckStore';
 import { handlerFor } from '../../editor/registry';
 import { languageOf } from '../../editor/codeHighlight';
 import { setElementAttr, setSectionAttr } from '../../editor/commands';
+import {
+  FRAGMENT_VARIANTS,
+  applyFragmentStep,
+  effectiveFragments,
+  fragmentVariant,
+  isFragment,
+  moveFragment,
+  setFragment,
+  setFragmentIndex,
+  setFragmentVariant,
+  showAllFragments,
+} from '../../editor/fragments';
 import { api } from '../../api/client';
 
 const TRANSITIONS = ['none', 'fade', 'slide', 'convex', 'concave', 'zoom'];
@@ -127,6 +140,8 @@ function SlideSection() {
         onChange={(e) => setSectionAttr(ctx, 'data-visibility', e.currentTarget.checked ? 'hidden' : null)}
       />
       <Divider />
+      <FragmentsOverview />
+      <Divider />
       <Text size="xs" c="dimmed">
         Click an element on the slide to edit its properties.
       </Text>
@@ -134,8 +149,78 @@ function SlideSection() {
   );
 }
 
-function ElementSection({ el }: { el: HTMLElement }) {
+/** Fragment list + step preview for the whole slide. */
+function FragmentsOverview() {
   const ctx = useEditorStore((s) => s.ctx)!;
+  const step = useEditorStore((s) => s.fragmentStep);
+  const fragments = effectiveFragments(ctx.section);
+
+  if (fragments.length === 0) {
+    return (
+      <Text size="xs" c="dimmed">
+        No fragments yet — select an element and enable “Fragment” to reveal it step by step.
+      </Text>
+    );
+  }
+
+  function preview(value: number) {
+    applyFragmentStep(ctx.section, value);
+    useEditorStore.getState().setFragmentStep(value);
+  }
+
+  return (
+    <>
+      <Text size="xs" fw={700} c="dimmed" tt="uppercase">
+        Fragments
+      </Text>
+      <Slider
+        size="sm"
+        min={0}
+        max={fragments.length}
+        step={1}
+        value={step ?? fragments.length}
+        onChange={preview}
+        onChangeEnd={() => {
+          // Leaving the slider back at "all" restores editing default.
+          if ((useEditorStore.getState().fragmentStep ?? fragments.length) >= fragments.length) {
+            showAllFragments(ctx.section);
+            useEditorStore.getState().setFragmentStep(null);
+          }
+        }}
+        marks={[{ value: 0, label: '0' }, { value: fragments.length, label: 'all' }]}
+        mb="sm"
+      />
+      <Stack gap={4}>
+        {fragments.map((el, i) => (
+          <Group key={i} gap={4} wrap="nowrap">
+            <Text
+              size="xs"
+              style={{ cursor: 'pointer', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              onClick={() => useEditorStore.getState().select(el)}
+            >
+              {i + 1}. {'<'}{el.tagName.toLowerCase()}{'>'} {el.textContent?.slice(0, 32)}
+            </Text>
+            <Button.Group>
+              <Button size="compact-xs" variant="default" disabled={i === 0} onClick={() => moveFragment(ctx, el, -1)}>
+                <IconArrowUp size={12} />
+              </Button>
+              <Button
+                size="compact-xs"
+                variant="default"
+                disabled={i === fragments.length - 1}
+                onClick={() => moveFragment(ctx, el, 1)}
+              >
+                <IconArrowDown size={12} />
+              </Button>
+            </Button.Group>
+          </Group>
+        ))}
+      </Stack>
+    </>
+  );
+}
+
+function ElementSection({ el }: { el: HTMLElement }) {
   const handler = handlerFor(el);
 
   return (
@@ -145,12 +230,51 @@ function ElementSection({ el }: { el: HTMLElement }) {
       </Text>
       {handler.type === 'image' && <ImageFields el={el as HTMLImageElement} />}
       {handler.type === 'code' && <CodeFields el={el} />}
-      {(handler.type === 'text' || handler.type === 'generic') && (
-        <Text size="xs" c="dimmed">
-          {el.getAttribute('class')
-            ? `class: ${el.getAttribute('class')}`
-            : 'No extra properties yet.'}
-        </Text>
+      <Divider />
+      <FragmentFields el={el} />
+    </>
+  );
+}
+
+function FragmentFields({ el }: { el: HTMLElement }) {
+  const ctx = useEditorStore((s) => s.ctx)!;
+  const on = isFragment(el);
+  const index = el.getAttribute('data-fragment-index');
+
+  return (
+    <>
+      <Text size="xs" fw={700} c="dimmed" tt="uppercase">
+        Fragment
+      </Text>
+      <Switch
+        label="Reveal step by step"
+        size="xs"
+        checked={on}
+        onChange={(e) => setFragment(ctx, el, e.currentTarget.checked)}
+      />
+      {on && (
+        <>
+          <Select
+            label="Effect"
+            size="xs"
+            value={fragmentVariant(el)}
+            data={FRAGMENT_VARIANTS}
+            onChange={(v) => v && setFragmentVariant(ctx, el, v)}
+            searchable
+          />
+          <NumberInput
+            label="Order (data-fragment-index)"
+            size="xs"
+            placeholder="document order"
+            defaultValue={index ? parseInt(index, 10) : undefined}
+            key={`fi-${index ?? 'auto'}`}
+            min={0}
+            onBlur={(e) => {
+              const v = e.currentTarget.value.trim();
+              if (v !== (index ?? '')) setFragmentIndex(ctx, el, v === '' ? null : parseInt(v, 10));
+            }}
+          />
+        </>
       )}
     </>
   );
