@@ -12,6 +12,7 @@ import {
   applyStyle,
   isAbsolute,
   isLayoutContainer,
+  marqueeHits,
   placeInFlow,
   slideRect,
   snapEdges,
@@ -86,6 +87,15 @@ ${stageHead(meta)}
         if (useEditorStore.getState().sessionEl === el) {
           useEditorStore.getState().setSessionEl(null);
         }
+      },
+      // Focus landing on editor chrome (text toolbar, font/color dropdowns,
+      // link popover) must not end the session — the parent document knows
+      // where focus went.
+      ignoreBlur: () => {
+        const active = document.activeElement as HTMLElement | null;
+        return !!active?.closest?.(
+          '.toolbar, .mantine-Popover-dropdown, [data-combobox-dropdown], .mantine-Menu-dropdown',
+        );
       },
       onTab: isCell
         ? (shift) => {
@@ -218,17 +228,7 @@ ${stageHead(meta)}
         h: Math.abs(y1 - marquee.y0),
       };
       useEditorStore.getState().setMarquee(rect);
-      const hits = Array.from(section.children).filter((c): c is HTMLElement => {
-        if (c.tagName === 'ASIDE' || (c as HTMLElement).style === undefined) return false;
-        const r = slideRect(ctxRef.current!, c as HTMLElement);
-        return (
-          r.left < rect.x + rect.w &&
-          r.left + r.width > rect.x &&
-          r.top < rect.y + rect.h &&
-          r.top + r.height > rect.y
-        );
-      });
-      useEditorStore.getState().selectMany(hits);
+      useEditorStore.getState().selectMany(marqueeHits(ctxRef.current!, rect));
     }
 
     /** A drag that loses its pointer must still land: commit and clear. */
@@ -307,8 +307,8 @@ ${stageHead(meta)}
       const el = withinSelected ? selected! : childOf(section, target);
       if (!el) return;
 
-      // Shift-click toggles set membership — no drag, no activation.
-      if (e.shiftKey) {
+      // Shift/Ctrl/Cmd-click toggles set membership — no drag, no activation.
+      if (e.shiftKey || e.ctrlKey || e.metaKey) {
         editor.toggleSelect(withinSelected ? selected! : el);
         return;
       }
@@ -578,6 +578,7 @@ ${stageHead(meta)}
     ctxRef.current = ctx;
     useEditorStore.getState().setCtx(ctx);
     useEditorStore.getState().setStartSession(startSession);
+    useEditorStore.getState().setEndSession(endSession);
     doc.body.toggleAttribute('data-re-layout', useEditorStore.getState().layoutMode);
     wireInteractions(doc, section);
     // Content height changes (typing, inserts, unpinning, late fonts) move

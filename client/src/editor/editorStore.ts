@@ -42,9 +42,12 @@ interface EditorState {
 
   /** Provided by the mounted StageFrame; lets panels start text sessions. */
   startSession: (el: HTMLElement) => void;
+  /** Provided by the mounted StageFrame; ends the active session (commit). */
+  endSession: (commitFirst: boolean) => void;
 
   setCtx(ctx: StageCtx | null): void;
   setStartSession(fn: (el: HTMLElement) => void): void;
+  setEndSession(fn: (commitFirst: boolean) => void): void;
   select(el: HTMLElement | null): void;
   /** Shift-click toggle: adds to / removes from the selection set. */
   toggleSelect(el: HTMLElement): void;
@@ -84,9 +87,11 @@ export const useEditorStore = create<EditorState>()((set) => ({
   docVersion: 0,
 
   startSession: () => undefined,
+  endSession: () => undefined,
 
   setCtx: (ctx) => set({ ctx }),
   setStartSession: (fn) => set({ startSession: fn }),
+  setEndSession: (fn) => set({ endSession: fn }),
   select: (el) =>
     set((s) => ({ selectedEl: el, extraSelected: [], docVersion: s.docVersion + 1 })),
   toggleSelect: (el) =>

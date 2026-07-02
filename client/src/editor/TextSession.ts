@@ -12,6 +12,12 @@ export interface TextSessionOptions {
   onExit(): void;
   /** Tab pressed (table cells navigate). Return true when handled. */
   onTab?(shift: boolean): boolean;
+  /**
+   * Blur whose focus destination should NOT end the session (toolbar and
+   * dropdown interactions — the session survives so range formatting can
+   * apply and the text toolbar stays mounted).
+   */
+  ignoreBlur?(): boolean;
   debounceMs?: number;
 }
 
@@ -100,9 +106,12 @@ export class TextSession {
     });
 
     this.listen('blur', () => {
-      // Toolbar clicks steal focus momentarily; only exit if focus truly left.
+      // Toolbar clicks steal focus momentarily; only exit if focus truly left
+      // AND didn't land on editor chrome (font dropdowns, popovers, …).
       setTimeout(() => {
-        if (!this.exited && doc.activeElement !== this.el) this.exit();
+        if (this.exited || doc.activeElement === this.el) return;
+        if (this.opts.ignoreBlur?.()) return;
+        this.exit();
       }, 0);
     });
   }

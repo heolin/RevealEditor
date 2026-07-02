@@ -22,6 +22,26 @@ export function App() {
   const meta = useDeckStore((s) => s.meta);
   const conflict = useDeckStore((s) => s.conflict);
 
+  // A session that survived a toolbar interaction (ignoreBlur) has no second
+  // blur to end it — parent clicks OUTSIDE editor chrome close it explicitly.
+  useEffect(() => {
+    function onMouseDown(e: MouseEvent) {
+      const editor = useEditorStore.getState();
+      if (!editor.sessionEl) return;
+      const target = e.target as HTMLElement;
+      if (
+        target.closest?.(
+          '.toolbar, .mantine-Popover-dropdown, [data-combobox-dropdown], .mantine-Menu-dropdown, .mantine-Modal-root',
+        )
+      ) {
+        return;
+      }
+      editor.endSession(true);
+    }
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, []);
+
   // Toolbar layout overrides from .revealeditor.json (docs/TOOLBARS.md P4).
   useEffect(() => {
     api

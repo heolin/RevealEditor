@@ -142,6 +142,24 @@ export function columnRatios(colsEl: HTMLElement): number[] {
     .map((col) => parseFloat(col.style.flexGrow) || 1);
 }
 
+/** Top-level elements intersecting a marquee rect (slide-space px). */
+export function marqueeHits(
+  ctx: StageCtx,
+  rect: { x: number; y: number; w: number; h: number },
+): HTMLElement[] {
+  return Array.from(ctx.section.children).filter((c): c is HTMLElement => {
+    const el = c as HTMLElement;
+    if (el.tagName === 'ASIDE' || el.style === undefined) return false;
+    const r = slideRect(ctx, el);
+    return (
+      r.left < rect.x + rect.w &&
+      r.left + r.width > rect.x &&
+      r.top < rect.y + rect.h &&
+      r.top + r.height > rect.y
+    );
+  });
+}
+
 /** Containers an element may be dropped into during layout mode. */
 export function isLayoutContainer(el: Element, section: HTMLElement): boolean {
   if (el === section) return true;

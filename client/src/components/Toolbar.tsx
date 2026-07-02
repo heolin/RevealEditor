@@ -76,15 +76,7 @@ function FormatRibbon() {
   const groups = resolveLayout(getLayout('top'), ctx);
   const textGroups = ctx.session === 'text' ? resolveLayout(getLayout('textBar'), ctx) : [];
   return (
-    <Group
-      gap={4}
-      px="sm"
-      py={4}
-      wrap="nowrap"
-      className="ribbon"
-      // Keep text sessions focused across any ribbon interaction.
-      onMouseDown={(e) => ctx.session === 'text' && e.preventDefault()}
-    >
+    <Group gap={4} px="sm" py={4} wrap="nowrap" className="ribbon">
       <InsertMenu />
       {groups.map((group, gi) => (
         <Fragment key={gi}>
