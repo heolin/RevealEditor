@@ -45,6 +45,9 @@ import { useEditorStore } from '../editorStore';
 
 const hasSelection = (ctx: EditorContext) => !!ctx.stage && !!ctx.selection && !ctx.session;
 
+const canMove = (ctx: EditorContext) =>
+  hasSelection(ctx) && !['TD', 'TH'].includes(ctx.selection!.tagName);
+
 function design(ctx: EditorContext): { width: number; height: number } {
   return ctx.deck?.config ?? { width: 960, height: 700 };
 }
@@ -104,8 +107,9 @@ export const arrangeActions: Action[] = [
     kind: 'button',
     group: 'arrange',
     // Only when a sibling exists to swap with — a lone element in its
-    // container (a column, a cell, the slide) shows neither arrow.
-    when: (ctx) => hasSelection(ctx) && !!ctx.selection && !!contentSibling(ctx.selection, 'up'),
+    // container (a column, a cell, the slide) shows neither arrow. Never for
+    // table cells: swapping cells is a table op, not element reordering.
+    when: (ctx) => canMove(ctx) && !!contentSibling(ctx.selection!, 'up'),
     run: (ctx) => ctx.stage && ctx.selection && moveSibling(ctx.stage, ctx.selection, 'up'),
   },
   {
@@ -114,7 +118,7 @@ export const arrangeActions: Action[] = [
     icon: IconArrowDown,
     kind: 'button',
     group: 'arrange',
-    when: (ctx) => hasSelection(ctx) && !!ctx.selection && !!contentSibling(ctx.selection, 'down'),
+    when: (ctx) => canMove(ctx) && !!contentSibling(ctx.selection!, 'down'),
     run: (ctx) => ctx.stage && ctx.selection && moveSibling(ctx.stage, ctx.selection, 'down'),
   },
   {

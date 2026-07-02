@@ -143,6 +143,22 @@ ${stageHead(meta)}
     return (el as HTMLElement) ?? null;
   }
 
+  /**
+   * The component nearest a point: the ancestor of `target` whose parent is
+   * a layout container (column, cell) or the slide itself. Content inside a
+   * group or table resolves to the group/table — those act as one unit.
+   */
+  function componentOf(section: HTMLElement, target: Element): HTMLElement | null {
+    let el: Element | null = target;
+    while (el && el !== section) {
+      const parent: Element | null = el.parentElement;
+      if (!parent) return null;
+      if (parent === section || isLayoutContainer(parent, section)) break;
+      el = parent;
+    }
+    return el === section ? null : (el as HTMLElement);
+  }
+
   function wireInteractions(doc: Document, section: HTMLElement) {
     let press: {
       el: HTMLElement;
@@ -260,17 +276,28 @@ ${stageHead(meta)}
       const editor = useEditorStore.getState();
       if (session) endSession(true);
       if (section.contains(target) && target !== section) {
-        // Right-click targets what's under the cursor. Table cells take
-        // priority: row/column ops need a cell context (PowerPoint behavior).
-        const cell = target.closest('td, th');
+        // Right-click targets the COMPONENT under the cursor — the ancestor
+        // whose parent is a layout container (column, cell) or the slide —
+        // so nested elements get their own menu (move/duplicate/delete).
+        const component = componentOf(section, target);
         const selected = editor.selectedEl;
-        const within =
-          !!selected && selected.isConnected && (selected === target || selected.contains(target));
-        if (cell && section.contains(cell) && cell !== selected) {
-          editor.select(cell as HTMLElement);
-        } else if (!within) {
-          const el = childOf(section, target);
-          if (el) editor.select(el);
+        // A selection at or below the resolved component survives (a nested
+        // element picked in the Layers panel must not be re-targeted).
+        const keep =
+          !!selected &&
+          selected.isConnected &&
+          !!component &&
+          (component === selected || component.contains(selected));
+        if (!keep) {
+          const cell = target.closest('td, th');
+          // Table cells take priority over coarse targets (the whole table):
+          // row/column ops need a cell context (PowerPoint behavior). A finer
+          // component INSIDE the cell still wins — ctx.cell derives from it.
+          if (cell && section.contains(cell) && (!component || component.contains(cell))) {
+            editor.select(cell as HTMLElement);
+          } else if (component) {
+            editor.select(component);
+          }
         }
       } else {
         editor.select(null);
