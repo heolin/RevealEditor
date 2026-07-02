@@ -118,6 +118,24 @@ export function placeInFlow(
   commit(ctx);
 }
 
+/** Set flex width proportions on a .re-cols container's columns. */
+export function setColumnRatios(ctx: StageCtx, colsEl: HTMLElement, ratios: number[]): void {
+  const cols = Array.from(colsEl.children).filter(
+    (c): c is HTMLElement => (c as HTMLElement).style !== undefined,
+  );
+  cols.forEach((col, i) => {
+    const r = ratios[i] ?? 1;
+    applyStyle(col, { flex: r === 1 ? null : `${r} 1 0` }); // default lives in .re-col CSS
+  });
+  commit(ctx);
+}
+
+export function columnRatios(colsEl: HTMLElement): number[] {
+  return Array.from(colsEl.children)
+    .filter((c): c is HTMLElement => (c as HTMLElement).style !== undefined)
+    .map((col) => parseFloat(col.style.flexGrow) || 1);
+}
+
 /** Containers an element may be dropped into during layout mode. */
 export function isLayoutContainer(el: Element, section: HTMLElement): boolean {
   if (el === section) return true;

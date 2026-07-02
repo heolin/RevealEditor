@@ -291,6 +291,35 @@ test('layout mode: columns, drag into flow, free out, back into layout', async (
   expect(file).not.toMatch(/<h1[^>]*position: absolute/);
 });
 
+test('layout palette inserts columns; ratios round-trip; text bar is contextual', async ({ page }) => {
+  await createDeck(page, 'e2e-palette');
+  const stage = stageFrame(page);
+
+  // Text bar hidden by default; appears during a text session; ribbon has no font select.
+  await expect(page.locator('.text-bar')).toHaveCount(0);
+  const h1 = stage.locator('#re-stage h1');
+  await h1.click();
+  await h1.click();
+  await expect(page.locator('.text-bar')).toBeVisible();
+  await expect(page.locator('.text-bar').getByRole('textbox').first()).toBeVisible(); // font select
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.text-bar')).toHaveCount(0);
+
+  // Layout palette appears only in layout mode.
+  await expect(page.locator('.layout-panel')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Layout mode' }).click();
+  await expect(page.locator('.layout-panel')).toBeVisible();
+
+  // Insert two columns from the palette; select it; set 1:2 via preset.
+  await page.getByRole('button', { name: 'Two columns' }).click();
+  await expect(stage.locator('#re-stage .re-cols .re-col')).toHaveCount(2);
+  await stage.locator('#re-stage .re-cols').click();
+  await page.getByRole('button', { name: '1 : 2' }).click();
+  await save(page);
+  const file = await fileContents(page, 'e2e-palette.html');
+  expect(file).toContain('flex: 2 1 0');
+});
+
 test('insert menu closes after selection; undo never blanks the deck', async ({ page }) => {
   await openDemo(page);
   await openInsertMenu(page);

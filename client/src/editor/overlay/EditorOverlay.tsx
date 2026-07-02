@@ -72,7 +72,8 @@ export function EditorOverlay({ scale }: { scale: number }) {
             {sessionEl && <span className="selection-label">EDIT</span>}
           </div>
           {!sessionEl && extras.length === 0 && <ResizeHandles el={connected} scale={scale} />}
-          <FloatingToolbar ctx={ctx} box={boxFor(connected, scale)} />
+          {/* During text sessions the contextual textBar is THE toolbar. */}
+          {!sessionEl && <FloatingToolbar ctx={ctx} box={boxFor(connected, scale)} />}
         </>
       )}
       {dropIndicator && (

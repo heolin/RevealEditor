@@ -4,6 +4,7 @@ import { IconPlus } from '@tabler/icons-react';
 import { useDeckStore } from '../../state/deckStore';
 import { StageFrame } from '../../editor/StageFrame';
 import { EditorOverlay } from '../../editor/overlay/EditorOverlay';
+import { LayoutPanel } from './LayoutPanel';
 
 /** The canvas pane: scales the editing stage to fit and hosts the overlay. */
 export function SlideCanvas() {
@@ -50,6 +51,7 @@ export function SlideCanvas() {
 
   return (
     <div className="canvas-pane" ref={paneRef}>
+      <LayoutPanel />
       <div className="canvas-stage" style={{ width: width * scale, height: height * scale }}>
         <div
           style={{

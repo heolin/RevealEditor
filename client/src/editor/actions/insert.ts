@@ -12,6 +12,7 @@ import {
   IconList,
   IconArrowUpRight,
   IconRectangle,
+  IconSquare,
   IconTable,
 } from '@tabler/icons-react';
 import type { Action, EditorContext } from './types';
@@ -44,7 +45,8 @@ function snippetAction(
 
 const LAYOUT_CSS_MARKER = '/* re:layout */';
 const LAYOUT_CSS = `.re-cols { display: flex; gap: 24px; width: 100%; align-items: stretch; }
-.re-col { flex: 1 1 0; min-width: 0; }`;
+.re-col { flex: 1 1 0; min-width: 0; }
+.re-cell { width: 100%; }`;
 
 function columnsAction(count: 2 | 3): Action {
   return {
@@ -63,6 +65,20 @@ function columnsAction(count: 2 | 3): Action {
   };
 }
 
+const cellAction: Action = {
+  id: 'insert.cell',
+  title: 'Single cell',
+  icon: IconSquare,
+  kind: 'button',
+  group: 'insert',
+  when: canInsert,
+  run: (ctx) => {
+    if (!ctx.stage) return;
+    ensureManagedBlock(LAYOUT_CSS_MARKER, LAYOUT_CSS);
+    insertHtmlSnippet(ctx.stage, '<div class="re-cell"></div>', ctx.selection);
+  },
+};
+
 const SHAPE_ICONS: Record<ShapeKind, Action['icon']> = {
   rect: IconRectangle,
   ellipse: IconCircle,
@@ -80,6 +96,7 @@ export const insertActions: Action[] = [
     '<ul>\n  <li>First item</li>\n  <li>Second item</li>\n</ul>',
   ),
   snippetAction('insert.quote', 'Quote', IconBlockquote, '<blockquote>Quote</blockquote>'),
+  cellAction,
   columnsAction(2),
   columnsAction(3),
   {

@@ -16,7 +16,7 @@ import {
 } from '@tabler/icons-react';
 import { useDeckStore } from '../state/deckStore';
 import { useEditorContext } from '../editor/actions/context';
-import { getAction } from '../editor/actions';
+import { getAction, resolveLayout } from '../editor/actions';
 import { getLayout } from '../editor/actions/layouts';
 import { ActionControl } from '../editor/actions/ActionControl';
 import { InsertMenu } from '../editor/overlay/EditorOverlay';
@@ -62,7 +62,38 @@ export function Toolbar() {
         </Button>
       </Group>
       <FormatRibbon />
+      <TextFormatBar />
     </div>
+  );
+}
+
+/**
+ * THE text toolbar: every text-format control in one place, visible only
+ * while a text session is active (docs/TOOLBARS.md — one home for text).
+ */
+function TextFormatBar() {
+  const ctx = useEditorContext();
+  if (ctx.session !== 'text') return null;
+  const groups = resolveLayout(getLayout('textBar'), ctx);
+  if (groups.length === 0) return null;
+  return (
+    <Group
+      gap={4}
+      px="sm"
+      py={4}
+      wrap="nowrap"
+      className="ribbon text-bar"
+      onMouseDown={(e) => e.preventDefault()} // keep the session focused
+    >
+      {groups.map((group, gi) => (
+        <Fragment key={gi}>
+          {gi > 0 && <Divider orientation="vertical" />}
+          {group.map((action) => (
+            <ActionControl key={action.id} action={action} ctx={ctx} variant="toolbar" />
+          ))}
+        </Fragment>
+      ))}
+    </Group>
   );
 }
 

@@ -138,7 +138,7 @@ export function DeckList() {
                   </Menu.Target>
                   <Menu.Dropdown onClick={(e) => e.stopPropagation()}>
                     <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => setRenaming(d)}>
-                      Rename file…
+                      Rename…
                     </Menu.Item>
                     <Menu.Item
                       leftSection={<IconCopy size={14} />}
@@ -178,10 +178,18 @@ export function DeckList() {
           onSubmit={async (e) => {
             e.preventDefault();
             if (!renaming) return;
-            const newPath = String(new FormData(e.currentTarget).get('newPath') || '').trim();
-            if (!newPath || newPath === renaming.path) return setRenaming(null);
+            const form = new FormData(e.currentTarget);
+            const newTitle = String(form.get('newTitle') || '').trim();
+            let newPath = String(form.get('newPath') || '').trim();
+            if (newPath && !newPath.endsWith('.html')) newPath += '.html';
             try {
-              await api.renameDeck(renaming.path, newPath.endsWith('.html') ? newPath : `${newPath}.html`);
+              // Title first (splices <title> in the file), then the file move.
+              if (newTitle && newTitle !== renaming.title) {
+                await api.saveDeck(renaming.path, { title: newTitle, baseMtime: renaming.mtime });
+              }
+              if (newPath && newPath !== renaming.path) {
+                await api.renameDeck(renaming.path, newPath);
+              }
               setRenaming(null);
               refresh();
             } catch (err) {
@@ -190,7 +198,13 @@ export function DeckList() {
           }}
         >
           <Stack gap="sm">
-            <TextInput name="newPath" defaultValue={renaming?.path} data-autofocus label="New file name" />
+            <TextInput
+              name="newTitle"
+              defaultValue={renaming?.title}
+              data-autofocus
+              label="Presentation title"
+            />
+            <TextInput name="newPath" defaultValue={renaming?.path} label="File name" />
             <Text size="xs" c="dimmed">
               Renaming within the same folder keeps relative asset links working.
             </Text>

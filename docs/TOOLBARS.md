@@ -66,8 +66,9 @@ Inspector remains the home for verbose property forms).
 
 | Surface | Component | Config |
 |---|---|---|
-| **Top panel** | `TopToolbar` — grouped, ribbon-lite, always visible; unavailable actions render disabled (PowerPoint behavior), not hidden, so the UI is stable | `topLayout: string[][]` (action ids; arrays = groups with separators) |
-| **Floating toolbar** | follows selection; the quick subset | `floatingLayout: string[][]` |
+| **Top panel** | `TopToolbar` — grouped, ribbon-lite, always visible; unavailable actions render disabled (PowerPoint behavior), not hidden, so the UI is stable. Text formatting does NOT live here | `topLayout: string[][]` (action ids; arrays = groups with separators) |
+| **Text bar** | THE text toolbar — every text-format control (style, font, size, color, inline, lists, alignment) in one row, shown ONLY while a text session is active | `textBar: string[][]` |
+| **Floating toolbar** | follows selection; quick non-text ops; hidden during text sessions (the text bar takes over) | `floatingLayout: string[][]` |
 | **Context menu** | right-click anywhere on the canvas (and later: sorter, inspector); sections by group; unavailable actions hidden (menu convention) | `contextLayout: string[][]` |
 | **Keyboard** | no UI — one dispatcher resolves `shortcut` strings against the same availability | derived from actions |
 

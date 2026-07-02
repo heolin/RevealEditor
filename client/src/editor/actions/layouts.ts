@@ -10,10 +10,11 @@
  */
 import type { SurfaceLayout } from './types';
 
-export type SurfaceId = 'top' | 'floating' | 'insertMenu' | 'context';
+export type SurfaceId = 'top' | 'floating' | 'insertMenu' | 'context' | 'textBar';
 
 const DEFAULTS: Record<SurfaceId, SurfaceLayout> = {
-  /** Top panel: stable ribbon-lite; unavailable actions render disabled. */
+  /** Top panel: stable ribbon-lite; unavailable actions render disabled.
+   *  Text formatting lives in the contextual textBar, not here. */
   top: [
     ['history.undo', 'history.redo'],
     [
@@ -27,8 +28,6 @@ const DEFAULTS: Record<SurfaceId, SurfaceLayout> = {
       'insert.shape.rect',
       'insert.component',
     ],
-    ['format.heading', 'format.fontFamily', 'format.fontSize', 'format.textColor'],
-    ['format.bold', 'format.italic', 'format.align.left', 'format.align.center', 'format.align.right'],
     [
       'arrange.align.left',
       'arrange.align.hcenter',
@@ -43,18 +42,19 @@ const DEFAULTS: Record<SurfaceId, SurfaceLayout> = {
     ['view.layoutMode'],
   ],
 
-  /** Floating toolbar: the quick subset that follows the selection. */
-  floating: [
+  /** THE text toolbar — every text-format control in one place, shown only
+   *  while a text session is active (hidden otherwise, per design). */
+  textBar: [
     ['format.heading'],
-    [
-      'format.bold',
-      'format.italic',
-      'format.strike',
-      'format.link',
-      'format.bulletList',
-      'format.numberedList',
-    ],
+    ['format.fontFamily', 'format.fontSize', 'format.textColor'],
+    ['format.bold', 'format.italic', 'format.strike', 'format.link'],
+    ['format.bulletList', 'format.numberedList'],
     ['format.align.left', 'format.align.center', 'format.align.right'],
+  ],
+
+  /** Floating toolbar: quick non-text ops that follow the selection.
+   *  Hidden entirely during text sessions (the textBar takes over). */
+  floating: [
     ['code.edit', 'chart.edit'],
     ['arrange.front', 'arrange.back', 'arrange.unpin'],
     ['arrange.duplicate', 'arrange.delete'],
