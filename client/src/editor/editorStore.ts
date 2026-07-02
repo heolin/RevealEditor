@@ -24,6 +24,8 @@ interface EditorState {
   snapGuides: { x: number | null; y: number | null } | null;
   /** Fragment preview step (null = editor default, all visible). */
   fragmentStep: number | null;
+  /** Design-system component palette modal. */
+  paletteOpen: boolean;
   /** Bumped on every DOM mutation / selection change → overlay re-measures. */
   docVersion: number;
 
@@ -39,6 +41,7 @@ interface EditorState {
   setChartEditEl(el: HTMLElement | null): void;
   setSnapGuides(g: { x: number | null; y: number | null } | null): void;
   setFragmentStep(step: number | null): void;
+  setPaletteOpen(open: boolean): void;
   bump(): void;
   /** Stage rebuilt — all element refs are stale. */
   reset(): void;
@@ -53,6 +56,7 @@ export const useEditorStore = create<EditorState>()((set) => ({
   chartEditEl: null,
   snapGuides: null,
   fragmentStep: null,
+  paletteOpen: false,
   docVersion: 0,
 
   startSession: () => undefined,
@@ -66,6 +70,7 @@ export const useEditorStore = create<EditorState>()((set) => ({
   setChartEditEl: (el) => set((s) => ({ chartEditEl: el, docVersion: s.docVersion + 1 })),
   setSnapGuides: (g) => set((s) => ({ snapGuides: g, docVersion: s.docVersion + 1 })),
   setFragmentStep: (step) => set((s) => ({ fragmentStep: step, docVersion: s.docVersion + 1 })),
+  setPaletteOpen: (open) => set({ paletteOpen: open }),
   bump: () => set((s) => ({ docVersion: s.docVersion + 1 })),
   reset: () =>
     set((s) => ({

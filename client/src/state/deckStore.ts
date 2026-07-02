@@ -33,6 +33,8 @@ interface DeckState {
   dirty: boolean;
   saving: boolean;
   conflict: boolean;
+  /** Deck-relative stylesheet hrefs to add to the head on next save. */
+  pendingLinks: string[];
 
   load(deck: DeckData): void;
   close(): void;
@@ -49,6 +51,8 @@ interface DeckState {
   setTheme(theme: string): void;
   /** Replace the editor-managed style block contents (table presets, tokens). */
   setManagedCss(css: string): void;
+  /** Link stylesheets into the deck head (applied immediately, spliced on save). */
+  linkStylesheets(hrefs: string[]): void;
   /** Commit edited slide markup from the editing engine (no-op if unchanged). */
   updateSlideSource(slideId: string, source: string): void;
 
@@ -115,6 +119,7 @@ export const useDeckStore = create<DeckState>()(
       dirty: false,
       saving: false,
       conflict: false,
+      pendingLinks: [],
 
       load(deck) {
         const columns = parseSections(deck.sections);
@@ -138,6 +143,7 @@ export const useDeckStore = create<DeckState>()(
           selectedSlideId: columns[0]?.slides[0]?.id ?? null,
           dirty: false,
           conflict: false,
+          pendingLinks: [],
         });
         // Clear AFTER the set: the set itself records the pre-load state
         // (an empty or stale deck) as an undo entry — Ctrl+Z must never be
@@ -303,6 +309,20 @@ export const useDeckStore = create<DeckState>()(
         set({ meta: { ...meta, managedCss: css }, dirty: true });
       },
 
+      linkStylesheets(hrefs) {
+        const { meta, pendingLinks } = get();
+        if (!meta) return;
+        const missing = hrefs.filter(
+          (h) => !meta.stylesheets.includes(h) && !pendingLinks.includes(h),
+        );
+        if (missing.length === 0) return;
+        set({
+          meta: { ...meta, stylesheets: [...meta.stylesheets, ...missing] },
+          pendingLinks: [...pendingLinks, ...missing],
+          dirty: true,
+        });
+      },
+
       updateSlideSource(slideId, source) {
         const { columns } = get();
         const current = columns
@@ -320,7 +340,7 @@ export const useDeckStore = create<DeckState>()(
       },
 
       async save(opts) {
-        const { meta, columns, mtime, saving } = get();
+        const { meta, columns, mtime, saving, pendingLinks } = get();
         if (!meta || saving) return;
         set({ saving: true });
         try {
@@ -328,10 +348,11 @@ export const useDeckStore = create<DeckState>()(
             slidesHtml: composeSlides(columns, meta.layout),
             theme: meta.theme ?? undefined,
             managedCss: meta.managedCss || undefined,
+            addStylesheetLinks: pendingLinks.length ? pendingLinks : undefined,
             baseMtime: mtime,
             force: opts?.force,
           });
-          set({ mtime: res.mtime, dirty: false, conflict: false });
+          set({ mtime: res.mtime, dirty: false, conflict: false, pendingLinks: [] });
         } catch (err) {
           if (err instanceof ApiError && err.status === 409) {
             set({ conflict: true });

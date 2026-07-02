@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { Workspace } from './lib/workspace.js';
 import { decksRouter, errorHandler } from './routes/decks.js';
 import { assetsRouter } from './routes/assets.js';
-import { themesRouter } from './routes/themes.js';
+import { designSystemsRouter, themesRouter } from './routes/themes.js';
 
 const require = createRequire(import.meta.url);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -23,6 +23,7 @@ export function createApp(workspaceRoot: string): express.Express {
   app.use('/api', decksRouter(ws));
   app.use('/api', assetsRouter(ws));
   app.use('/api', themesRouter(revealDist));
+  app.use('/api', designSystemsRouter(ws));
 
   // Vendored reveal.js runtime — stable path for the preview harness and canvas.
   app.use('/vendor/reveal.js/dist', express.static(revealDist));

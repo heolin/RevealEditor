@@ -1,0 +1,68 @@
+/* ACME presentation design system — demo */
+:root {
+  --acme-accent: #e8590c;
+  --acme-ink: #1d2530;
+  --acme-paper: #fff8f1;
+}
+
+.acme-callout {
+  border-left: 6px solid var(--acme-accent);
+  background: var(--acme-paper);
+  color: var(--acme-ink);
+  padding: 0.6em 0.9em;
+  border-radius: 0 8px 8px 0;
+  font-size: 0.8em;
+  text-align: left;
+}
+
+.acme-kpi {
+  display: inline-block;
+  text-align: center;
+  padding: 0.4em 1em;
+}
+.acme-kpi-value {
+  font-size: 2.6em;
+  font-weight: 800;
+  color: var(--acme-accent);
+  line-height: 1;
+}
+.acme-kpi-label {
+  font-size: 0.55em;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.acme-quote {
+  border: none;
+  background: var(--acme-paper);
+  color: var(--acme-ink);
+  padding: 0.8em 1.1em;
+  border-radius: 10px;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.12);
+  font-style: italic;
+  text-align: left;
+}
+.acme-quote footer {
+  font-style: normal;
+  font-size: 0.65em;
+  margin-top: 0.5em;
+  color: var(--acme-accent);
+}
+
+.acme-section {
+  text-align: left;
+}
+.acme-kicker {
+  font-size: 0.5em;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--acme-accent);
+  font-weight: 700;
+  margin-bottom: 0.4em;
+}
+.acme-section-title {
+  font-size: 1.9em;
+  font-weight: 800;
+  margin: 0;
+}

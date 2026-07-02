@@ -305,6 +305,16 @@ html, body, #root { height: 100%; margin: 0; }
   background: #111;
 }
 
+/* ---------- Component palette ---------- */
+
+.component-card { cursor: pointer; }
+.component-card:hover { border-color: var(--re-accent); }
+.component-preview {
+  overflow: hidden;
+  border-radius: 4px;
+  background: #f4f4f2;
+}
+
 /* ---------- Chart editor ---------- */
 
 .chart-preview {

@@ -373,6 +373,22 @@ permanent round-trip fixture (`server/test/fixtures/benchmarks.html`).
 - Table column ops don't update `<colgroup>` widths — T2 alongside merges.
 - `data-auto-animate` preserved but not editable (already T2 in FEATURES).
 
+## 12c. V2 design systems — implemented shape (2026-07-02)
+
+As sketched in §12 and FEATURES §O, now concrete:
+- Convention: a workspace folder holding `components.html`; each component is
+  `<template data-component="id" data-name="…" data-description="…">snippet</template>`.
+  System CSS = the `<link rel="stylesheet">`s in that file (fallback: all `.css`
+  in the folder). `<title>` names the system. The file is inert — no `div.slides`,
+  so the deck scanner ignores it.
+- `GET /api/design-systems` returns `{dir, name, stylesheets, components[]}`.
+- Insert flow: palette modal (Insert → Component…) with live mini-renders
+  (scaled same-origin iframes: reveal.css + deck theme + deck headStyles +
+  system CSS); clicking inserts via the generic `insertHtmlSnippet` and queues
+  any missing system stylesheets as deck-relative `pendingLinks`, spliced
+  before `</head>` on save (`addStylesheetLinks`, idempotent).
+- Components are copies, not references — decks stay standalone/detachable.
+
 ## 13. Testing strategy
 
 - **Round-trip (make-or-break):** fixture corpus of real hand-written decks (weird

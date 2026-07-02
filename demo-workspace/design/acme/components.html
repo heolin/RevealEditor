@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ACME design system</title>
+<link rel="stylesheet" href="system.css">
+</head>
+<body>
+<!--
+  Reusable presentation components. Each <template data-component> is a plain
+  HTML snippet the editor can insert into any slide — copies, not references.
+  This file is inert: it is never presented, only read by the editor.
+-->
+
+<template data-component="callout" data-name="Callout box"
+          data-description="Highlighted note with an accent bar">
+<div class="acme-callout">
+  <strong>Heads up.</strong> Something worth calling out goes here.
+</div>
+</template>
+
+<template data-component="kpi" data-name="KPI stat"
+          data-description="Big number with a label">
+<div class="acme-kpi">
+  <div class="acme-kpi-value">42%</div>
+  <div class="acme-kpi-label">of something important</div>
+</div>
+</template>
+
+<template data-component="quote" data-name="Pull quote"
+          data-description="Attributed quotation">
+<blockquote class="acme-quote">
+  <p>&ldquo;A memorable sentence somebody actually said.&rdquo;</p>
+  <footer>— Someone Notable, Somewhere</footer>
+</blockquote>
+</template>
+
+<template data-component="section-title" data-name="Section divider"
+          data-description="Kicker + big title for section openers">
+<div class="acme-section">
+  <div class="acme-kicker">Section 01</div>
+  <h2 class="acme-section-title">New chapter</h2>
+</div>
+</template>
+
+</body>
+</html>

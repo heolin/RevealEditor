@@ -16,6 +16,7 @@ import {
   IconBold,
   IconChartBar,
   IconCode,
+  IconComponents,
   IconCopy,
   IconItalic,
   IconLink,
@@ -572,6 +573,12 @@ export function InsertMenu({ after }: { after?: HTMLElement | null }) {
             }}
           >
             Chart…
+          </Menu.Item>
+          <Menu.Item
+            leftSection={<IconComponents size={14} />}
+            onClick={() => useEditorStore.getState().setPaletteOpen(true)}
+          >
+            Component…
           </Menu.Item>
           <Menu.Divider />
           <Menu.Label>Shapes</Menu.Label>

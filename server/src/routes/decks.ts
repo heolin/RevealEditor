@@ -79,12 +79,13 @@ export function decksRouter(ws: Workspace): Router {
   router.put('/deck', async (req, res, next) => {
     try {
       const relPath = deckPathParam(req);
-      const { slidesHtml, theme, title, managedCss, baseMtime, force } =
+      const { slidesHtml, theme, title, managedCss, addStylesheetLinks, baseMtime, force } =
         req.body as {
           slidesHtml?: string;
           theme?: string;
           title?: string;
           managedCss?: string;
+          addStylesheetLinks?: string[];
           baseMtime?: number;
           force?: boolean;
         };
@@ -96,7 +97,7 @@ export function decksRouter(ws: Workspace): Router {
         });
       }
       const { src } = await ws.readDeck(relPath);
-      const updated = updateDeck(src, { slidesHtml, theme, title, managedCss });
+      const updated = updateDeck(src, { slidesHtml, theme, title, managedCss, addStylesheetLinks });
       const mtime = await ws.writeDeck(relPath, updated);
       res.json({ mtime });
     } catch (err) {

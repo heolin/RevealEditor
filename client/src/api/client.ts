@@ -34,8 +34,23 @@ export interface SavePayload {
   theme?: string;
   title?: string;
   managedCss?: string;
+  addStylesheetLinks?: string[];
   baseMtime: number;
   force?: boolean;
+}
+
+export interface DesignComponent {
+  id: string;
+  name: string;
+  description?: string;
+  html: string;
+}
+
+export interface DesignSystem {
+  dir: string;
+  name: string;
+  stylesheets: string[];
+  components: DesignComponent[];
 }
 
 export class ApiError extends Error {
@@ -92,6 +107,7 @@ export const api = {
       body: JSON.stringify({ path }),
     }),
   listThemes: () => request<string[]>('/api/themes'),
+  listDesignSystems: () => request<DesignSystem[]>('/api/design-systems'),
   uploadAsset: async (deckPath: string, file: File): Promise<{ url: string }> => {
     const form = new FormData();
     form.append('file', file);
@@ -130,3 +146,15 @@ export function themeUrl(
 
 /** Stylesheets from the deck head that the editor should NOT re-inject. */
 export const REVEAL_CSS_RE = /reveal(\.min)?\.css|(?:^|\/)theme\/[\w-]+(\.min)?\.css/;
+
+/** Relative posix path from a deck's directory to a workspace-relative target. */
+export function relativeHref(deckPath: string, target: string): string {
+  const fromParts = deckPath.split('/').slice(0, -1);
+  const toParts = target.split('/');
+  let common = 0;
+  while (common < fromParts.length && common < toParts.length - 1 && fromParts[common] === toParts[common]) {
+    common++;
+  }
+  const ups = fromParts.length - common;
+  return [...Array<string>(ups).fill('..'), ...toParts.slice(common)].join('/');
+}

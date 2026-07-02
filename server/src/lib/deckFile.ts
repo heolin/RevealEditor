@@ -69,6 +69,8 @@ export interface DeckUpdate {
   theme?: string;
   title?: string;
   managedCss?: string;
+  /** Stylesheet hrefs (relative to the deck file) to link before </head>. */
+  addStylesheetLinks?: string[];
 }
 
 type Element = T.Element;
@@ -339,6 +341,19 @@ export function updateDeck(src: string, update: DeckUpdate): string {
     edits.push({ ...info.titleRange, text: escapeHtmlText(update.title) });
   }
 
+  if (update.addStylesheetLinks && update.addStylesheetLinks.length > 0) {
+    if (info.headInsertOffset === null) {
+      throw new DeckParseError('Deck has no <head> to insert stylesheet links into');
+    }
+    const links = update.addStylesheetLinks
+      .filter((href) => !info.stylesheets.includes(href))
+      .map((href) => `<link rel="stylesheet" href="${escapeAttr(href)}">\n`)
+      .join('');
+    if (links) {
+      edits.push({ start: info.headInsertOffset, end: info.headInsertOffset, text: links });
+    }
+  }
+
   if (update.managedCss !== undefined) {
     if (info.managedCssRange) {
       edits.push({ ...info.managedCssRange, text: update.managedCss });
@@ -359,4 +374,8 @@ export function updateDeck(src: string, update: DeckUpdate): string {
 
 function escapeHtmlText(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function escapeAttr(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 }
