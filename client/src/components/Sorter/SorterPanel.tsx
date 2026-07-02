@@ -1,4 +1,11 @@
 import { useState } from 'react';
+import { ActionIcon, Tooltip } from '@mantine/core';
+import {
+  IconArrowDown,
+  IconArrowRight,
+  IconCopy,
+  IconTrash,
+} from '@tabler/icons-react';
 import {
   DndContext,
   PointerSensor,
@@ -138,46 +145,59 @@ function SorterSlide({
     >
       {indexLabel && <span className="slide-sub-index">{indexLabel}</span>}
       <SlideThumb source={slide.source} />
-      <div className="slide-actions">
-        <button
-          title="Add slide after (horizontal)"
-          onClick={(e) => {
-            e.stopPropagation();
-            const col = store
-              .getState()
-              .columns.find((c) => c.slides.some((s) => s.id === slide.id));
-            if (col) store.getState().addSlideAfterColumn(col.id);
-          }}
-        >
-          +→
-        </button>
-        <button
-          title="Add slide below (vertical stack)"
-          onClick={(e) => {
-            e.stopPropagation();
-            store.getState().addSlideBelow(slide.id);
-          }}
-        >
-          +↓
-        </button>
-        <button
-          title="Duplicate"
-          onClick={(e) => {
-            e.stopPropagation();
-            store.getState().duplicateSlide(slide.id);
-          }}
-        >
-          ⧉
-        </button>
-        <button
-          title="Delete"
-          onClick={(e) => {
-            e.stopPropagation();
-            store.getState().deleteSlide(slide.id);
-          }}
-        >
-          ✕
-        </button>
+      <div className="slide-actions" onPointerDown={(e) => e.stopPropagation()}>
+        <Tooltip label="Add slide after">
+          <ActionIcon
+            size="sm"
+            variant="default"
+            onClick={(e) => {
+              e.stopPropagation();
+              const col = store
+                .getState()
+                .columns.find((c) => c.slides.some((s) => s.id === slide.id));
+              if (col) store.getState().addSlideAfterColumn(col.id);
+            }}
+          >
+            <IconArrowRight size={13} />
+          </ActionIcon>
+        </Tooltip>
+        <Tooltip label="Add below (vertical stack)">
+          <ActionIcon
+            size="sm"
+            variant="default"
+            onClick={(e) => {
+              e.stopPropagation();
+              store.getState().addSlideBelow(slide.id);
+            }}
+          >
+            <IconArrowDown size={13} />
+          </ActionIcon>
+        </Tooltip>
+        <Tooltip label="Duplicate">
+          <ActionIcon
+            size="sm"
+            variant="default"
+            onClick={(e) => {
+              e.stopPropagation();
+              store.getState().duplicateSlide(slide.id);
+            }}
+          >
+            <IconCopy size={13} />
+          </ActionIcon>
+        </Tooltip>
+        <Tooltip label="Delete">
+          <ActionIcon
+            size="sm"
+            variant="default"
+            color="red"
+            onClick={(e) => {
+              e.stopPropagation();
+              store.getState().deleteSlide(slide.id);
+            }}
+          >
+            <IconTrash size={13} />
+          </ActionIcon>
+        </Tooltip>
       </div>
     </div>
   );

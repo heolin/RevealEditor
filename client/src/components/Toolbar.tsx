@@ -1,6 +1,22 @@
 import { useEffect, useState } from 'react';
+import {
+  ActionIcon,
+  Button,
+  Group,
+  Select,
+  Text,
+  Tooltip,
+  useMantineColorScheme,
+} from '@mantine/core';
+import {
+  IconArrowBackUp,
+  IconArrowForwardUp,
+  IconChevronLeft,
+  IconMoon,
+  IconPlayerPlay,
+  IconSun,
+} from '@tabler/icons-react';
 import { useDeckStore } from '../state/deckStore';
-import { useUiTheme } from '../state/uiTheme';
 import { api } from '../api/client';
 
 export function Toolbar() {
@@ -11,57 +27,72 @@ export function Toolbar() {
   const close = useDeckStore((s) => s.close);
   const setTheme = useDeckStore((s) => s.setTheme);
   const [themes, setThemes] = useState<string[]>([]);
-  const [uiTheme, toggleUiTheme] = useUiTheme();
+  const { colorScheme, toggleColorScheme } = useMantineColorScheme();
 
   useEffect(() => {
     api.listThemes().then(setThemes).catch(() => setThemes([]));
   }, []);
 
   return (
-    <div className="toolbar">
-      <button onClick={close} title="Back to deck list">
-        ←
-      </button>
-      <span className="toolbar-title">
+    <Group gap="xs" px="sm" py={6} className="toolbar" wrap="nowrap">
+      <Tooltip label="Back to presentations">
+        <ActionIcon variant="subtle" color="gray" onClick={close}>
+          <IconChevronLeft size={18} />
+        </ActionIcon>
+      </Tooltip>
+      <Text fw={600} size="sm" truncate style={{ minWidth: 0 }}>
         {meta.title || meta.path}
-        {dirty && <span className="dirty-dot" title="Unsaved changes" />}
-      </span>
-      <div className="toolbar-spacer" />
-      <button onClick={() => useDeckStore.temporal.getState().undo()} title="Undo (Ctrl+Z)">
-        ↩
-      </button>
-      <button onClick={() => useDeckStore.temporal.getState().redo()} title="Redo (Ctrl+Y)">
-        ↪
-      </button>
-      {themes.length > 0 && (
-        <select
-          value={meta.theme ?? ''}
-          onChange={(e) => setTheme(e.target.value)}
-          title="Theme"
+      </Text>
+      {dirty && <span className="dirty-dot" title="Unsaved changes" />}
+      <div style={{ flex: 1 }} />
+      <Tooltip label="Undo (Ctrl+Z)">
+        <ActionIcon
+          variant="subtle"
+          color="gray"
+          onClick={() => useDeckStore.temporal.getState().undo()}
         >
-          {meta.theme === null && <option value="">custom theme</option>}
-          {themes.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
+          <IconArrowBackUp size={18} />
+        </ActionIcon>
+      </Tooltip>
+      <Tooltip label="Redo (Ctrl+Y)">
+        <ActionIcon
+          variant="subtle"
+          color="gray"
+          onClick={() => useDeckStore.temporal.getState().redo()}
+        >
+          <IconArrowForwardUp size={18} />
+        </ActionIcon>
+      </Tooltip>
+      {themes.length > 0 && (
+        <Select
+          size="xs"
+          w={150}
+          value={meta.theme}
+          placeholder="custom theme"
+          data={themes}
+          onChange={(v) => v && setTheme(v)}
+          searchable
+          comboboxProps={{ withinPortal: true }}
+        />
       )}
-      <button
-        onClick={toggleUiTheme}
-        title={`Switch editor to ${uiTheme === 'light' ? 'dark' : 'light'} mode`}
-      >
-        {uiTheme === 'light' ? '🌙' : '☀️'}
-      </button>
-      <button
-        onClick={() => window.open(`/files/${meta.path}`, '_blank')}
-        title="Open the real file — exactly what your audience sees"
-      >
-        Present
-      </button>
-      <button className="primary" disabled={!dirty || saving} onClick={() => void save()}>
-        {saving ? 'Saving…' : 'Save'}
-      </button>
-    </div>
+      <Tooltip label={`Switch editor to ${colorScheme === 'light' ? 'dark' : 'light'} mode`}>
+        <ActionIcon variant="subtle" color="gray" onClick={toggleColorScheme}>
+          {colorScheme === 'light' ? <IconMoon size={18} /> : <IconSun size={18} />}
+        </ActionIcon>
+      </Tooltip>
+      <Tooltip label="Open the real file — exactly what your audience sees">
+        <Button
+          size="xs"
+          variant="default"
+          leftSection={<IconPlayerPlay size={14} />}
+          onClick={() => window.open(`/files/${meta.path}`, '_blank')}
+        >
+          Present
+        </Button>
+      </Tooltip>
+      <Button size="xs" disabled={!dirty} loading={saving} onClick={() => void save()}>
+        Save
+      </Button>
+    </Group>
   );
 }

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { Button } from '@mantine/core';
+import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import { useDeckStore, useSelectedPosition } from '../../state/deckStore';
 import { composeSlides } from '../../model/deck';
 import { themeUrl } from '../../api/client';
@@ -84,9 +86,18 @@ export function PreviewPane() {
 
   return (
     <div className={`preview-pane${open ? '' : ' collapsed'}`}>
-      <button className="preview-toggle" onClick={() => setOpen(!open)}>
-        {open ? 'Hide preview ▸' : '◂ Preview'}
-      </button>
+      <Button
+        variant="subtle"
+        color="gray"
+        size="compact-sm"
+        radius={0}
+        fullWidth
+        rightSection={open ? <IconChevronRight size={14} /> : undefined}
+        leftSection={open ? undefined : <IconChevronLeft size={14} />}
+        onClick={() => setOpen(!open)}
+      >
+        {open ? 'Hide preview' : 'Preview'}
+      </Button>
       {open && (
         <iframe ref={iframeRef} title="Live preview" src="/preview.html" className="preview-frame" />
       )}

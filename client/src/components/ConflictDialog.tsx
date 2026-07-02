@@ -1,3 +1,4 @@
+import { Button, Code, Group, Modal, Stack, Text } from '@mantine/core';
 import { useDeckStore } from '../state/deckStore';
 import { api } from '../api/client';
 
@@ -13,20 +14,20 @@ export function ConflictDialog() {
   }
 
   return (
-    <div className="modal-backdrop">
-      <div className="modal">
-        <h2>File changed on disk</h2>
-        <p>
-          <code>{meta.path}</code> was modified outside the editor since you opened it.
-        </p>
-        <div className="modal-actions">
-          <button onClick={() => void reload()}>Reload from disk (discard my changes)</button>
-          <button className="danger" onClick={() => void save({ force: true })}>
+    <Modal opened onClose={dismiss} title="File changed on disk">
+      <Stack gap="sm">
+        <Text size="sm">
+          <Code>{meta.path}</Code> was modified outside the editor since you opened it.
+        </Text>
+        <Group justify="flex-end">
+          <Button variant="default" onClick={() => void reload()}>
+            Reload from disk
+          </Button>
+          <Button color="red" onClick={() => void save({ force: true })}>
             Overwrite file
-          </button>
-          <button onClick={dismiss}>Cancel</button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </Group>
+      </Stack>
+    </Modal>
   );
 }

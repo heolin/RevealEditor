@@ -1,6 +1,22 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import {
+  ActionIcon,
+  Alert,
+  Button,
+  Card,
+  Container,
+  Group,
+  Modal,
+  Select,
+  Stack,
+  Text,
+  TextInput,
+  Title,
+  Tooltip,
+  useMantineColorScheme,
+} from '@mantine/core';
+import { IconMoon, IconPlus, IconSun } from '@tabler/icons-react';
 import { api, type DeckSummary } from '../api/client';
-import { useUiTheme } from '../state/uiTheme';
 import { openDeck } from '../App';
 
 export function DeckList() {
@@ -8,18 +24,10 @@ export function DeckList() {
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [themes, setThemes] = useState<string[]>([]);
-  const [uiTheme, toggleUiTheme] = useUiTheme();
-
-  async function refresh() {
-    try {
-      setDecks(await api.listDecks());
-    } catch (err) {
-      setError(String(err));
-    }
-  }
+  const { colorScheme, toggleColorScheme } = useMantineColorScheme();
 
   useEffect(() => {
-    void refresh();
+    api.listDecks().then(setDecks).catch((err) => setError(String(err)));
     api.listThemes().then(setThemes).catch(() => setThemes(['black', 'white']));
   }, []);
 
@@ -40,71 +48,71 @@ export function DeckList() {
   }
 
   return (
-    <div className="deck-list-page">
-      <header>
-        <h1>RevealEditor</h1>
-        <div className="header-actions">
-          <button
-            onClick={toggleUiTheme}
-            title={`Switch editor to ${uiTheme === 'light' ? 'dark' : 'light'} mode`}
-          >
-            {uiTheme === 'light' ? '🌙' : '☀️'}
-          </button>
-          <button className="primary" onClick={() => setCreating(true)}>
+    <Container size="sm" py={48}>
+      <Group justify="space-between" mb="lg">
+        <Title order={2}>RevealEditor</Title>
+        <Group gap="xs">
+          <Tooltip label={`Switch to ${colorScheme === 'light' ? 'dark' : 'light'} mode`}>
+            <ActionIcon variant="default" size="lg" onClick={toggleColorScheme}>
+              {colorScheme === 'light' ? <IconMoon size={18} /> : <IconSun size={18} />}
+            </ActionIcon>
+          </Tooltip>
+          <Button leftSection={<IconPlus size={16} />} onClick={() => setCreating(true)}>
             New presentation
-          </button>
-        </div>
-      </header>
-      {error && <div className="error-banner">{error}</div>}
+          </Button>
+        </Group>
+      </Group>
+
+      {error && (
+        <Alert color="red" mb="md" withCloseButton onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+
       {decks === null ? (
-        <p className="muted">Loading…</p>
+        <Text c="dimmed">Loading…</Text>
       ) : decks.length === 0 ? (
-        <p className="muted">No reveal.js presentations found in this workspace yet.</p>
+        <Text c="dimmed">No reveal.js presentations found in this workspace yet.</Text>
       ) : (
-        <ul className="deck-list">
+        <Stack gap="xs">
           {decks.map((d) => (
-            <li key={d.path}>
-              <button className="deck-item" onClick={() => void openDeck(d.path)}>
-                <span className="deck-title">{d.title}</span>
-                <span className="deck-meta">
-                  {d.path} · {d.slideCount} slides
-                </span>
-              </button>
-            </li>
+            <Card
+              key={d.path}
+              withBorder
+              padding="md"
+              className="deck-item"
+              onClick={() => void openDeck(d.path)}
+            >
+              <Text fw={600}>{d.title}</Text>
+              <Text size="xs" c="dimmed">
+                {d.path} · {d.slideCount} slides
+              </Text>
+            </Card>
           ))}
-        </ul>
+        </Stack>
       )}
-      {creating && (
-        <div className="modal-backdrop" onClick={() => setCreating(false)}>
-          <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={onCreate}>
-            <h2>New presentation</h2>
-            <label>
-              Title
-              <input name="title" defaultValue="New presentation" autoFocus />
-            </label>
-            <label>
-              File name (optional)
-              <input name="path" placeholder="my-talk.html" />
-            </label>
-            <label>
-              Theme
-              <select name="theme" defaultValue="black">
-                {(themes.length ? themes : ['black']).map((t) => (
-                  <option key={t}>{t}</option>
-                ))}
-              </select>
-            </label>
-            <div className="modal-actions">
-              <button type="button" onClick={() => setCreating(false)}>
+
+      <Modal opened={creating} onClose={() => setCreating(false)} title="New presentation">
+        <form onSubmit={onCreate}>
+          <Stack gap="sm">
+            <TextInput label="Title" name="title" defaultValue="New presentation" data-autofocus />
+            <TextInput label="File name (optional)" name="path" placeholder="my-talk.html" />
+            <Select
+              label="Theme"
+              name="theme"
+              defaultValue="black"
+              data={themes.length ? themes : ['black']}
+              searchable
+            />
+            <Group justify="flex-end" mt="xs">
+              <Button variant="default" onClick={() => setCreating(false)}>
                 Cancel
-              </button>
-              <button type="submit" className="primary">
-                Create
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-    </div>
+              </Button>
+              <Button type="submit">Create</Button>
+            </Group>
+          </Stack>
+        </form>
+      </Modal>
+    </Container>
   );
 }
