@@ -255,6 +255,12 @@ function isSizedMedia(el: HTMLElement): boolean {
 
 /** The style patch that takes an element out of free positioning. */
 function flowPatch(el: HTMLElement): StylePatch {
+  if (isGroupEl(el)) {
+    // A group stays the containing block for its absolutely positioned
+    // children: relative (a normal flow participant), keeping its box —
+    // absolute children contribute no height of their own.
+    return { position: 'relative', left: null, top: null, margin: null, 'z-index': null };
+  }
   return {
     position: null,
     left: null,
@@ -461,6 +467,10 @@ export function groupElements(
 
 /** Ungroup: rebase children back to slide coordinates and unwrap. */
 export function ungroupElements(ctx: StageCtx, group: HTMLElement): HTMLElement[] {
+  // A group living in flow (position:relative) releases ABSOLUTE children —
+  // the section must be pinned so their coordinates mean slide coordinates.
+  const design = useDeckStore.getState().meta?.config ?? { width: 960, height: 700 };
+  ensureFreeLayoutSection(ctx, design.height);
   const children = Array.from(group.children).filter(
     (c): c is HTMLElement => (c as HTMLElement).style !== undefined,
   );
