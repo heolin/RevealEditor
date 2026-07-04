@@ -7,11 +7,19 @@ import { Workspace } from './lib/workspace.js';
 import { decksRouter, errorHandler } from './routes/decks.js';
 import { assetsRouter } from './routes/assets.js';
 import { designSystemsRouter, themesRouter } from './routes/themes.js';
+import { workspaceRouter } from './routes/workspace.js';
 
 const require = createRequire(import.meta.url);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
-export function createApp(workspaceRoot: string): express.Express {
+export interface AppOptions {
+  /** Allow re-rooting the workspace from the UI (POST /api/workspace). */
+  allowWorkspaceChange?: boolean;
+  /** Where to persist a workspace switch. */
+  configPath?: string;
+}
+
+export function createApp(workspaceRoot: string, opts: AppOptions = {}): express.Express {
   const ws = new Workspace(workspaceRoot);
   const app = express();
   app.use(express.json({ limit: '10mb' }));
@@ -24,13 +32,15 @@ export function createApp(workspaceRoot: string): express.Express {
   app.use('/api', assetsRouter(ws));
   app.use('/api', themesRouter(revealDist));
   app.use('/api', designSystemsRouter(ws));
+  app.use('/api', workspaceRouter(ws, opts));
 
   // Vendored reveal.js runtime — stable path for the preview harness and canvas.
   app.use('/vendor/reveal.js/dist', express.static(revealDist));
   app.use('/vendor/reveal.js/plugin', express.static(revealPlugin));
 
   // The whole workspace, served as-is (Present mode, images, shared CSS).
-  app.use('/files', express.static(ws.root));
+  // Resolved per request so a runtime workspace switch takes effect.
+  app.use('/files', (req, res, next) => express.static(ws.root)(req, res, next));
 
   // Preview harness + any other server-owned static pages.
   app.use(express.static(path.join(HERE, '../public')));

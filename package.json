@@ -14,7 +14,8 @@
     "test": "npm run test -w server --if-present && npm run test -w client --if-present",
     "typecheck": "npm run typecheck -w server && npm run typecheck -w client",
     "test:e2e": "npm run build && playwright test",
-    "build:site": "node scripts/build-site.mjs"
+    "build:site": "node scripts/build-site.mjs",
+    "screenshots": "npm run build && playwright test -c playwright.screenshots.config.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",

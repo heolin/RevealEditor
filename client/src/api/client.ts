@@ -116,6 +116,12 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ path }),
     }),
+  getWorkspace: () => request<{ path: string; canChange: boolean }>('/api/workspace'),
+  setWorkspace: (path: string) =>
+    request<{ path: string; canChange: boolean }>('/api/workspace', {
+      method: 'POST',
+      body: JSON.stringify({ path }),
+    }),
   listThemes: () => request<string[]>('/api/themes'),
   listDesignSystems: () => request<DesignSystem[]>('/api/design-systems'),
   deckStat: (path: string) =>

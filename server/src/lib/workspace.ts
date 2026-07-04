@@ -28,10 +28,17 @@ const IGNORED_DIRS = new Set(['node_modules', '.git', 'dist', '.cache']);
 const MAX_DECK_BYTES = 4 * 1024 * 1024;
 
 export class Workspace {
-  readonly root: string;
+  /** Absolute workspace root. Mutable so the app can switch folders at runtime
+   *  (see setRoot) without recreating routers — they read this per request. */
+  root: string;
 
   constructor(root: string) {
     this.root = path.resolve(root);
+  }
+
+  /** Re-root the workspace at a new absolute-or-relative directory. */
+  setRoot(newRoot: string): void {
+    this.root = path.resolve(newRoot);
   }
 
   /** Resolve a workspace-relative path, rejecting traversal outside the root. */

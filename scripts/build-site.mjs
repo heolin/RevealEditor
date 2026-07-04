@@ -10,10 +10,15 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, '_site');
 
-/** Doc pages: source Markdown → output HTML file + nav label. Order = nav order. */
+// User-facing pages — these get the top nav. Order = nav order.
 const PAGES = [
+  { src: 'docs/TUTORIAL.md', out: 'tutorial.html', label: 'Tutorial' },
   { src: 'docs/USAGE.md', out: 'usage.html', label: 'User guide' },
   { src: 'docs/FEATURES.md', out: 'features.html', label: 'Features' },
+];
+
+// Developer/reference docs — built and linked from the footer, not the top nav.
+const DEV_PAGES = [
   { src: 'docs/ARCHITECTURE.md', out: 'architecture.html', label: 'Architecture' },
   { src: 'docs/DIAGRAMMING.md', out: 'diagramming.html', label: 'Diagramming' },
   { src: 'docs/TOOLBARS.md', out: 'toolbars.html', label: 'Toolbars' },
@@ -76,7 +81,10 @@ a:hover { text-decoration: underline; }
 .doc th, .doc td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
 .doc th { background: var(--card); }
 .doc blockquote { margin: 1em 0; padding: 0.4em 1em; border-left: 3px solid var(--accent); color: var(--muted); }
-.doc img { max-width: 100%; }
+.doc img { max-width: 100%; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,0.10); margin: 0.6em 0; }
+.shot { max-width: 1000px; margin: 0 auto; padding: 8px 24px 0; }
+.shot img { width: 100%; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 48px rgba(0,0,0,0.16); }
+.footer-dev { margin-top: 8px; font-size: 0.85rem; }
 /* Landing */
 .hero { text-align: center; padding: 72px 24px 40px; }
 .hero h1 { font-size: clamp(2.4rem, 6vw, 3.6rem); margin: 0 0 0.2em; letter-spacing: -0.03em; }
@@ -118,7 +126,10 @@ function page({ title, currentOut, body }) {
 <body>
 ${topbar(currentOut)}
 ${body}
-<div class="footer">RevealEditor — a WYSIWYG editor for reveal.js. <a href="${REPO_URL}">Source on GitHub</a>.</div>
+<div class="footer">
+  <div>RevealEditor — a WYSIWYG editor for reveal.js. <a href="${REPO_URL}">Source on GitHub</a>.</div>
+  <div class="footer-dev">For developers: ${DEV_PAGES.map((p) => `<a href="${p.out}">${p.label}</a>`).join(' · ')}</div>
+</div>
 </body>
 </html>
 `;
@@ -168,6 +179,7 @@ function landing() {
     <a class="btn" href="${REPO_URL}">GitHub</a>
   </div>
 </section>
+<div class="shot"><img src="images/editor-overview.png" alt="Editing a slide in RevealEditor — sorter, canvas, toolbar and inspector"></div>
 <div class="wrap">
   <h2 class="section-title">Why RevealEditor</h2>
   <div class="grid">${cards}</div>
@@ -196,7 +208,7 @@ fs.writeFileSync(path.join(OUT, 'index.html'), landing());
 fs.writeFileSync(path.join(OUT, '.nojekyll'), '');
 
 let built = 1;
-for (const p of PAGES) {
+for (const p of [...PAGES, ...DEV_PAGES]) {
   const abs = path.join(ROOT, p.src);
   if (!fs.existsSync(abs)) {
     console.warn(`skip (missing): ${p.src}`);
@@ -207,6 +219,12 @@ for (const p of PAGES) {
   const body = `<div class="wrap doc">${renderDoc(md)}</div>`;
   fs.writeFileSync(path.join(OUT, p.out), page({ title, currentOut: p.out, body }));
   built++;
+}
+
+// Copy screenshots referenced by the landing + tutorial.
+const imgSrc = path.join(ROOT, 'docs', 'images');
+if (fs.existsSync(imgSrc)) {
+  fs.cpSync(imgSrc, path.join(OUT, 'images'), { recursive: true });
 }
 
 console.log(`Built ${built} pages into ${path.relative(ROOT, OUT)}/`);

@@ -27,6 +27,46 @@ node server/dist/index.js ~/path/to/your/talks --port 4321
 
 Any `.html` file containing a reveal.js `div.slides` is detected automatically.
 
+## Choosing a workspace folder
+
+The **workspace** is the folder RevealEditor scans and edits. It's chosen when
+the server starts, in this order of precedence:
+
+1. A folder passed on the command line — `node server/dist/index.js ~/talks`.
+2. The `workspace` value in the server config file (see below), if present.
+3. The current working directory.
+
+### Switching folders from the app
+
+You can also change the folder from the deck list — a **Change folder…** button
+next to the workspace path. This is handy locally, but because it re-roots the
+server to *any* directory on the machine, it is **off by default**. Enable it:
+
+- per run, with a flag: `node server/dist/index.js ~/talks --allow-workspace-change`, or
+- persistently, in the config file: `"allowWorkspaceChange": true`.
+
+When it's off, the button is hidden and the switch API refuses (`403`).
+
+> **Hosting note.** If you expose RevealEditor beyond your own machine, leave
+> workspace switching **off**. The editor has no authentication, so an enabled
+> switch lets anyone re-root it to browse the server's filesystem.
+
+### The server config file
+
+Settings live in **`revealeditor.config.json`** in the project directory (not
+your home folder), so configuration travels with the deployment. Point at a
+different file with `--config <path>`.
+
+```json
+{
+  "workspace": "/home/you/talks",
+  "allowWorkspaceChange": true
+}
+```
+
+Switching folders in the app updates `workspace` here, so the next start
+(without a command-line folder) resumes where you left off.
+
 ## The deck list
 
 The landing screen scans your workspace folder (recursively) and shows every
@@ -165,7 +205,7 @@ the preview.
 - **Present** — opens the actual file, exactly what your audience sees. Reveal's
   speaker view works if the notes plugin is in the deck.
 
-## Exporting & publishing
+## Exporting and publishing
 
 - **PDF** — one click. If the optional server dependency is installed it renders
   a real PDF; otherwise it falls back to reveal's guided print flow (choose

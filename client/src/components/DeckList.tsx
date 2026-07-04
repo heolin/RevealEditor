@@ -18,6 +18,7 @@ import {
 import {
   IconCopy,
   IconDots,
+  IconFolder,
   IconMoon,
   IconPencil,
   IconPlus,
@@ -60,6 +61,8 @@ export function DeckList() {
   const [renaming, setRenaming] = useState<DeckSummary | null>(null);
   const [deleting, setDeleting] = useState<DeckSummary | null>(null);
   const [themes, setThemes] = useState<string[]>([]);
+  const [workspace, setWorkspace] = useState<{ path: string; canChange: boolean } | null>(null);
+  const [changingFolder, setChangingFolder] = useState(false);
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
 
   function refresh() {
@@ -69,6 +72,7 @@ export function DeckList() {
   useEffect(() => {
     refresh();
     api.listThemes().then(setThemes).catch(() => setThemes(['black', 'white']));
+    api.getWorkspace().then(setWorkspace).catch(() => undefined);
   }, []);
 
   async function onCreate(e: FormEvent<HTMLFormElement>) {
@@ -90,8 +94,27 @@ export function DeckList() {
 
   return (
     <Container size="xl" py={40}>
-      <Group justify="space-between" mb="lg">
-        <Title order={2}>RevealEditor</Title>
+      <Group justify="space-between" mb="lg" align="flex-start">
+        <div style={{ minWidth: 0 }}>
+          <Title order={2}>RevealEditor</Title>
+          {workspace && (
+            <Group gap="xs" mt={4} wrap="nowrap">
+              <Text size="xs" c="dimmed" title={workspace.path} style={{ fontFamily: 'monospace' }} truncate>
+                {workspace.path}
+              </Text>
+              {workspace.canChange && (
+                <Button
+                  size="compact-xs"
+                  variant="subtle"
+                  leftSection={<IconFolder size={13} />}
+                  onClick={() => setChangingFolder(true)}
+                >
+                  Change folder…
+                </Button>
+              )}
+            </Group>
+          )}
+        </div>
         <Tooltip label={`Switch to ${colorScheme === 'light' ? 'dark' : 'light'} mode`}>
           <ActionIcon variant="default" size="lg" onClick={toggleColorScheme}>
             {colorScheme === 'light' ? <IconMoon size={18} /> : <IconSun size={18} />}
@@ -245,6 +268,48 @@ export function DeckList() {
             </Button>
           </Group>
         </Stack>
+      </Modal>
+
+      <Modal
+        opened={changingFolder}
+        onClose={() => setChangingFolder(false)}
+        title="Change workspace folder"
+      >
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const folder = String(new FormData(e.currentTarget).get('folder') || '').trim();
+            if (!folder) return;
+            try {
+              setWorkspace(await api.setWorkspace(folder));
+              setChangingFolder(false);
+              setDecks(null);
+              refresh();
+            } catch (err) {
+              setError(String(err));
+            }
+          }}
+        >
+          <Stack gap="sm">
+            <TextInput
+              name="folder"
+              label="Folder path"
+              placeholder="/home/you/presentations"
+              defaultValue={workspace?.path}
+              data-autofocus
+            />
+            <Text size="xs" c="dimmed">
+              An absolute path on the server. The deck list reloads from the new folder, and the
+              choice is saved to the server config.
+            </Text>
+            <Group justify="flex-end">
+              <Button variant="default" onClick={() => setChangingFolder(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">Switch</Button>
+            </Group>
+          </Stack>
+        </form>
       </Modal>
 
       <Modal opened={creating} onClose={() => setCreating(false)} title="New presentation">
