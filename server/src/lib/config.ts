@@ -16,11 +16,12 @@ export interface ServerConfig {
   allowWorkspaceChange?: boolean;
 }
 
-/** Default config location: <repo-root>/revealeditor.config.json. Resolved the
- *  same way from src (tsx dev) and dist (built), both two levels up from here. */
+/** Default config location: <repo-root>/revealeditor.config.json. This file
+ *  sits at server/{src,dist}/lib/config.*, so the repo root is three levels up —
+ *  the same in tsx dev (src/lib) and the built server (dist/lib). */
 export function defaultConfigPath(): string {
   const here = path.dirname(fileURLToPath(import.meta.url));
-  return path.resolve(here, '../..', 'revealeditor.config.json');
+  return path.resolve(here, '../../..', 'revealeditor.config.json');
 }
 
 export function loadConfig(configPath: string): ServerConfig {
