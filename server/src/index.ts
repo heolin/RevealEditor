@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import fs from 'node:fs';
 import path from 'node:path';
 import { createApp } from './app.js';
 import { loadConfig, defaultConfigPath } from './lib/config.js';
@@ -29,14 +30,30 @@ const workspace =
 // Enabled by the CLI flag OR the config; OFF by default (safe for hosting).
 const allowWorkspaceChange = allowFlag || config.allowWorkspaceChange === true;
 
+const configExists = fs.existsSync(configPath);
+const workspaceSource = workspaceArg
+  ? 'command-line argument'
+  : config.workspace
+    ? 'config file'
+    : 'current directory (no folder given)';
+const switchSource = allowFlag
+  ? '--allow-workspace-change flag'
+  : config.allowWorkspaceChange === true
+    ? 'config file'
+    : 'default';
+
 const app = createApp(workspace, { allowWorkspaceChange, configPath });
 app.listen(port, () => {
-  console.log(`revealeditor serving workspace ${workspace}`);
-  console.log(`  http://localhost:${port}`);
+  console.log('revealeditor');
+  console.log(`  config:     ${configPath} ${configExists ? '(loaded)' : '(not found — using defaults)'}`);
+  console.log(`  workspace:  ${workspace} (from ${workspaceSource})`);
+  console.log(
+    `  switching:  ${allowWorkspaceChange ? 'ENABLED' : 'disabled'} (${switchSource})`,
+  );
+  console.log(`  → http://localhost:${port}`);
   if (allowWorkspaceChange) {
     console.log(
-      '  ⚠ workspace switching is ENABLED — the UI can re-root to any directory on this machine.',
+      '  ⚠ switching lets the UI re-root to ANY directory on this machine — keep it off when hosting.',
     );
-    console.log('    Do not expose this server to untrusted networks with switching on.');
   }
 });
