@@ -57,6 +57,13 @@ Settings live in **`revealeditor.config.json`** in the project directory (not
 your home folder), so configuration travels with the deployment. Point at a
 different file with `--config <path>`.
 
+The repo ships **`revealeditor.config.example.json`** as a template. Copy it and
+edit:
+
+```bash
+cp revealeditor.config.example.json revealeditor.config.json
+```
+
 ```json
 {
   "workspace": "/home/you/talks",
@@ -64,8 +71,10 @@ different file with `--config <path>`.
 }
 ```
 
-Switching folders in the app updates `workspace` here, so the next start
-(without a command-line folder) resumes where you left off.
+`revealeditor.config.json` itself is git-ignored (it ends up holding local
+paths), so your copy stays out of version control. Switching folders in the app
+updates `workspace` here, so the next start (without a command-line folder)
+resumes where you left off.
 
 ## The deck list
 
@@ -135,6 +144,8 @@ header row/column, set per-cell alignment and colors, drag column boundaries to
 resize, and merge/split cells. Paste TSV/CSV from a spreadsheet to fill or grow
 a table.
 
+![Editing a table cell](images/table-editing.png)
+
 ## Charts
 
 Charts are **baked into the deck as inline SVG** — no chart runtime ships with
@@ -148,12 +159,16 @@ can reopen and re-edit them. Insert a chart to open the modal:
 - Colors default from the theme; override per series. Raw-JSON editing is
   available as an escape hatch.
 
+![The chart editor: data grid, options, and live preview](images/chart-modal.png)
+
 ## Shapes & diagrams
 
 Open the **Draw** group (or the shapes gallery) for rectangles, ellipses,
 lines, arrows, and flowchart shapes. Draw by dragging on the canvas; you'll see
 a live preview of the shape. Set fill, stroke color/width/dash and opacity in
 the inspector.
+
+![The shapes gallery](images/shapes-gallery.png)
 
 Lines and arrows are **two-point connectors**: drag either endpoint, and it
 snaps to one of the 8 anchor points on nearby elements. Attached endpoints stay

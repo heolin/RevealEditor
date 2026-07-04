@@ -1,0 +1,5 @@
+{
+  "//": "Copy this file to revealeditor.config.json (git-ignored) and edit. See docs/USAGE.md#the-server-config-file.",
+  "workspace": "demo-workspace",
+  "allowWorkspaceChange": false
+}

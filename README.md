@@ -22,8 +22,9 @@ node server/dist/index.js ~/path/to/your/talks --port 4321
 Any `.html` file containing a reveal.js `div.slides` is picked up automatically.
 
 You can also switch folders from the deck list at runtime — off by default;
-enable with `--allow-workspace-change` (or `"allowWorkspaceChange": true` in
-`revealeditor.config.json`). Keep it **off** when hosting. See
+enable with `--allow-workspace-change`, or copy `revealeditor.config.example.json`
+to `revealeditor.config.json` and set `"allowWorkspaceChange": true`. Keep it
+**off** when hosting. See
 [Choosing a workspace folder](docs/USAGE.md#choosing-a-workspace-folder).
 
 New here? The [user guide](docs/USAGE.md) walks through editing a deck end to end.
