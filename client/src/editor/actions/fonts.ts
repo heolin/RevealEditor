@@ -39,9 +39,12 @@ export function fontOptions(deck: DeckMeta | null): ActionOption[] {
   return [{ value: '', label: 'Theme default' }, ...detectedOpts, ...GENERIC];
 }
 
+/** Classic point-scale sizes in px — slides are a fixed 960×700 design
+ *  space, so px are stable and WYSIWYG (em shifted with the theme's base). */
 export const FONT_SIZES: ActionOption[] = [
   { value: '', label: 'Default' },
-  ...['0.5', '0.6', '0.7', '0.8', '0.9', '1', '1.2', '1.4', '1.7', '2', '2.5', '3'].map(
-    (v) => ({ value: `${v}em`, label: `${v}em` }),
-  ),
+  ...[8, 9, 10, 11, 12, 14, 16, 18, 24, 30, 36, 48, 60, 72, 96].map((v) => ({
+    value: `${v}px`,
+    label: `${v}`,
+  })),
 ];

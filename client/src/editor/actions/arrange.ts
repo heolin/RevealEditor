@@ -45,8 +45,13 @@ import { useEditorStore } from '../editorStore';
 
 const hasSelection = (ctx: EditorContext) => !!ctx.stage && !!ctx.selection && !ctx.session;
 
+// Sibling reordering is a FLOW concept: a freely positioned element sits at
+// coordinates, not in a sequence — DOM order changes nothing visible there
+// (front/back covers z-order), so the arrows hide for absolute elements.
 const canMove = (ctx: EditorContext) =>
-  hasSelection(ctx) && !['TD', 'TH'].includes(ctx.selection!.tagName);
+  hasSelection(ctx) &&
+  !['TD', 'TH'].includes(ctx.selection!.tagName) &&
+  ctx.selection!.style?.position !== 'absolute';
 
 function design(ctx: EditorContext): { width: number; height: number } {
   return ctx.deck?.config ?? { width: 960, height: 700 };

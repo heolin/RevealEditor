@@ -17,6 +17,7 @@ import { NotesDrawer } from './components/Notes/NotesDrawer';
 import { CodeModal } from './editor/CodeModal';
 import { ChartModal } from './editor/chart/ChartModal';
 import { ComponentPalette } from './components/Palette/ComponentPalette';
+import { IconPicker } from './components/IconPicker';
 
 export function App() {
   const meta = useDeckStore((s) => s.meta);
@@ -108,6 +109,7 @@ export function App() {
       <CodeModal />
       <ChartModal />
       <ComponentPalette />
+      <IconPicker />
       {conflict && <ConflictDialog />}
     </div>
   );

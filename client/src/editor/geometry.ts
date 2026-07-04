@@ -76,6 +76,24 @@ function containingOrigin(ctx: StageCtx, el: HTMLElement): { left: number; top: 
 }
 
 /**
+ * Per-gesture position writer: measures the containing-block origin ONCE.
+ * Drags write at pointer rate — re-deriving the origin every move means a
+ * getComputedStyle + rect per element per move (visible lag on tables,
+ * which reflow expensively). The containing block cannot change mid-drag.
+ */
+export function stageWriter(
+  ctx: StageCtx,
+  el: HTMLElement,
+): (pos: { left: number; top: number }) => void {
+  const origin = containingOrigin(ctx, el);
+  return (pos) =>
+    applyStyle(el, {
+      left: `${Math.round(pos.left - origin.left)}px`,
+      top: `${Math.round(pos.top - origin.top)}px`,
+    });
+}
+
+/**
  * Write a stage-coords position/size as inline styles on an absolutely
  * positioned element, converting to its containing block's space. The single
  * write boundary between stage coordinates and CSS — call it AFTER
@@ -122,7 +140,9 @@ export function toAbsoluteAll(ctx: StageCtx, els: HTMLElement[], designHeight: n
     syncInlineCentering(ctx);
     return;
   }
-  const rects = targets.map((el) => stageRect(ctx, el));
+  // Unrotated boxes: inline left/top/width describe the layout box, not the
+  // AABB a rotated element's gBCR reports (identical when unrotated).
+  const rects = targets.map((el) => unrotatedRect(ctx, el));
   ensureFreeLayoutSection(ctx, designHeight);
   targets.forEach((el, i) => {
     applyStyle(el, {
@@ -494,7 +514,7 @@ export interface SnapResult {
   dy: number;
 }
 
-interface Edges {
+export interface Edges {
   xs: number[];
   ys: number[];
 }
@@ -513,6 +533,207 @@ export function snapEdges(ctx: StageCtx, moving: HTMLElement, designW: number, d
     ys.push(r.top, r.top + r.height / 2, r.top + r.height);
   }
   return { xs, ys };
+}
+
+/* ---------- rotation ---------- */
+
+/**
+ * The editor-managed transform: `rotate(Ndeg) scale(±1, ±1)` (either part
+ * optional). Anything else is a transform the editor did not write (foreign
+ * matrix/skew/…) — opaque: rotation/flip UI hides rather than risk
+ * rewriting markup we don't understand.
+ */
+const MANAGED_TRANSFORM = /^(?:rotate\((-?[\d.]+)deg\))?\s*(?:scale\((-?1),\s*(-?1)\))?$/;
+
+function parseManagedTransform(
+  el: HTMLElement,
+): { deg: number; sx: 1 | -1; sy: 1 | -1 } | null {
+  const t = el.style?.transform;
+  if (!t) return { deg: 0, sx: 1, sy: 1 };
+  const m = MANAGED_TRANSFORM.exec(t);
+  if (!m || (m[1] === undefined && m[2] === undefined)) return null;
+  return {
+    deg: m[1] ? parseFloat(m[1]) : 0,
+    sx: (m[2] ? Number(m[2]) : 1) as 1 | -1,
+    sy: (m[3] ? Number(m[3]) : 1) as 1 | -1,
+  };
+}
+
+function writeManagedTransform(el: HTMLElement, deg: number, sx: 1 | -1, sy: 1 | -1): void {
+  const parts: string[] = [];
+  if (deg !== 0) parts.push(`rotate(${deg}deg)`);
+  if (sx !== 1 || sy !== 1) parts.push(`scale(${sx}, ${sy})`);
+  applyStyle(el, { transform: parts.length ? parts.join(' ') : null });
+}
+
+/** Angle (deg) of the managed transform; 0 = none; null = foreign. */
+export function rotation(el: HTMLElement): number | null {
+  return parseManagedTransform(el)?.deg ?? null;
+}
+
+/** Write a rotation (rounded degrees, normalized to (-180, 180]); 0 clears.
+ *  Preserves any managed flip. NO commit — gestures commit on release. */
+export function setRotation(el: HTMLElement, deg: number): void {
+  const cur = parseManagedTransform(el);
+  if (!cur) return; // foreign transform — hands off
+  let d = Math.round(deg) % 360;
+  if (d > 180) d -= 360;
+  if (d <= -180) d += 360;
+  writeManagedTransform(el, d, cur.sx, cur.sy);
+}
+
+/** Managed flip state; null = foreign transform. */
+export function flipState(el: HTMLElement): { x: boolean; y: boolean } | null {
+  const cur = parseManagedTransform(el);
+  return cur ? { x: cur.sx === -1, y: cur.sy === -1 } : null;
+}
+
+/** Toggle a mirror axis, preserving rotation. NO commit. */
+export function toggleFlip(el: HTMLElement, axis: 'x' | 'y'): void {
+  const cur = parseManagedTransform(el);
+  if (!cur) return;
+  writeManagedTransform(
+    el,
+    cur.deg,
+    axis === 'x' ? ((-cur.sx) as 1 | -1) : cur.sx,
+    axis === 'y' ? ((-cur.sy) as 1 | -1) : cur.sy,
+  );
+}
+
+/**
+ * The element's box as if unrotated: layout size (transform-independent)
+ * centered on the AABB center — rotation about the center preserves the
+ * center, so no DOM mutation is needed. Equals stageRect when unrotated.
+ */
+export function unrotatedRect(
+  ctx: StageCtx,
+  el: HTMLElement,
+): { left: number; top: number; width: number; height: number } {
+  const aabb = stageRect(ctx, el);
+  const rot = rotation(el);
+  if (!rot) return aabb;
+  // SVG elements have no offsetWidth — their inline size IS the layout size.
+  const w = el.offsetWidth || parseFloat(el.style.width) || aabb.width;
+  const h = el.offsetHeight || parseFloat(el.style.height) || aabb.height;
+  return {
+    left: aabb.left + aabb.width / 2 - w / 2,
+    top: aabb.top + aabb.height / 2 - h / 2,
+    width: w,
+    height: h,
+  };
+}
+
+function rotatePoint(
+  p: { x: number; y: number },
+  c: { x: number; y: number },
+  deg: number,
+): { x: number; y: number } {
+  const a = (deg * Math.PI) / 180;
+  const dx = p.x - c.x;
+  const dy = p.y - c.y;
+  return {
+    x: c.x + dx * Math.cos(a) - dy * Math.sin(a),
+    y: c.y + dx * Math.sin(a) + dy * Math.cos(a),
+  };
+}
+
+/** Named anchor positions on a box: 4 corners + 4 edge midpoints. */
+export type AnchorId = 'nw' | 'n' | 'ne' | 'w' | 'e' | 'sw' | 's' | 'se';
+
+const ANCHOR_IDS: AnchorId[][] = [
+  ['nw', 'n', 'ne'],
+  ['w', 'e'],
+  ['sw', 's', 'se'],
+];
+
+/** One named anchor point of a box. */
+export function anchorPoint(
+  r: { left: number; top: number; width: number; height: number },
+  id: AnchorId,
+): { x: number; y: number } {
+  const x = id.includes('w') ? r.left : id.includes('e') ? r.left + r.width : r.left + r.width / 2;
+  const y = id.includes('n') ? r.top : id.includes('s') ? r.top + r.height : r.top + r.height / 2;
+  return { x, y };
+}
+
+/** The 8 anchor points of a box (no center). */
+export function anchorPoints(r: {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}): { x: number; y: number; id: AnchorId }[] {
+  return ANCHOR_IDS.flat().map((id) => ({ ...anchorPoint(r, id), id }));
+}
+
+export interface AnchorSet {
+  el: HTMLElement;
+  rect: { left: number; top: number; width: number; height: number };
+  points: { x: number; y: number; id: AnchorId }[];
+}
+
+/** An element's anchors in stage coords, honoring its rotation: the 8
+ *  points of the UNROTATED box, rotated around its center — connectors snap
+ *  to and track the true corners of rotated nodes. */
+export function elementAnchorPoints(
+  ctx: StageCtx,
+  el: HTMLElement,
+): { x: number; y: number; id: AnchorId }[] {
+  const rot = rotation(el);
+  if (!rot) return anchorPoints(stageRect(ctx, el));
+  const box = unrotatedRect(ctx, el);
+  const c = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+  return anchorPoints(box).map((p) => ({ ...rotatePoint(p, c, rot), id: p.id }));
+}
+
+/** One named anchor of an element (rotation-aware) — reconcile's resolver. */
+export function elementAnchorPoint(
+  ctx: StageCtx,
+  el: HTMLElement,
+  id: AnchorId,
+): { x: number; y: number } {
+  const rot = rotation(el);
+  if (!rot) return anchorPoint(stageRect(ctx, el), id);
+  const box = unrotatedRect(ctx, el);
+  const c = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+  return rotatePoint(anchorPoint(box, id), c, rot);
+}
+
+/** Anchor sets of every top-level slide element except `exclude` — the snap
+ *  targets for connector-endpoint drags. */
+export function collectAnchorSets(ctx: StageCtx, exclude: HTMLElement): AnchorSet[] {
+  const sets: AnchorSet[] = [];
+  for (const el of Array.from(ctx.section.children)) {
+    if (el === exclude || (el as HTMLElement).style === undefined) continue;
+    if (el.tagName === 'ASIDE') continue;
+    const rect = stageRect(ctx, el as HTMLElement);
+    sets.push({
+      el: el as HTMLElement,
+      rect,
+      points: elementAnchorPoints(ctx, el as HTMLElement),
+    });
+  }
+  return sets;
+}
+
+/** Nearest anchor within `threshold` (2-D distance), or null. */
+export function nearestAnchor(
+  p: { x: number; y: number },
+  sets: AnchorSet[],
+  threshold: number,
+): { x: number; y: number; id: AnchorId; el: HTMLElement } | null {
+  let best: { x: number; y: number; id: AnchorId; el: HTMLElement } | null = null;
+  let bestD = threshold;
+  for (const set of sets) {
+    for (const a of set.points) {
+      const d = Math.hypot(a.x - p.x, a.y - p.y);
+      if (d <= bestD) {
+        bestD = d;
+        best = { ...a, el: set.el };
+      }
+    }
+  }
+  return best;
 }
 
 /** Snap a single edge coordinate against candidates (resize gestures). */

@@ -105,6 +105,51 @@ export function insertChart(ctx: StageCtx, after: HTMLElement | null): HTMLEleme
   return el;
 }
 
+const CHART_TYPES_SET = new Set([
+  'bar',
+  'stackedBar',
+  'hbar',
+  'line',
+  'area',
+  'combo',
+  'pie',
+  'donut',
+  'scatter',
+]);
+
+/** Raw-JSON escape hatch: parse + structurally validate a spec. Returns the
+ *  spec or a human-readable error string. */
+export function parseChartSpecJson(text: string): ChartSpec | string {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch (err) {
+    return `Invalid JSON: ${(err as Error).message}`;
+  }
+  if (typeof raw !== 'object' || raw === null) return 'Spec must be a JSON object';
+  const spec = raw as Partial<ChartSpec>;
+  if (!spec.type || !CHART_TYPES_SET.has(spec.type)) {
+    return `Unknown type — expected one of: ${[...CHART_TYPES_SET].join(', ')}`;
+  }
+  if (!Array.isArray(spec.labels) || !spec.labels.every((l) => typeof l === 'string')) {
+    return '"labels" must be an array of strings';
+  }
+  if (
+    !Array.isArray(spec.series) ||
+    spec.series.length === 0 ||
+    !spec.series.every(
+      (s) =>
+        s &&
+        typeof s.name === 'string' &&
+        Array.isArray(s.values) &&
+        s.values.every((v) => typeof v === 'number'),
+    )
+  ) {
+    return '"series" must be a non-empty array of { name, values: number[] }';
+  }
+  return spec as ChartSpec;
+}
+
 /** Parse pasted TSV/CSV into labels + series (first row = header, first col = labels). */
 export function parseDelimited(text: string): { labels: string[]; series: { name: string; values: number[] }[] } | null {
   const rows = text

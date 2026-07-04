@@ -15,10 +15,11 @@ import {
 } from '@mantine/core';
 import { IconPlus, IconTrash, IconX } from '@tabler/icons-react';
 import { useEditorStore } from '../editorStore';
-import { type ChartSpec, renderChart, seriesColor } from './renderChart';
+import { type ChartNumberFormat, type ChartSpec, renderChart, seriesColor } from './renderChart';
 import {
   chartMode,
   defaultChartSpec,
+  parseChartSpecJson,
   parseDelimited,
   readChartSpec,
   slideBackgroundColor,
@@ -28,11 +29,22 @@ import {
 const CHART_TYPES = [
   { value: 'bar', label: 'Bar' },
   { value: 'stackedBar', label: 'Stacked bar' },
+  { value: 'hbar', label: 'Horizontal bar' },
   { value: 'line', label: 'Line' },
   { value: 'area', label: 'Area' },
+  { value: 'combo', label: 'Combo (bar + line)' },
   { value: 'pie', label: 'Pie' },
   { value: 'donut', label: 'Donut' },
   { value: 'scatter', label: 'Scatter (numeric labels = x)' },
+];
+
+const NUMBER_FORMATS = [
+  { value: 'auto', label: 'Auto' },
+  { value: '0', label: '0 decimals' },
+  { value: '1', label: '1 decimal' },
+  { value: '2', label: '2 decimals' },
+  { value: 'percent', label: 'Percent (%)' },
+  { value: 'compact', label: 'Compact (k / M)' },
 ];
 
 /** Chart editor: spreadsheet-ish grid + options + live preview. */
@@ -41,9 +53,16 @@ export function ChartModal() {
   const ctx = useEditorStore((s) => s.ctx);
   const [spec, setSpec] = useState<ChartSpec | null>(null);
   const [importText, setImportText] = useState('');
+  // Raw-JSON escape hatch: null = collapsed; text edits apply on demand.
+  const [jsonText, setJsonText] = useState<string | null>(null);
+  const [jsonError, setJsonError] = useState('');
 
   useEffect(() => {
-    if (el) setSpec(readChartSpec(el) ?? defaultChartSpec());
+    if (el) {
+      setSpec(readChartSpec(el) ?? defaultChartSpec());
+      setJsonText(null);
+      setJsonError('');
+    }
   }, [el]);
 
   const mode = ctx ? chartMode(ctx) : 'dark';
@@ -100,7 +119,7 @@ export function ChartModal() {
               onChange={(e) => patchOptions({ title: e.currentTarget.value || undefined })}
             />
           </Group>
-          <Group gap="lg">
+          <Group gap="lg" align="flex-end">
             <Switch
               label="Value labels (endpoints / caps / big slices)"
               size="xs"
@@ -112,6 +131,18 @@ export function ChartModal() {
               size="xs"
               checked={spec.options?.legend ?? spec.series.length >= 2}
               onChange={(e) => patchOptions({ legend: e.currentTarget.checked })}
+            />
+            <Select
+              label="Numbers"
+              size="xs"
+              w={130}
+              value={spec.options?.format ?? 'auto'}
+              data={NUMBER_FORMATS}
+              onChange={(v) =>
+                patchOptions({
+                  format: v && v !== 'auto' ? (v as ChartNumberFormat) : undefined,
+                })
+              }
             />
           </Group>
 
@@ -141,6 +172,34 @@ export function ChartModal() {
                         withEyeDropper={false}
                         variant="unstyled"
                       />
+                      {spec.type === 'combo' && (
+                        <Select
+                          size="xs"
+                          w={70}
+                          variant="unstyled"
+                          aria-label={`Series ${i + 1} mark`}
+                          value={s.kind ?? 'bar'}
+                          data={[
+                            { value: 'bar', label: 'Bar' },
+                            { value: 'line', label: 'Line' },
+                          ]}
+                          onChange={(v) =>
+                            v &&
+                            setSpec((sp) =>
+                              sp
+                                ? {
+                                    ...sp,
+                                    series: sp.series.map((sr, j) =>
+                                      j === i
+                                        ? { ...sr, kind: v === 'line' ? 'line' : undefined }
+                                        : sr,
+                                    ),
+                                  }
+                                : sp,
+                            )
+                          }
+                        />
+                      )}
                       <TextInput
                         size="xs"
                         variant="unstyled"
@@ -293,6 +352,52 @@ export function ChartModal() {
             >
               Replace data with pasted table
             </Button>
+          )}
+
+          {jsonText === null ? (
+            <Button
+              size="compact-xs"
+              variant="subtle"
+              onClick={() => setJsonText(JSON.stringify(spec, null, 2))}
+            >
+              Edit as JSON…
+            </Button>
+          ) : (
+            <>
+              <Textarea
+                label="Chart spec (JSON) — the exact data-re-chart payload"
+                size="xs"
+                autosize
+                minRows={6}
+                maxRows={16}
+                styles={{ input: { fontFamily: 'monospace' } }}
+                value={jsonText}
+                error={jsonError || undefined}
+                onChange={(e) => {
+                  setJsonText(e.currentTarget.value);
+                  setJsonError('');
+                }}
+              />
+              <Group gap={4}>
+                <Button
+                  size="compact-xs"
+                  variant="light"
+                  onClick={() => {
+                    const parsed = parseChartSpecJson(jsonText);
+                    if (typeof parsed === 'string') setJsonError(parsed);
+                    else {
+                      setSpec(parsed);
+                      setJsonError('');
+                    }
+                  }}
+                >
+                  Apply JSON
+                </Button>
+                <Button size="compact-xs" variant="subtle" onClick={() => setJsonText(null)}>
+                  Close
+                </Button>
+              </Group>
+            </>
           )}
         </Stack>
 

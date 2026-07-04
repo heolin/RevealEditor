@@ -11,7 +11,7 @@ function fakeDeck(): DeckData {
     stylesheets: [],
     headStyles: [],
     managedCss: '',
-    config: { width: 960, height: 700, center: true, margin: 0.04 },
+    config: { width: 960, height: 700, center: true, margin: 0.04, slideNumber: false },
     sections: [
       { source: '<section><h1>One</h1></section>', leading: '\n  ', attrsText: '', inner: '<h1>One</h1>' },
       { source: '<section><h1>Two</h1></section>', leading: '\n  ', attrsText: '', inner: '<h1>Two</h1>' },
@@ -70,5 +70,55 @@ describe('deck store undo history', () => {
     const before = useDeckStore.temporal.getState().pastStates.length;
     store.select(store.columns[1].slides[0].id);
     expect(useDeckStore.temporal.getState().pastStates).toHaveLength(before);
+  });
+});
+
+it('addSlideFromSource appends a pasted <section>, rejects non-section text', () => {
+  const store = useDeckStore.getState();
+  store.load(fakeDeck());
+  const before = useDeckStore.getState().columns.length;
+  store.addSlideFromSource('<section data-x="1"><h2>Pasted</h2></section>');
+  const columns = useDeckStore.getState().columns;
+  expect(columns).toHaveLength(before + 1);
+  expect(columns[columns.length - 1].slides[0].source).toContain('Pasted');
+  expect(useDeckStore.getState().dirty).toBe(true);
+  // Arbitrary clipboard text must not become a slide.
+  store.addSlideFromSource('just some text');
+  expect(useDeckStore.getState().columns).toHaveLength(before + 1);
+});
+
+describe('duplicateSlideForAutoAnimate', () => {
+  beforeEach(() => {
+    useDeckStore.getState().close();
+    useDeckStore.getState().load(fakeDeck());
+  });
+
+  it('flags BOTH the original and the copy with data-auto-animate', () => {
+    const store = useDeckStore.getState();
+    const origId = store.columns[0].slides[0].id;
+    store.duplicateSlideForAutoAnimate(origId);
+
+    const columns = useDeckStore.getState().columns;
+    // Non-stack slide → copy lands in a new column right after the original.
+    expect(columns).toHaveLength(3);
+    const original = columns[0].slides[0];
+    const copy = columns[1].slides[0];
+    expect(original.source).toMatch(/<section[^>]*\bdata-auto-animate\b/);
+    expect(copy.source).toMatch(/<section[^>]*\bdata-auto-animate\b/);
+    // The copy still carries the original content and is the new selection.
+    expect(copy.source).toContain('One');
+    expect(useDeckStore.getState().selectedSlideId).toBe(copy.id);
+    expect(useDeckStore.getState().dirty).toBe(true);
+  });
+
+  it('does not add a second data-auto-animate to an already-flagged slide', () => {
+    const store = useDeckStore.getState();
+    const origId = store.columns[0].slides[0].id;
+    store.duplicateSlideForAutoAnimate(origId);
+    // Duplicate the (now-flagged) original again.
+    const again = useDeckStore.getState().columns[0].slides[0];
+    useDeckStore.getState().duplicateSlideForAutoAnimate(again.id);
+    const matches = useDeckStore.getState().columns[0].slides[0].source.match(/data-auto-animate/g);
+    expect(matches).toHaveLength(1);
   });
 });

@@ -16,6 +16,9 @@ import {
 import { IconArrowDown, IconArrowUp, IconUpload } from '@tabler/icons-react';
 import { useEditorStore } from '../../editor/editorStore';
 import { useDeckStore } from '../../state/deckStore';
+import { getAction, useEditorContext, type Action } from '../../editor/actions';
+import { ActionControl } from '../../editor/actions/ActionControl';
+import { ArrowHeadsPicker, BorderWidthPicker, LineStylePicker, ReColorInput } from '../pickers';
 import { handlerFor } from '../../editor/registry';
 import { languageOf } from '../../editor/codeHighlight';
 import { setElementAttr, setSectionAttr } from '../../editor/commands';
@@ -31,20 +34,40 @@ import {
   setFragmentVariant,
   showAllFragments,
 } from '../../editor/fragments';
-import { isShapeEl, readShapeSpec, renderShapeInto, writeShapeSpec } from '../../editor/shapes';
+import {
+  isConnectorEl,
+  isLineKind,
+  isShapeEl,
+  readShapeSpec,
+  renderShapeInto,
+  writeShapeSpec,
+  type ArrowHeads,
+} from '../../editor/shapes';
 import { isChartEl, readChartSpec, refreshChart } from '../../editor/chart/chart';
-import { applyStyle, isAbsolute, returnToFlow } from '../../editor/geometry';
+import {
+  applyStyle,
+  flipState,
+  isAbsolute,
+  returnToFlow,
+  rotation,
+  setRotation,
+  toggleFlip,
+} from '../../editor/geometry';
 import { commit as commitCommand } from '../../editor/commands';
 import {
   TABLE_PRESETS,
   type TablePreset,
   addColumn,
   addRow,
+  canMerge,
+  canSplit,
   deleteColumn,
   deleteRow,
   hasHeaderRow,
+  mergeCells,
   setColumnAlignment,
   setTablePreset,
+  splitCell,
   tablePreset,
   toggleHeaderRow,
 } from '../../editor/table';
@@ -167,6 +190,12 @@ function DeckSection() {
           comboboxProps={{ withinPortal: true }}
         />
       )}
+      <Switch
+        label="Slide numbers"
+        size="xs"
+        checked={meta.config.slideNumber}
+        onChange={(e) => useDeckStore.getState().setSlideNumber(e.currentTarget.checked)}
+      />
     </>
   );
 }
@@ -181,6 +210,8 @@ function SlideSection() {
   const bgColor = section.getAttribute('data-background-color') ?? '';
   const bgImage = section.getAttribute('data-background-image') ?? '';
   const transition = section.getAttribute('data-transition') ?? '';
+  const bgTransition = section.getAttribute('data-background-transition') ?? '';
+  const autoAnimate = section.hasAttribute('data-auto-animate');
   const hidden = section.getAttribute('data-visibility') === 'hidden';
 
   // Inputs are uncontrolled (commit on blur/pick, not per keystroke — one
@@ -248,6 +279,22 @@ function SlideSection() {
         clearable
         data={TRANSITIONS}
         onChange={(v) => setSectionAttr(ctx, 'data-transition', v)}
+      />
+      <Select
+        label="Background transition"
+        size="xs"
+        value={bgTransition || null}
+        placeholder="deck default"
+        clearable
+        data={TRANSITIONS}
+        onChange={(v) => setSectionAttr(ctx, 'data-background-transition', v)}
+      />
+      <Switch
+        label="Auto-animate"
+        size="xs"
+        description="Morph matching elements from the previous slide"
+        checked={autoAnimate}
+        onChange={(e) => setSectionAttr(ctx, 'data-auto-animate', e.currentTarget.checked ? 'true' : null)}
       />
       <Switch
         label="Hidden slide"
@@ -350,6 +397,12 @@ function ElementSection({ el }: { el: HTMLElement }) {
       {handler.type === 'code' && <CodeFields el={el} />}
       {handler.type === 'shape' && <ShapeFields el={el} />}
       {handler.type === 'chart' && <ChartFields el={el} />}
+      {handler.type === 'text' && (
+        <>
+          <TextFields />
+          <BoxFields el={el} />
+        </>
+      )}
       {table && ctx.section.contains(table) && (
         <>
           <Divider />
@@ -371,6 +424,7 @@ function ElementSection({ el }: { el: HTMLElement }) {
 function PositionFields({ el }: { el: HTMLElement }) {
   const ctx = useEditorStore((s) => s.ctx)!;
   const num = (v: string) => parseInt(v, 10) || 0;
+  const rot = rotation(el); // null = foreign transform → no rotation field
 
   function setStyleProp(prop: string, value: string) {
     applyStyle(el, { [prop]: value });
@@ -384,7 +438,7 @@ function PositionFields({ el }: { el: HTMLElement }) {
       <Text size="xs" fw={700} c="dimmed" tt="uppercase">
         Position
       </Text>
-      <Group gap={4} grow>
+      <Group gap={4} grow wrap="nowrap">
         <NumberInput
           label="X"
           size="xs"
@@ -397,8 +451,6 @@ function PositionFields({ el }: { el: HTMLElement }) {
           value={num(el.style.top)}
           onChange={(v) => typeof v === 'number' && setStyleProp('top', `${v}px`)}
         />
-      </Group>
-      <Group gap={4} grow>
         <NumberInput
           label="Width"
           size="xs"
@@ -418,6 +470,21 @@ function PositionFields({ el }: { el: HTMLElement }) {
           <div />
         )}
       </Group>
+      {rot !== null && !isConnectorEl(el) && (
+        <NumberInput
+          label="Rotation"
+          size="xs"
+          suffix="°"
+          min={-180}
+          max={180}
+          value={rot}
+          onChange={(v) => {
+            if (typeof v !== 'number') return;
+            setRotation(el, v);
+            commitCommand(ctx);
+          }}
+        />
+      )}
       <Button size="compact-xs" variant="light" onClick={() => returnToFlow(ctx, el)}>
         Back to layout (unpin)
       </Button>
@@ -474,6 +541,54 @@ function TableFields({ table, el }: { table: HTMLTableElement; el: HTMLElement }
             <Button size="compact-xs" color="red" variant="light" onClick={() => deleteColumn(ctx, cell)}>
               Delete column
             </Button>
+          </Group>
+          <Group gap={4}>
+            <Button
+              size="compact-xs"
+              variant="default"
+              disabled={!canMerge(cell, 'right')}
+              onClick={() => mergeCells(ctx, cell, 'right')}
+            >
+              Merge →
+            </Button>
+            <Button
+              size="compact-xs"
+              variant="default"
+              disabled={!canMerge(cell, 'down')}
+              onClick={() => mergeCells(ctx, cell, 'down')}
+            >
+              Merge ↓
+            </Button>
+            <Button
+              size="compact-xs"
+              variant="default"
+              disabled={!canSplit(cell)}
+              onClick={() => splitCell(ctx, cell)}
+            >
+              Split
+            </Button>
+          </Group>
+          <Group gap={6} wrap="nowrap">
+            <ReColorInput
+              key={`cf-${cell.style.backgroundColor}`}
+              label="Cell fill"
+              defaultValue={cell.style.backgroundColor}
+              placeholder="none"
+              onChangeEnd={(v) => {
+                applyStyle(cell, { 'background-color': v || null });
+                commitCommand(ctx);
+              }}
+            />
+            <ReColorInput
+              key={`ct-${cell.style.color}`}
+              label="Cell text"
+              defaultValue={cell.style.color}
+              placeholder="theme"
+              onChangeEnd={(v) => {
+                applyStyle(cell, { color: v || null });
+                commitCommand(ctx);
+              }}
+            />
           </Group>
           <Text size="xs" c="dimmed">
             Column alignment
@@ -552,9 +667,34 @@ function ImageFields({ el }: { el: HTMLImageElement }) {
   const alt = el.getAttribute('alt') ?? '';
   const width = el.getAttribute('width');
   const inputKey = `${src}-${alt}-${width}`;
+  const flipped = flipState(el); // null = foreign transform → no flip UI
 
   return (
     <>
+      {flipped && (
+        <Group gap={4}>
+          <Button
+            size="compact-xs"
+            variant={flipped.x ? 'filled' : 'default'}
+            onClick={() => {
+              toggleFlip(el, 'x');
+              commitCommand(ctx);
+            }}
+          >
+            Flip H
+          </Button>
+          <Button
+            size="compact-xs"
+            variant={flipped.y ? 'filled' : 'default'}
+            onClick={() => {
+              toggleFlip(el, 'y');
+              commitCommand(ctx);
+            }}
+          >
+            Flip V
+          </Button>
+        </Group>
+      )}
       <TextInput
         key={`src-${inputKey}`}
         label="Source"
@@ -608,56 +748,270 @@ function ImageFields({ el }: { el: HTMLImageElement }) {
   );
 }
 
-function ShapeFields({ el }: { el: HTMLElement }) {
+/** Text-format action ids surfaced in the panel (same registry the textBar
+ *  renders — these all work on a bare selection, no session required),
+ *  packed into two compact rows. */
+const TEXT_ROW_1 = ['format.heading', 'format.fontFamily', 'format.fontSize'];
+const TEXT_ROW_2 = [
+  'format.textColor',
+  'format.align.left',
+  'format.align.center',
+  'format.align.right',
+];
+
+/**
+ * Text styling for a SELECTED text box — the textBar only exists during an
+ * edit session, but block-level format (font, size, color, alignment) is
+ * just inline styles on the element and needs no session.
+ */
+function TextFields() {
+  const ctx = useEditorContext();
+  const row = (ids: string[]) =>
+    ids.map(getAction).filter((a): a is Action => !!a && a.when(ctx));
+  const row1 = row(TEXT_ROW_1);
+  const row2 = row(TEXT_ROW_2);
+  if (row1.length === 0 && row2.length === 0) return null;
+  return (
+    <>
+      <Text size="xs" fw={700} c="dimmed" tt="uppercase">
+        Text
+      </Text>
+      {[row1, row2].map(
+        (actions, i) =>
+          actions.length > 0 && (
+            <Group key={i} gap={4} wrap="nowrap">
+              {actions.map((action) => (
+                <ActionControl key={action.id} action={action} ctx={ctx} variant="toolbar" />
+              ))}
+            </Group>
+          ),
+      )}
+      {ctx.stage && ctx.selection && (
+        <Switch
+          label="Fit text to width (r-fit-text)"
+          size="xs"
+          checked={ctx.selection.classList.contains('r-fit-text')}
+          onChange={() => {
+            const el = ctx.selection!;
+            el.classList.toggle('r-fit-text');
+            if (!el.getAttribute('class')) el.removeAttribute('class');
+            commitCommand(ctx.stage!);
+          }}
+        />
+      )}
+      <Divider />
+    </>
+  );
+}
+
+/**
+ * Box styling for text elements — background, padding, border, radius as
+ * plain inline styles (round-trip clean, presents anywhere). A text box with
+ * a background + padding IS a diagram node: connector endpoints snap to its
+ * anchors like any other box (docs/DIAGRAMMING.md phase 3).
+ */
+function BoxFields({ el }: { el: HTMLElement }) {
   const ctx = useEditorStore((s) => s.ctx)!;
-  const spec = readShapeSpec(el);
-  if (!spec) return null;
-  const hasFill = spec.kind === 'rect' || spec.kind === 'ellipse';
+  const num = (v: string) => parseInt(v, 10) || 0;
+  const set = (patch: Parameters<typeof applyStyle>[1]) => {
+    applyStyle(el, patch);
+    commitCommand(ctx);
+  };
 
   return (
     <>
-      {hasFill && (
-        <ColorInput
-          key={`f-${spec.fill}`}
-          label="Fill"
-          size="xs"
-          defaultValue={spec.fill === 'none' ? '' : spec.fill}
-          onChangeEnd={(v) => writeShapeSpec(ctx, el, { fill: v || 'none' })}
-          withEyeDropper={false}
+      <Text size="xs" fw={700} c="dimmed" tt="uppercase">
+        Box
+      </Text>
+      {/* Row 1: colors + border width/style; row 2: padding + radius. */}
+      <Group gap={6} align="flex-end" wrap="nowrap">
+        <ReColorInput
+          key={`bg-${el.style.backgroundColor}`}
+          label="Background"
+          defaultValue={el.style.backgroundColor}
+          placeholder="none"
+          onChangeEnd={(v) => set({ 'background-color': v || null })}
         />
-      )}
-      <ColorInput
-        key={`s-${spec.stroke}`}
-        label={hasFill ? 'Border color' : 'Color'}
-        size="xs"
-        defaultValue={spec.stroke === 'none' ? '' : spec.stroke}
-        onChangeEnd={(v) => writeShapeSpec(ctx, el, { stroke: v || 'none' })}
-        withEyeDropper={false}
-      />
-      <NumberInput
-        label={hasFill ? 'Border width' : 'Line width'}
-        size="xs"
-        min={0}
-        max={40}
-        value={spec.strokeWidth}
-        onChange={(v) => typeof v === 'number' && writeShapeSpec(ctx, el, { strokeWidth: v })}
-      />
-      <Select
-        label="Line style"
-        size="xs"
-        value={spec.dash}
-        data={['solid', 'dashed', 'dotted']}
-        onChange={(v) => v && writeShapeSpec(ctx, el, { dash: v as 'solid' | 'dashed' | 'dotted' })}
-      />
-      {spec.kind === 'rect' && (
+        <ReColorInput
+          key={`bc-${el.style.borderColor}`}
+          label="Border"
+          defaultValue={el.style.borderColor}
+          placeholder="text color"
+          onChangeEnd={(v) => set({ 'border-color': v || null })}
+        />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <BorderWidthPicker
+            label="Width"
+            value={num(el.style.borderWidth)}
+            allowNone
+            onChange={(v) =>
+              // Width 0 removes the whole border; color stays currentColor
+              // (theme text color) until explicitly picked.
+              set(
+                v > 0
+                  ? {
+                      'border-width': `${v}px`,
+                      'border-style': el.style.borderStyle || 'solid',
+                    }
+                  : { 'border-width': null, 'border-style': null, 'border-color': null },
+              )
+            }
+          />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <LineStylePicker
+            label="Style"
+            value={(el.style.borderStyle as 'solid' | 'dashed' | 'dotted') || 'solid'}
+            sampleWidth={num(el.style.borderWidth) || 2}
+            onChange={(v) =>
+              set(
+                num(el.style.borderWidth) > 0
+                  ? { 'border-style': v }
+                  : // Picking a style before a width implies "give me a border".
+                    { 'border-style': v, 'border-width': '2px' },
+              )
+            }
+          />
+        </div>
+      </Group>
+      <Group gap={6} grow>
+        <NumberInput
+          label="Padding"
+          size="xs"
+          min={0}
+          max={200}
+          value={num(el.style.padding)}
+          onChange={(v) => typeof v === 'number' && set({ padding: v > 0 ? `${v}px` : null })}
+        />
         <NumberInput
           label="Corner radius"
           size="xs"
           min={0}
-          max={100}
-          value={spec.radius ?? 0}
-          onChange={(v) => typeof v === 'number' && writeShapeSpec(ctx, el, { radius: v })}
+          max={200}
+          value={num(el.style.borderRadius)}
+          onChange={(v) =>
+            typeof v === 'number' && set({ 'border-radius': v > 0 ? `${v}px` : null })
+          }
         />
+      </Group>
+    </>
+  );
+}
+
+function ShapeFields({ el }: { el: HTMLElement }) {
+  const ctx = useEditorStore((s) => s.ctx)!;
+  const spec = readShapeSpec(el);
+  if (!spec) return null;
+  const hasFill = !isLineKind(spec.kind);
+  const grow: React.CSSProperties = { flex: 1, minWidth: 0 };
+
+  return (
+    <>
+      {/* Row 1: colors + stroke width + stroke style. */}
+      <Group gap={6} align="flex-end" wrap="nowrap">
+        {hasFill && (
+          <ReColorInput
+            key={`f-${spec.fill}`}
+            label="Fill"
+            defaultValue={spec.fill === 'none' ? '' : spec.fill}
+            placeholder="none"
+            onChangeEnd={(v) => writeShapeSpec(ctx, el, { fill: v || 'none' })}
+          />
+        )}
+        <ReColorInput
+          key={`s-${spec.stroke}`}
+          label={hasFill ? 'Border' : 'Color'}
+          defaultValue={spec.stroke === 'none' ? '' : spec.stroke}
+          placeholder={hasFill ? 'none' : undefined}
+          onChangeEnd={(v) => writeShapeSpec(ctx, el, { stroke: v || 'none' })}
+        />
+        <div style={grow}>
+          <BorderWidthPicker
+            label="Width"
+            value={spec.strokeWidth}
+            allowNone={hasFill}
+            onChange={(v) => writeShapeSpec(ctx, el, { strokeWidth: v })}
+          />
+        </div>
+        <div style={grow}>
+          <LineStylePicker
+            label="Style"
+            value={spec.dash}
+            sampleWidth={spec.strokeWidth}
+            onChange={(v) => writeShapeSpec(ctx, el, { dash: v })}
+          />
+        </div>
+      </Group>
+      {/* Row 2 (fill shapes): radius + flips. */}
+      {hasFill && (
+        <Group gap={6} align="flex-end" wrap="nowrap">
+          {(spec.kind === 'rect' || spec.kind === 'roundrect') && (
+            <NumberInput
+              label="Corner radius"
+              size="xs"
+              min={0}
+              max={100}
+              style={grow}
+              value={spec.radius ?? (spec.kind === 'roundrect' ? 24 : 0)}
+              onChange={(v) => typeof v === 'number' && writeShapeSpec(ctx, el, { radius: v })}
+            />
+          )}
+          <Button
+            size="compact-xs"
+            mb={4}
+            variant={spec.flipX ? 'filled' : 'default'}
+            onClick={() => writeShapeSpec(ctx, el, { flipX: !spec.flipX || undefined })}
+          >
+            Flip H
+          </Button>
+          <Button
+            size="compact-xs"
+            mb={4}
+            variant={spec.flipY ? 'filled' : 'default'}
+            onClick={() => writeShapeSpec(ctx, el, { flipY: !spec.flipY || undefined })}
+          >
+            Flip V
+          </Button>
+        </Group>
+      )}
+      {/* Row 2 (connectors): routing + heads + snap gap in one line. */}
+      {isLineKind(spec.kind) && (
+        <Group gap={6} grow wrap="nowrap">
+          <Select
+            label="Route"
+            size="xs"
+            value={spec.route ?? 'straight'}
+            data={[
+              { value: 'straight', label: 'Straight' },
+              { value: 'elbow', label: 'Elbow (right angles)' },
+              { value: 'curve', label: 'Curved' },
+            ]}
+            onChange={(v) =>
+              v &&
+              writeShapeSpec(ctx, el, {
+                route: v === 'straight' ? undefined : (v as 'elbow' | 'curve'),
+              })
+            }
+          />
+          <ArrowHeadsPicker
+            label="Arrowheads"
+            value={spec.heads ?? (spec.kind === 'arrow' ? 'end' : 'none')}
+            onChange={(v) => writeShapeSpec(ctx, el, { heads: v as ArrowHeads })}
+          />
+          <Tooltip label="Endpoints stop this many px short of a snapped anchor">
+            <NumberInput
+              label="Snap gap"
+              size="xs"
+              min={0}
+              max={60}
+              value={spec.snapGap ?? 0}
+              onChange={(v) =>
+                typeof v === 'number' &&
+                writeShapeSpec(ctx, el, { snapGap: v > 0 ? v : undefined })
+              }
+            />
+          </Tooltip>
+        </Group>
       )}
       <Text size="xs" c="dimmed">
         Opacity

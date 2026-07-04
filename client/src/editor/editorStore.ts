@@ -8,6 +8,7 @@
  */
 import { create } from 'zustand';
 import type { StageCtx } from './commands';
+import type { ShapeKind } from './shapes';
 
 interface EditorState {
   /** Live stage context for commands/toolbars; null when no stage mounted. */
@@ -18,6 +19,8 @@ interface EditorState {
   extraSelected: HTMLElement[];
   /** Marquee rectangle during rubber-band selection, slide-space px. */
   marquee: { x: number; y: number; w: number; h: number } | null;
+  /** Live preview while dragging out a line/arrow, endpoints in slide-space px. */
+  drawLine: { kind: ShapeKind; x1: number; y1: number; x2: number; y2: number } | null;
   /** Layout mode: dashed containers, drags reparent into flow instead of pinning. */
   layoutMode: boolean;
   /** Insertion indicator during a layout-mode drag, slide-space px. */
@@ -31,10 +34,22 @@ interface EditorState {
   chartEditEl: HTMLElement | null;
   /** Active snap guide lines during a drag, in slide-space px. */
   snapGuides: { x: number | null; y: number | null } | null;
+  /** Anchor dots shown during a connector-endpoint drag: the hovered
+   *  element's 8 anchors, plus which one (if any) the endpoint snapped to. */
+  anchorDots: { points: { x: number; y: number }[]; active: { x: number; y: number } | null } | null;
+  /** The primary selection's rect DURING a drag, in slide-space px — the
+   *  exact values just written. The overlay prefers this over measuring:
+   *  parent-side getBoundingClientRect on iframe content lags one layout
+   *  behind during rapid mutation. */
+  dragRect: { left: number; top: number; width: number; height: number } | null;
   /** Fragment preview step (null = editor default, all visible). */
   fragmentStep: number | null;
   /** Design-system component palette modal. */
   paletteOpen: boolean;
+  /** Icon library modal (inline-SVG inserts). */
+  iconPickerOpen: boolean;
+  /** Armed shape kind: the next canvas click/drag DRAWS this shape. */
+  pendingShapeKind: ShapeKind | null;
   /** Right-click context menu position in slide-space px (null = closed). */
   contextMenu: { x: number; y: number } | null;
   /** Bumped on every DOM mutation / selection change → overlay re-measures. */
@@ -54,6 +69,9 @@ interface EditorState {
   /** Replace the whole selection set (marquee). */
   selectMany(els: HTMLElement[]): void;
   setMarquee(rect: { x: number; y: number; w: number; h: number } | null): void;
+  setDrawLine(
+    line: { kind: ShapeKind; x1: number; y1: number; x2: number; y2: number } | null,
+  ): void;
   setLayoutMode(on: boolean): void;
   setDropIndicator(rect: { x: number; y: number; w: number; h: number } | null): void;
   hover(el: HTMLElement | null): void;
@@ -61,8 +79,14 @@ interface EditorState {
   setCodeEditEl(el: HTMLElement | null): void;
   setChartEditEl(el: HTMLElement | null): void;
   setSnapGuides(g: { x: number | null; y: number | null } | null): void;
+  setAnchorDots(
+    d: { points: { x: number; y: number }[]; active: { x: number; y: number } | null } | null,
+  ): void;
+  setDragRect(r: { left: number; top: number; width: number; height: number } | null): void;
   setFragmentStep(step: number | null): void;
   setPaletteOpen(open: boolean): void;
+  setIconPickerOpen(open: boolean): void;
+  setPendingShapeKind(kind: ShapeKind | null): void;
   setContextMenu(pos: { x: number; y: number } | null): void;
   bump(): void;
   /** Stage rebuilt — all element refs are stale. */
@@ -74,6 +98,7 @@ export const useEditorStore = create<EditorState>()((set) => ({
   selectedEl: null,
   extraSelected: [],
   marquee: null,
+  drawLine: null,
   layoutMode: false,
   dropIndicator: null,
   hoveredEl: null,
@@ -81,8 +106,12 @@ export const useEditorStore = create<EditorState>()((set) => ({
   codeEditEl: null,
   chartEditEl: null,
   snapGuides: null,
+  anchorDots: null,
+  dragRect: null,
   fragmentStep: null,
   paletteOpen: false,
+  iconPickerOpen: false,
+  pendingShapeKind: null,
   contextMenu: null,
   docVersion: 0,
 
@@ -113,6 +142,7 @@ export const useEditorStore = create<EditorState>()((set) => ({
       docVersion: s.docVersion + 1,
     })),
   setMarquee: (rect) => set((s) => ({ marquee: rect, docVersion: s.docVersion + 1 })),
+  setDrawLine: (line) => set((s) => ({ drawLine: line, docVersion: s.docVersion + 1 })),
   setLayoutMode: (on) => set((s) => ({ layoutMode: on, docVersion: s.docVersion + 1 })),
   setDropIndicator: (rect) => set((s) => ({ dropIndicator: rect, docVersion: s.docVersion + 1 })),
   hover: (el) => set((s) => (s.hoveredEl === el ? s : { hoveredEl: el, docVersion: s.docVersion + 1 })),
@@ -120,8 +150,12 @@ export const useEditorStore = create<EditorState>()((set) => ({
   setCodeEditEl: (el) => set((s) => ({ codeEditEl: el, docVersion: s.docVersion + 1 })),
   setChartEditEl: (el) => set((s) => ({ chartEditEl: el, docVersion: s.docVersion + 1 })),
   setSnapGuides: (g) => set((s) => ({ snapGuides: g, docVersion: s.docVersion + 1 })),
+  setAnchorDots: (d) => set((s) => ({ anchorDots: d, docVersion: s.docVersion + 1 })),
+  setDragRect: (r) => set((s) => ({ dragRect: r, docVersion: s.docVersion + 1 })),
   setFragmentStep: (step) => set((s) => ({ fragmentStep: step, docVersion: s.docVersion + 1 })),
   setPaletteOpen: (open) => set({ paletteOpen: open }),
+  setIconPickerOpen: (open) => set({ iconPickerOpen: open }),
+  setPendingShapeKind: (kind) => set((s) => ({ pendingShapeKind: kind, docVersion: s.docVersion + 1 })),
   setContextMenu: (pos) => set((s) => ({ contextMenu: pos, docVersion: s.docVersion + 1 })),
   bump: () => set((s) => ({ docVersion: s.docVersion + 1 })),
   reset: () =>
@@ -129,12 +163,15 @@ export const useEditorStore = create<EditorState>()((set) => ({
       selectedEl: null,
       extraSelected: [],
       marquee: null,
+      drawLine: null,
       dropIndicator: null, // layoutMode itself persists across slides
       hoveredEl: null,
       sessionEl: null,
       codeEditEl: null,
       chartEditEl: null,
       snapGuides: null,
+      anchorDots: null,
+      dragRect: null,
       fragmentStep: null,
       contextMenu: null,
       docVersion: s.docVersion + 1,

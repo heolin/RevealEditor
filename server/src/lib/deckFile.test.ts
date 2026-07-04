@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseDeck, updateDeck } from './deckFile.js';
+import { parseDeck, updateDeck, resourceRefs, rewriteResourceRefs } from './deckFile.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURES = path.join(HERE, '../../test/fixtures');
@@ -44,7 +44,7 @@ describe('parseDeck', () => {
     expect(info.theme).toBe('black');
     expect(info.title).toBe('RevealEditor demo deck');
     expect(info.stylesheets).toHaveLength(3);
-    expect(info.config).toEqual({ width: 960, height: 700, center: true, margin: 0.04 });
+    expect(info.config).toEqual({ width: 960, height: 700, center: true, margin: 0.04, slideNumber: false });
   });
 
   it('reads custom width/height from Reveal.initialize', () => {
@@ -58,7 +58,7 @@ describe('parseDeck', () => {
     expect(info.theme).toBeNull();
     expect(info.themeHref).toBeNull();
     expect(info.sections).toHaveLength(21);
-    expect(info.config).toEqual({ width: 1280, height: 720, center: false, margin: 0.025 });
+    expect(info.config).toEqual({ width: 1280, height: 720, center: false, margin: 0.025, slideNumber: false });
   });
 
   it('collects user <style> blocks so custom designs reach canvas/preview', () => {
@@ -190,6 +190,18 @@ describe('updateDeck round-trip', () => {
     expect(withSize).toContain('// user comment inside config');
   });
 
+  it('writes slideNumber into Reveal.initialize: insert, then replace in place', () => {
+    const demo = fixture('demo.html');
+    expect(parseDeck(demo).config.slideNumber).toBe(false);
+    const numbered = updateDeck(demo, { configPatch: { slideNumber: true } });
+    expect(parseDeck(numbered).config.slideNumber).toBe(true);
+    expect(numbered).toContain('slideNumber: true');
+    // Existing key → the boolean is replaced in place, not duplicated.
+    const off = updateDeck(numbered, { configPatch: { slideNumber: false } });
+    expect(parseDeck(off).config.slideNumber).toBe(false);
+    expect(off.match(/slideNumber/g)).toHaveLength(1);
+  });
+
   it('handles weird formatting (single quotes, odd whitespace, comments between sections)', () => {
     const src = fixture('weird.html');
     const info = parseDeck(src);
@@ -197,5 +209,59 @@ describe('updateDeck round-trip', () => {
     expect(updateDeck(src, {}), 'no-op').toBe(src);
     const original = src.slice(info.slidesRange.start, info.slidesRange.end);
     expect(updateDeck(src, { slidesHtml: original })).toBe(src);
+  });
+});
+
+describe('resourceRefs / rewriteResourceRefs (bundle offline)', () => {
+  const html = [
+    '<!doctype html><html><head>',
+    '<link rel="stylesheet" href="https://cdn.example.com/reveal.js@5/dist/reveal.css">',
+    "<link rel='stylesheet' href='dist/theme/black.css'>",
+    '<link rel="preconnect" href="https://fonts.example.com">',
+    '</head><body>',
+    '<script src="//cdn.example.com/reveal.js@5/dist/reveal.js"></script>',
+    '<script src="local/plugin.js"></script>',
+    '</body></html>',
+  ].join('\n');
+
+  it('finds only stylesheet links and script[src], with exact value ranges', () => {
+    const refs = resourceRefs(html);
+    // preconnect link is excluded; both stylesheets + both scripts included.
+    expect(refs.map((r) => r.url)).toEqual([
+      'https://cdn.example.com/reveal.js@5/dist/reveal.css',
+      'dist/theme/black.css',
+      '//cdn.example.com/reveal.js@5/dist/reveal.js',
+      'local/plugin.js',
+    ]);
+    // Each value range slices back to exactly the url (quotes excluded).
+    for (const r of refs) expect(html.slice(r.valueRange.start, r.valueRange.end)).toBe(r.url);
+  });
+
+  it('rewrites remote refs in place, leaving everything else byte-identical', () => {
+    const refs = resourceRefs(html);
+    const remote = refs.filter((r) => /^(?:https?:)?\/\//i.test(r.url));
+    expect(remote).toHaveLength(2);
+    const out = rewriteResourceRefs(html, [
+      { range: remote[0].valueRange, href: 'vendor/cdn.example.com/reveal.js@5/dist/reveal.css' },
+      { range: remote[1].valueRange, href: 'vendor/cdn.example.com/reveal.js@5/dist/reveal.js' },
+    ]);
+    expect(out).toContain('href="vendor/cdn.example.com/reveal.js@5/dist/reveal.css"');
+    expect(out).toContain('src="vendor/cdn.example.com/reveal.js@5/dist/reveal.js"');
+    // Untouched refs and surrounding markup survive verbatim.
+    expect(out).toContain("href='dist/theme/black.css'");
+    expect(out).toContain('src="local/plugin.js"');
+    expect(out).toContain('<link rel="preconnect" href="https://fonts.example.com">');
+    // Byte-surgical: only the two value spans changed.
+    expect(out.length).toBe(
+      html.length +
+        ('vendor/cdn.example.com/reveal.js@5/dist/reveal.css'.length -
+          'https://cdn.example.com/reveal.js@5/dist/reveal.css'.length) +
+        ('vendor/cdn.example.com/reveal.js@5/dist/reveal.js'.length -
+          '//cdn.example.com/reveal.js@5/dist/reveal.js'.length),
+    );
+  });
+
+  it('no-op when there is nothing to rewrite', () => {
+    expect(rewriteResourceRefs(html, [])).toBe(html);
   });
 });

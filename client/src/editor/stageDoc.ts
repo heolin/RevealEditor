@@ -66,9 +66,20 @@ export function stageLayoutCss(meta: StageMeta): string {
   .reveal .slides section .fragment {
     visibility: visible !important;
     opacity: 1 !important;
+  }
+  /* Neutralize fragment ANIMATION transforms (fade-up etc.) — but not the
+     editor's own inline rotation. Inline transform beats the non-important
+     fragment rules at runtime too, so editor and presentation agree. */
+  .reveal .slides section .fragment:not([style*="transform"]) {
     transform: none !important;
   }
   aside.notes { display: none !important; }
+  /* r-fit-text renders at NATURAL size in the editor (the fitting needs the
+     reveal runtime); the dashed underline marks it. True size in preview. */
+  .reveal .slides section .r-fit-text {
+    text-decoration: underline dashed rgba(128, 128, 128, 0.55) 1px;
+    text-underline-offset: 4px;
+  }
   /* Native image drag-and-drop steals pointer events from element dragging. */
   img { -webkit-user-drag: none; user-select: none; }
   /* Text is selectable ONLY inside an active text session — otherwise moving

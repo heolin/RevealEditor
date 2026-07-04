@@ -38,16 +38,28 @@ describe('serializeSlide', () => {
     expect(out).not.toContain('style=""');
   });
 
-  it('keeps file-format data-re attrs: shape/chart specs, free-layout marker', () => {
+  it('keeps file-format data-re attrs: shape/chart specs, ids, free-layout marker', () => {
     const s = stage(
       '<svg data-re-shape=\'{"kind":"rect"}\' class="re-shape"></svg>' +
-        '<figure data-re-chart=\'{"type":"bar"}\'></figure>',
+        '<figure data-re-chart=\'{"type":"bar"}\'></figure>' +
+        '<div data-re-id="abc12345">target</div>',
     );
     s.setAttribute('data-re-free', '');
     const out = serializeSlide(s);
     expect(out).toContain('data-re-shape');
     expect(out).toContain('data-re-chart');
     expect(out).toContain('data-re-free');
+    expect(out).toContain('data-re-id="abc12345"');
+  });
+
+  it('drops empty shape labels, keeps filled ones', () => {
+    const label = (text: string) =>
+      `<svg data-re-shape='{"kind":"rect"}' class="re-shape">` +
+      `<foreignObject><div class="re-shape-label">${text}</div></foreignObject></svg>`;
+    expect(serializeSlide(stage(label('')))).not.toContain('foreignObject');
+    const kept = serializeSlide(stage(label('Node A')));
+    expect(kept).toContain('foreignObject');
+    expect(kept).toContain('Node A');
   });
 
   it('strips fragment preview classes but keeps fragment itself', () => {

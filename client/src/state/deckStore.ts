@@ -21,7 +21,7 @@ export interface DeckMeta {
   stylesheets: string[];
   headStyles: string[];
   managedCss: string;
-  config: { width: number; height: number; center: boolean; margin: number };
+  config: { width: number; height: number; center: boolean; margin: number; slideNumber: boolean };
   layout: SlidesLayout;
 }
 
@@ -36,7 +36,7 @@ interface DeckState {
   /** Deck-relative stylesheet hrefs to add to the head on next save. */
   pendingLinks: string[];
   /** Reveal config values to splice into the file on next save. */
-  pendingConfig: { width?: number; height?: number } | null;
+  pendingConfig: { width?: number; height?: number; slideNumber?: boolean } | null;
 
   load(deck: DeckData): void;
   close(): void;
@@ -45,7 +45,12 @@ interface DeckState {
   addSlideAtEnd(): void;
   addSlideAfterColumn(columnId: string): void;
   addSlideBelow(slideId: string): void;
+  /** Insert a slide from clipboard-carried <section> source (cross-deck paste). */
+  addSlideFromSource(source: string): void;
   duplicateSlide(slideId: string): void;
+  /** Duplicate a slide as the next auto-animate step: copy it and flag BOTH the
+   *  original and the copy with `data-auto-animate` so reveal morphs between them. */
+  duplicateSlideForAutoAnimate(slideId: string): void;
   deleteSlide(slideId: string): void;
   moveColumn(columnId: string, gapIndex: number): void;
   moveSlideToSlot(slideId: string, columnId: string, index: number): void;
@@ -57,6 +62,13 @@ interface DeckState {
   linkStylesheets(hrefs: string[]): void;
   /** Change the slide design size (applied immediately, spliced on save). */
   setDeckSize(width: number, height: number): void;
+  /** Toggle reveal's slide numbers (spliced into the config on save). */
+  setSlideNumber(on: boolean): void;
+  /** Newer on-disk mtime observed by the freshness poll (null = in sync). */
+  externalMtime: number | null;
+  setExternalMtime(mtime: number | null): void;
+  /** Discard in-memory state and reload the deck from disk. */
+  reloadFromDisk(): Promise<void>;
   /** Commit edited slide markup from the editing engine (no-op if unchanged). */
   updateSlideSource(slideId: string, source: string): void;
 
@@ -68,6 +80,17 @@ interface DeckState {
 function touched(col: Column): Column {
   const { originalSource: _drop, ...rest } = col;
   return rest;
+}
+
+/** Add a bare boolean attribute to a section source's opening tag if absent.
+ *  Byte-surgical: only the `<section …>` tag is touched, everything else is
+ *  preserved verbatim (used by the store-level ops that have no live stage). */
+function withSectionFlag(source: string, attr: string): string {
+  const m = /<section\b([^>]*)>/.exec(source);
+  if (!m) return source;
+  const attrs = m[1];
+  if (new RegExp(`(^|\\s)${attr}(?=[\\s=]|$)`).test(attrs)) return source;
+  return source.replace(m[0], `<section${attrs} ${attr}>`);
 }
 
 function makeSlide(indent: string, source?: string, attrsText = ''): Slide {
@@ -125,6 +148,7 @@ export const useDeckStore = create<DeckState>()(
       conflict: false,
       pendingLinks: [],
       pendingConfig: null,
+      externalMtime: null,
 
       load(deck) {
         const columns = parseSections(deck.sections);
@@ -150,6 +174,7 @@ export const useDeckStore = create<DeckState>()(
           conflict: false,
           pendingLinks: [],
           pendingConfig: null,
+          externalMtime: null,
         });
         // Clear AFTER the set: the set itself records the pre-load state
         // (an empty or stale deck) as an undo entry — Ctrl+Z must never be
@@ -187,6 +212,18 @@ export const useDeckStore = create<DeckState>()(
         const next = [...columns];
         next.splice(idx + 1, 0, makeColumn(indent, [slide]));
         set({ columns: next, selectedSlideId: slide.id, dirty: true });
+      },
+
+      addSlideFromSource(source) {
+        const { columns, meta } = get();
+        if (!meta || !/^<section[\s>]/i.test(source.trim())) return;
+        const indent = meta.layout.sectionIndent;
+        const slide = makeSlide(indent, source.trim());
+        set({
+          columns: [...columns, makeColumn(indent, [slide])],
+          selectedSlideId: slide.id,
+          dirty: true,
+        });
       },
 
       addSlideBelow(slideId) {
@@ -229,6 +266,38 @@ export const useDeckStore = create<DeckState>()(
             const dup = makeSlide(indent, orig.source, orig.attrsText);
             dupId = dup.id;
             next.push(col, makeColumn(indent, [dup]));
+          }
+        }
+        set({ columns: next, selectedSlideId: dupId, dirty: true });
+      },
+
+      duplicateSlideForAutoAnimate(slideId) {
+        const { columns, meta } = get();
+        const indent = meta!.layout.sectionIndent;
+        let dupId: string | null = null;
+        const next: Column[] = [];
+        for (const col of columns) {
+          const idx = col.slides.findIndex((s) => s.id === slideId);
+          if (idx < 0) {
+            next.push(col);
+            continue;
+          }
+          const orig = col.slides[idx];
+          const animSource = withSectionFlag(orig.source, 'data-auto-animate');
+          if (col.isStack) {
+            const dup = makeSlide(`${indent}  `, animSource, orig.attrsText);
+            dupId = dup.id;
+            const slides = [...col.slides];
+            slides[idx] = { ...orig, source: animSource };
+            slides.splice(idx + 1, 0, dup);
+            next.push(touched({ ...col, slides }));
+          } else {
+            const dup = makeSlide(indent, animSource, orig.attrsText);
+            dupId = dup.id;
+            next.push(
+              touched({ ...col, slides: [{ ...orig, source: animSource }] }),
+              makeColumn(indent, [dup]),
+            );
           }
         }
         set({ columns: next, selectedSlideId: dupId, dirty: true });
@@ -325,6 +394,28 @@ export const useDeckStore = create<DeckState>()(
         });
       },
 
+      setSlideNumber(on) {
+        const { meta, pendingConfig } = get();
+        if (!meta || meta.config.slideNumber === on) return;
+        set({
+          meta: { ...meta, config: { ...meta.config, slideNumber: on } },
+          pendingConfig: { ...pendingConfig, slideNumber: on },
+          dirty: true,
+        });
+      },
+
+      setExternalMtime(mtime) {
+        set({ externalMtime: mtime });
+      },
+
+      async reloadFromDisk() {
+        const { meta } = get();
+        if (!meta) return;
+        const deck = await api.getDeck(meta.path);
+        get().load(deck);
+        set({ externalMtime: null });
+      },
+
       linkStylesheets(hrefs) {
         const { meta, pendingLinks } = get();
         if (!meta) return;
@@ -375,6 +466,7 @@ export const useDeckStore = create<DeckState>()(
             conflict: false,
             pendingLinks: [],
             pendingConfig: null,
+            externalMtime: null,
           });
         } catch (err) {
           if (err instanceof ApiError && err.status === 409) {

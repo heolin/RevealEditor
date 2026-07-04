@@ -10,8 +10,9 @@ import { restoreRawCode } from './codeHighlight';
 const EDITOR_ATTRS = ['contenteditable', 'spellcheck', 'draggable'];
 
 /** data-re-* attrs that are part of the FILE FORMAT, not editor state:
- *  shape/chart spec JSON and the free-layout section marker. */
-const PERSISTENT_RE_ATTRS = ['data-re-shape', 'data-re-chart', 'data-re-free'];
+ *  shape/chart spec JSON, the free-layout section marker, and the stable
+ *  element ids connector attachments reference. */
+const PERSISTENT_RE_ATTRS = ['data-re-shape', 'data-re-chart', 'data-re-free', 'data-re-id'];
 
 export function serializeSlide(stageSection: HTMLElement): string {
   const clone = stageSection.cloneNode(true) as HTMLElement;
@@ -22,6 +23,11 @@ export function serializeSlide(stageSection: HTMLElement): string {
 
   // Display-only highlight markup out; raw code text back in.
   restoreRawCode(stageSection, clone);
+
+  // A shape label the user left empty is scaffolding, not content.
+  for (const label of clone.querySelectorAll('.re-shape-label')) {
+    if (!label.textContent?.trim()) label.closest('foreignObject')?.remove();
+  }
 
   for (const el of [clone, ...clone.querySelectorAll('*')]) {
     for (const attr of EDITOR_ATTRS) el.removeAttribute(attr);

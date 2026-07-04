@@ -3,6 +3,8 @@
  * chart & code editors. Verbose property forms stay in the Inspector.
  */
 import {
+  IconArrowMergeAltRight,
+  IconArrowsSplit2,
   IconChartBar,
   IconCode,
   IconColumnInsertLeft,
@@ -13,7 +15,16 @@ import {
   IconRowRemove,
 } from '@tabler/icons-react';
 import type { Action, EditorContext } from './types';
-import { addColumn, addRow, deleteColumn, deleteRow } from '../table';
+import {
+  addColumn,
+  addRow,
+  canMerge,
+  canSplit,
+  deleteColumn,
+  deleteRow,
+  mergeCells,
+  splitCell,
+} from '../table';
 import { useEditorStore } from '../editorStore';
 
 const inCell = (ctx: EditorContext) => !!ctx.stage && !!ctx.cell && ctx.session !== 'code';
@@ -46,6 +57,24 @@ export const contentActions: Action[] = [
   tableAction('table.deleteCol', 'Delete column', IconColumnRemove, (ctx) =>
     deleteColumn(ctx.stage!, ctx.cell!),
   ),
+  {
+    ...tableAction('table.mergeRight', 'Merge with right cell', IconArrowMergeAltRight, (ctx) =>
+      mergeCells(ctx.stage!, ctx.cell!, 'right'),
+    ),
+    when: (ctx) => inCell(ctx) && canMerge(ctx.cell!, 'right'),
+  },
+  {
+    ...tableAction('table.mergeDown', 'Merge with cell below', IconArrowMergeAltRight, (ctx) =>
+      mergeCells(ctx.stage!, ctx.cell!, 'down'),
+    ),
+    when: (ctx) => inCell(ctx) && canMerge(ctx.cell!, 'down'),
+  },
+  {
+    ...tableAction('table.splitCell', 'Split cell', IconArrowsSplit2, (ctx) =>
+      splitCell(ctx.stage!, ctx.cell!),
+    ),
+    when: (ctx) => inCell(ctx) && canSplit(ctx.cell!),
+  },
   {
     id: 'chart.edit',
     title: 'Edit chart data…',

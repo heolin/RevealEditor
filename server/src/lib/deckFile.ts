@@ -60,7 +60,7 @@ export interface DeckInfo {
   headStyles: string[];
   managedCss: string;
   managedCssRange: Region | null;
-  config: { width: number; height: number; center: boolean; margin: number };
+  config: { width: number; height: number; center: boolean; margin: number; slideNumber: boolean };
   sections: SectionInfo[];
 }
 
@@ -76,7 +76,7 @@ export interface DeckUpdate {
    * config write (docs/ARCHITECTURE.md §3): existing numbers are replaced
    * in place, missing keys are inserted after the opening brace.
    */
-  configPatch?: { width?: number; height?: number };
+  configPatch?: { width?: number; height?: number; slideNumber?: boolean };
 }
 
 type Element = T.Element;
@@ -94,6 +94,23 @@ function attr(el: Element, name: string): string | null {
 function hasClass(el: Element, cls: string): boolean {
   const c = attr(el, 'class');
   return !!c && c.split(/\s+/).includes(cls);
+}
+
+/** Byte range of an attribute's VALUE (inside the quotes), or null if absent. */
+function attrValueRange(src: string, el: Element, name: string): Region | null {
+  const attrLoc = el.sourceCodeLocation?.attrs?.[name];
+  if (!attrLoc) return null;
+  const attrText = src.slice(attrLoc.startOffset, attrLoc.endOffset);
+  const eq = attrText.indexOf('=');
+  if (eq < 0) return null; // bare attribute, no value
+  let vStart = attrLoc.startOffset + eq + 1;
+  let vEnd = attrLoc.endOffset;
+  const quote = src[vStart];
+  if (quote === '"' || quote === "'") {
+    vStart += 1;
+    vEnd -= 1;
+  }
+  return { start: vStart, end: vEnd };
 }
 
 function* walk(node: Node): Generator<Element> {
@@ -234,17 +251,7 @@ export function parseDeck(src: string): DeckInfo {
   if (themeLink) {
     themeHref = attr(themeLink, 'href');
     theme = themeHref!.match(THEME_HREF_RE)![1];
-    const attrLoc = themeLink.sourceCodeLocation!.attrs!['href'];
-    const attrText = src.slice(attrLoc.startOffset, attrLoc.endOffset);
-    const eq = attrText.indexOf('=');
-    let vStart = attrLoc.startOffset + eq + 1;
-    let vEnd = attrLoc.endOffset;
-    const quote = src[vStart];
-    if (quote === '"' || quote === "'") {
-      vStart += 1;
-      vEnd -= 1;
-    }
-    themeHrefValueRange = { start: vStart, end: vEnd };
+    themeHrefValueRange = attrValueRange(src, themeLink, 'href');
   }
 
   const titleRange = titleEl ? innerRegion(titleEl) : null;
@@ -272,7 +279,7 @@ export function parseDeck(src: string): DeckInfo {
 
   // Best-effort read of layout-relevant options from Reveal.initialize({...}).
   // The config script is opaque to the editor and is never rewritten.
-  const config = { width: 960, height: 700, center: true, margin: 0.04 };
+  const config = { width: 960, height: 700, center: true, margin: 0.04, slideNumber: false };
   const initMatch = src.match(/Reveal\.initialize\s*\(\s*\{([\s\S]*?)\}\s*\)/);
   if (initMatch) {
     const w = initMatch[1].match(/\bwidth\s*:\s*(\d+)/);
@@ -283,6 +290,8 @@ export function parseDeck(src: string): DeckInfo {
     if (h) config.height = parseInt(h[1], 10);
     if (c) config.center = c[1] === 'true';
     if (m) config.margin = parseFloat(m[1]);
+    const sn = initMatch[1].match(/\bslideNumber\s*:\s*(true|false)/);
+    if (sn) config.slideNumber = sn[1] === 'true';
   }
 
   return {
@@ -305,6 +314,57 @@ export function parseDeck(src: string): DeckInfo {
 }
 
 export class DeckParseError extends Error {}
+
+export type ResourceKind = 'link' | 'script';
+
+export interface ResourceRef {
+  kind: ResourceKind;
+  /** The href/src value as written. */
+  url: string;
+  /** Byte range of the value inside the quotes — the splice target. */
+  valueRange: Region;
+}
+
+/**
+ * Every vendorable external resource the deck loads: `<link rel="stylesheet">`
+ * hrefs and `<script src>` values, paired with the byte range of the value so
+ * the "bundle offline" flow can rewrite each in place. Order is document order.
+ */
+export function resourceRefs(src: string): ResourceRef[] {
+  const doc = parse(src, { sourceCodeLocationInfo: true });
+  const refs: ResourceRef[] = [];
+  for (const el of walk(doc)) {
+    let name: string;
+    let kind: ResourceKind;
+    if (el.tagName === 'link') {
+      if (attr(el, 'rel') !== 'stylesheet') continue;
+      name = 'href';
+      kind = 'link';
+    } else if (el.tagName === 'script') {
+      name = 'src';
+      kind = 'script';
+    } else {
+      continue;
+    }
+    const url = attr(el, name);
+    if (!url) continue;
+    const valueRange = attrValueRange(src, el, name);
+    if (!valueRange) continue;
+    refs.push({ kind, url, valueRange });
+  }
+  return refs;
+}
+
+/** Splice new hrefs into resource-ref value ranges (byte-surgical, like the theme swap). */
+export function rewriteResourceRefs(
+  src: string,
+  rewrites: { range: Region; href: string }[],
+): string {
+  return applyEdits(
+    src,
+    rewrites.map((r) => ({ start: r.range.start, end: r.range.end, text: escapeAttr(r.href) })),
+  );
+}
 
 interface Edit {
   start: number;
@@ -360,7 +420,12 @@ export function updateDeck(src: string, update: DeckUpdate): string {
     }
   }
 
-  if (update.configPatch && (update.configPatch.width || update.configPatch.height)) {
+  if (
+    update.configPatch &&
+    (update.configPatch.width ||
+      update.configPatch.height ||
+      update.configPatch.slideNumber !== undefined)
+  ) {
     const init = /Reveal\.initialize\s*\(\s*\{([\s\S]*?)\}\s*\)/.exec(src);
     if (!init) {
       throw new DeckParseError('Deck has no Reveal.initialize({...}) to write config into');
@@ -377,6 +442,16 @@ export function updateDeck(src: string, update: DeckUpdate): string {
         edits.push({ start: numStart, end: numStart + m[1].length, text: String(value) });
       } else {
         missing.push(`${key}: ${value}`);
+      }
+    }
+    if (update.configPatch.slideNumber !== undefined) {
+      const value = String(update.configPatch.slideNumber);
+      const m = /\bslideNumber\s*:\s*(true|false)/.exec(inner);
+      if (m) {
+        const valStart = innerStart + m.index + m[0].length - m[1].length;
+        edits.push({ start: valStart, end: valStart + m[1].length, text: value });
+      } else {
+        missing.push(`slideNumber: ${value}`);
       }
     }
     if (missing.length > 0) {

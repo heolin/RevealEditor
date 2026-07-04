@@ -9,6 +9,7 @@ import { TextSession } from './TextSession';
 import { handlerFor, textEditableFrom } from './registry';
 import { hydrateCodeBlocks } from './codeHighlight';
 import {
+  type Edges,
   applyStyle,
   isAbsolute,
   isLayoutContainer,
@@ -17,11 +18,22 @@ import {
   snapEdges,
   snapRect,
   stageRect,
+  stageWriter,
   toAbsoluteAll,
+  unrotatedRect,
   writeStageRect,
 } from './geometry';
 import { showAllFragments } from './fragments';
-import { nextCell } from './table';
+import {
+  REF_ATTR,
+  detachForMove,
+  ensureShapeLabel,
+  insertShape,
+  isConnectorEl,
+  isLineKind,
+  reconcileConnectors,
+} from './shapes';
+import { insertTableFromData, nextCell, parseClipboardTable, parseTsv, pasteFillCells } from './table';
 import { type StageCtx, commit } from './commands';
 import { dispatchShortcut } from './actions/dispatcher';
 
@@ -55,6 +67,7 @@ export function StageFrame({ slide, meta }: { slide: Slide | null; meta: DeckMet
 ${stageHead(meta)}
 <style>${stageLayoutCss(meta)}
   [contenteditable]:focus { outline: none; }
+  body[data-re-draw], body[data-re-draw] * { cursor: crosshair !important; }
   .reveal .slides section :where(h1,h2,h3,h4,h5,h6,p,ul,ol,blockquote,img,pre,div,figure,table) {
     cursor: default;
   }
@@ -76,6 +89,15 @@ ${stageHead(meta)}
     const el = doc?.querySelector('style[data-re-managed]');
     if (el && el.textContent !== managedCss) el.textContent = managedCss;
   }, [managedCss]);
+
+  // Draw mode (armed shape): crosshair over the whole stage.
+  const pendingShapeKind = useEditorStore((s) => s.pendingShapeKind);
+  useEffect(() => {
+    const body = iframeRef.current?.contentDocument?.body;
+    if (!body) return;
+    if (pendingShapeKind) body.setAttribute('data-re-draw', '');
+    else body.removeAttribute('data-re-draw');
+  }, [pendingShapeKind]);
 
   function endSession(commitFirst: boolean) {
     const session = sessionRef.current;
@@ -108,6 +130,11 @@ ${stageHead(meta)}
           '.toolbar, .mantine-Popover-dropdown, [data-combobox-dropdown], .mantine-Menu-dropdown',
         );
       },
+      // Excel/Sheets multi-cell paste distributes into the grid instead of
+      // dumping tab-separated text into one cell.
+      onPasteText: isCell
+        ? (text) => pasteFillCells(ctx, el as HTMLTableCellElement, text)
+        : undefined,
       onTab: isCell
         ? (shift) => {
             const next = nextCell(el as HTMLTableCellElement, shift ? -1 : 1);
@@ -137,6 +164,17 @@ ${stageHead(meta)}
     if (handler.capabilities.textEdit) {
       const editable = textEditableFrom(target ?? el, ctx.section) ?? el;
       startSession(editable, caretPoint);
+      return;
+    }
+    // Self-describing shapes: the svg children are baked render output, not
+    // content to drill into. Activating a fill shape edits its LABEL —
+    // created on first activation (PowerPoint's "click a shape and type").
+    // Connectors label on DOUBLE-click only (see the dblclick handler): a
+    // plain click must not hijack endpoint editing.
+    if (handler.type === 'shape') {
+      if (isConnectorEl(el)) return;
+      const label = ensureShapeLabel(el);
+      if (label) startSession(label, caretPoint);
       return;
     }
     // Non-text containers: drill one level toward the click target.
@@ -181,11 +219,25 @@ ${stageHead(meta)}
       startLeft: number;
       startTop: number;
       /** Other selected members dragged along (multi-select). */
-      others: { el: HTMLElement; startLeft: number; startTop: number }[];
+      others: {
+        el: HTMLElement;
+        startLeft: number;
+        startTop: number;
+        write?: (pos: { left: number; top: number }) => void;
+      }[];
+      /** Cached at drag start — nothing here can change mid-gesture, and
+       *  re-measuring per move causes forced reflows (laggy table drags). */
+      size?: { w: number; h: number };
+      edges?: Edges;
+      write?: (pos: { left: number; top: number }) => void;
     } | null = null;
 
     /** Marquee rubber-band selection, started from empty canvas. */
     let marquee: { x0: number; y0: number; active: boolean } | null = null;
+
+    /** Armed shape being drawn (draw mode): click places, drag sizes. */
+    let draw: { x0: number; y0: number; kind: import('./shapes').ShapeKind; active: boolean } | null =
+      null;
 
     /** Prospective drop position during a layout-mode drag. */
     let drop: { parent: HTMLElement; before: HTMLElement | null } | null = null;
@@ -270,6 +322,7 @@ ${stageHead(meta)}
       drop = null;
       useEditorStore.getState().setDropIndicator(null);
       useEditorStore.getState().setSnapGuides(null);
+      useEditorStore.getState().setDragRect(null);
       if (p?.dragging) applyStyle(p.el, { 'pointer-events': null });
       if (p?.dragging && ctxRef.current && !useEditorStore.getState().layoutMode) {
         commit(ctxRef.current);
@@ -334,6 +387,18 @@ ${stageHead(meta)}
       if (!inSession) (document.activeElement as HTMLElement | null)?.blur?.();
       if (e.button !== 0) return;
       if (useEditorStore.getState().contextMenu) useEditorStore.getState().setContextMenu(null);
+      // Draw mode: an armed shape kind captures the gesture — click places
+      // the default size here, a drag draws at the dragged rect/line.
+      const pendingKind = useEditorStore.getState().pendingShapeKind;
+      if (pendingKind) {
+        draw = { x0: e.clientX, y0: e.clientY, kind: pendingKind, active: false };
+        try {
+          (target as HTMLElement).setPointerCapture?.(e.pointerId);
+        } catch {
+          /* best-effort */
+        }
+        return;
+      }
       if (press) finalizePress(); // stale gesture (missed pointerup)
       const editor = useEditorStore.getState();
       if (session) {
@@ -369,11 +434,13 @@ ${stageHead(meta)}
       }
 
       const ctx = ctxRef.current!;
-      const rect = stageRect(ctx, el);
+      // Inline left/top position the UNROTATED box — a rotated element's
+      // AABB would make the first write jump it by the rotation overhang.
+      const rect = unrotatedRect(ctx, el);
       const others = [...useEditorStore.getState().extraSelected, useEditorStore.getState().selectedEl]
         .filter((o): o is HTMLElement => !!o && o.isConnected && o !== el)
         .map((o) => {
-          const r = stageRect(ctx, o);
+          const r = unrotatedRect(ctx, o);
           return { el: o, startLeft: r.left, startTop: r.top };
         });
       press = {
@@ -392,6 +459,32 @@ ${stageHead(meta)}
 
     doc.addEventListener('pointermove', (e) => {
       const ctx = ctxRef.current;
+      if (draw && ctx) {
+        if (!draw.active && Math.hypot(e.clientX - draw.x0, e.clientY - draw.y0) >= DRAG_THRESHOLD) {
+          draw.active = true;
+        }
+        if (draw.active) {
+          // Lines/arrows preview as the actual line being dragged; filled
+          // shapes preview as their bounding rectangle (the marquee box).
+          if (isLineKind(draw.kind)) {
+            useEditorStore.getState().setDrawLine({
+              kind: draw.kind,
+              x1: draw.x0,
+              y1: draw.y0,
+              x2: e.clientX,
+              y2: e.clientY,
+            });
+          } else {
+            useEditorStore.getState().setMarquee({
+              x: Math.min(draw.x0, e.clientX),
+              y: Math.min(draw.y0, e.clientY),
+              w: Math.abs(e.clientX - draw.x0),
+              h: Math.abs(e.clientY - draw.y0),
+            });
+          }
+        }
+        return;
+      }
       if (marquee && ctx) {
         if (!marquee.active && Math.hypot(e.clientX - marquee.x0, e.clientY - marquee.y0) >= DRAG_THRESHOLD) {
           marquee.active = true;
@@ -420,15 +513,40 @@ ${stageHead(meta)}
             press.el.style.pointerEvents = 'none';
           }
           if (!layoutMode) {
+            // Manually moving a connector releases its attachments — unless
+            // the attachment target moves along in the same gesture (dragging
+            // a selection of box + arrows keeps the diagram wired).
+            const moving = new Set<Element>([press.el, ...press.others.map((o) => o.el)]);
+            for (const m of moving) {
+              if (isConnectorEl(m)) detachForMove(ctx, m as HTMLElement, moving);
+            }
             // One batch: all rects measured before the first conversion —
             // each conversion reflows the remaining flow content.
             toAbsoluteAll(ctx, [press.el, ...press.others.map((o) => o.el)], height);
-            const r = stageRect(ctx, press.el);
+            // Alt-drag duplicates: clones stay behind at the original spot,
+            // the drag moves the originals (identity + attachments travel
+            // with the moved element; clones mint fresh ids on next attach).
+            if (e.altKey) {
+              for (const m of [press.el, ...press.others.map((o) => o.el)]) {
+                const dup = m.cloneNode(true) as HTMLElement;
+                dup.removeAttribute(REF_ATTR);
+                m.after(dup);
+              }
+            }
+            const r = unrotatedRect(ctx, press.el);
             press.startLeft = r.left;
             press.startTop = r.top;
+            press.size = { w: r.width, h: r.height };
+            press.write = stageWriter(ctx, press.el);
+            press.edges = snapEdges(ctx, press.el, width, height);
             press.others = press.others.map((o) => {
-              const or = stageRect(ctx, o.el);
-              return { ...o, startLeft: or.left, startTop: or.top };
+              const or = unrotatedRect(ctx, o.el);
+              return {
+                ...o,
+                startLeft: or.left,
+                startTop: or.top,
+                write: stageWriter(ctx, o.el),
+              };
             });
           }
         }
@@ -440,26 +558,34 @@ ${stageHead(meta)}
         }
         if (press.dragging) {
           e.preventDefault();
+          // Pure math against drag-start caches — zero layout reads per move.
           const raw = {
             left: press.startLeft + dx,
             top: press.startTop + dy,
-            width: press.el.getBoundingClientRect().width,
-            height: press.el.getBoundingClientRect().height,
+            width: press.size!.w,
+            height: press.size!.h,
           };
-          const snap = snapRect(raw, snapEdges(ctx, press.el, width, height), SNAP_THRESHOLD);
-          writeStageRect(ctx, press.el, {
-            left: raw.left + snap.dx,
-            top: raw.top + snap.dy,
-          });
+          const snap = snapRect(raw, press.edges!, SNAP_THRESHOLD);
+          press.write!({ left: raw.left + snap.dx, top: raw.top + snap.dy });
           // Multi-select: the rest of the set rides along with the same delta.
           for (const o of press.others) {
-            writeStageRect(ctx, o.el, {
+            o.write?.({
               left: o.startLeft + dx + snap.dx,
               top: o.startTop + dy + snap.dy,
             });
           }
+          // Arrows attached to anything just moved follow live. (No-op when
+          // the slide has no attachments — guarded by a selector probe.)
+          reconcileConnectors(ctx);
+          // The overlay draws the selection box from these exact values —
+          // measuring the iframe mid-drag returns the previous layout.
+          useEditorStore.getState().setDragRect({
+            left: raw.left + snap.dx,
+            top: raw.top + snap.dy,
+            width: raw.width,
+            height: raw.height,
+          });
           useEditorStore.getState().setSnapGuides({ x: snap.x, y: snap.y });
-          if (press.others.length > 0) useEditorStore.getState().bump();
           return;
         }
       }
@@ -477,6 +603,36 @@ ${stageHead(meta)}
 
     doc.addEventListener('pointerup', (e) => {
       const ctx = ctxRef.current;
+      if (draw) {
+        const gesture = draw;
+        draw = null;
+        useEditorStore.getState().setMarquee(null);
+        useEditorStore.getState().setDrawLine(null);
+        useEditorStore.getState().setPendingShapeKind(null);
+        if (!ctx) return;
+        if (gesture.active) {
+          const p1 = { x: gesture.x0, y: gesture.y0 };
+          const p2 = { x: e.clientX, y: e.clientY };
+          // Connectors take the drag as their endpoints; fill shapes as box.
+          insertShape(
+            ctx,
+            gesture.kind,
+            isLineKind(gesture.kind)
+              ? { p1, p2 }
+              : {
+                  rect: {
+                    left: Math.min(p1.x, p2.x),
+                    top: Math.min(p1.y, p2.y),
+                    width: Math.abs(p2.x - p1.x),
+                    height: Math.abs(p2.y - p1.y),
+                  },
+                },
+          );
+        } else {
+          insertShape(ctx, gesture.kind, { at: { x: e.clientX, y: e.clientY } });
+        }
+        return;
+      }
       if (marquee) {
         const wasActive = marquee.active;
         marquee = null;
@@ -488,6 +644,7 @@ ${stageHead(meta)}
       press = null;
       if (!p || !ctx) return;
       useEditorStore.getState().setSnapGuides(null);
+      useEditorStore.getState().setDragRect(null);
       if (p.dragging) {
         const pendingDrop = drop;
         drop = null;
@@ -517,11 +674,38 @@ ${stageHead(meta)}
         useEditorStore.getState().setCodeEditEl(pre as HTMLElement);
         return;
       }
+      // Double-click on a connector edits its midpoint label.
+      const shapeSvg = target.closest('[data-re-shape]');
+      if (shapeSvg && section.contains(shapeSvg) && isConnectorEl(shapeSvg)) {
+        e.preventDefault();
+        const label = ensureShapeLabel(shapeSvg as HTMLElement);
+        if (label) startSession(label, { x: e.clientX, y: e.clientY });
+        return;
+      }
       const editable = textEditableFrom(target, section);
       if (editable && editable !== sessionRef.current?.el) {
         e.preventDefault();
         startSession(editable, { x: e.clientX, y: e.clientY });
       }
+    });
+
+    // Spreadsheet paste outside a text session: clipboard carrying a table
+    // (Excel/Sheets HTML flavor) or TSV becomes a NEW table on the slide.
+    doc.addEventListener('paste', (e: ClipboardEvent) => {
+      // sessionRef can go stale after an Escape-exit — the store is truth.
+      if (useEditorStore.getState().sessionEl) return; // sessions own their paste
+      const ctx = ctxRef.current;
+      if (!ctx) return;
+      const html = e.clipboardData?.getData('text/html') ?? '';
+      const text = e.clipboardData?.getData('text/plain') ?? '';
+      const data = (html ? parseClipboardTable(html) : null) ?? (text ? parseTsv(text) : null);
+      if (!data) return;
+      e.preventDefault();
+      // Anchor on the selection's TOP-LEVEL container — inserting after a
+      // cell would nest the new table inside the old one's row.
+      const sel = useEditorStore.getState().selectedEl;
+      const anchor = sel && section.contains(sel) ? childOf(section, sel) : null;
+      insertTableFromData(ctx, anchor, data);
     });
 
     doc.addEventListener('pointerleave', () => useEditorStore.getState().hover(null));
@@ -560,6 +744,13 @@ ${stageHead(meta)}
       // Selection navigation & activation — interaction logic, not commands.
       if (!inSession && ctx) {
         const selected = editor.selectedEl;
+        if (e.key === 'Escape' && editor.pendingShapeKind) {
+          draw = null;
+          editor.setMarquee(null);
+          editor.setDrawLine(null);
+          editor.setPendingShapeKind(null);
+          return;
+        }
         if (e.key === 'Escape' && selected) {
           const parent = selected.parentElement;
           editor.select(parent && parent !== ctx.section ? parent : null);

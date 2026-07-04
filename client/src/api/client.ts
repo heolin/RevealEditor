@@ -19,7 +19,7 @@ export interface DeckSummary {
     stylesheets: string[];
     headStyles: string[];
     managedCss: string;
-    config: { width: number; height: number; center: boolean; margin: number };
+    config: { width: number; height: number; center: boolean; margin: number; slideNumber: boolean };
   };
 }
 
@@ -31,7 +31,7 @@ export interface DeckData {
   stylesheets: string[];
   headStyles: string[];
   managedCss: string;
-  config: { width: number; height: number; center: boolean; margin: number };
+  config: { width: number; height: number; center: boolean; margin: number; slideNumber: boolean };
   sections: SectionInfo[];
   slidesTrailing: string;
   sectionIndent: string;
@@ -44,7 +44,7 @@ export interface SavePayload {
   title?: string;
   managedCss?: string;
   addStylesheetLinks?: string[];
-  configPatch?: { width?: number; height?: number };
+  configPatch?: { width?: number; height?: number; slideNumber?: boolean };
   baseMtime: number;
   force?: boolean;
 }
@@ -118,6 +118,8 @@ export const api = {
     }),
   listThemes: () => request<string[]>('/api/themes'),
   listDesignSystems: () => request<DesignSystem[]>('/api/design-systems'),
+  deckStat: (path: string) =>
+    request<{ path: string; mtime: number }>(`/api/deck/stat?path=${encodeURIComponent(path)}`),
   editorConfig: () => request<unknown>('/api/editor-config'),
   uploadAsset: async (deckPath: string, file: File): Promise<{ url: string }> => {
     const form = new FormData();

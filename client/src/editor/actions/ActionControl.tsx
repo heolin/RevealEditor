@@ -1,5 +1,6 @@
-import { ActionIcon, ColorInput, Menu, Select, Tooltip } from '@mantine/core';
+import { ActionIcon, Menu, Select, Tooltip } from '@mantine/core';
 import type { Action, EditorContext, SurfaceVariant } from './types';
+import { ReColorInput } from '../../components/pickers';
 import { isEnabled } from './index';
 
 /**
@@ -54,14 +55,12 @@ export function ActionControl({
     case 'color': {
       const value = action.value?.(ctx) ?? '';
       return (
-        <ColorInput
+        <ReColorInput
           key={value}
-          size="xs"
           w={action.width ?? 96}
           disabled={!enabled}
           defaultValue={value}
           placeholder="theme"
-          withEyeDropper={false}
           onChangeEnd={(v) => v !== value && action.run(ctx, v)}
           aria-label={action.title}
         />

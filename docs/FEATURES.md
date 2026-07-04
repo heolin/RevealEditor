@@ -2,6 +2,7 @@
 
 The complete feature inventory for the product, written down before implementation so the
 architecture can be designed for all of it — even features we build later.
+Execution plans for everything still open live in [ROADMAP.md](ROADMAP.md).
 
 ## Vision & non-negotiable principles
 
@@ -36,7 +37,7 @@ architecture can be designed for all of it — even features we build later.
 | Open arbitrary existing hand-written decks | T1 | Round-trip fidelity guarantee |
 | Save with conflict detection | T1 | mtime check → 409 → reload/overwrite dialog |
 | Rename / delete / duplicate deck | T1 | |
-| External-change detection while editing | T2 | Watcher + "file changed on disk" banner |
+| External-change detection while editing | T2 | Shipped — 5s freshness poll + banner with reload/keep-editing |
 | Deck templates gallery (user-defined starter decks) | T3 | A folder of template decks in the workspace |
 | Multiple workspaces / recent workspaces | T3 | |
 
@@ -46,10 +47,10 @@ architecture can be designed for all of it — even features we build later.
 |---|---|---|
 | 2-D slide sorter (horizontal columns, vertical stacks) | T1 | Mirrors reveal navigation; live thumbnails |
 | Add / delete / duplicate / reorder slides (incl. into/out of vertical stacks) | T1 | Drag & drop + context menu |
-| Copy/paste slides within and across decks | T2 | Clipboard carries slide HTML + referenced assets |
+| Copy/paste slides within and across decks | T2 | Shipped — system clipboard carries the `<section>` source (assets referenced by path) |
 | Hidden slides (`data-visibility="hidden"`) | T1 | Badge in sorter |
-| Slide numbering config surface | T2 | Read/toggle `slideNumber` needs config write — see Architecture §Config |
-| Jump-to-slide search (by text content) | T2 | |
+| Slide numbering config surface | T2 | Shipped — inspector toggle, spliced into `Reveal.initialize` |
+| Jump-to-slide search (by text content) | T2 | Shipped — sorter search box; Enter cycles matches |
 | Section dividers / grouping labels in sorter | T3 | Editor-only metadata problem — likely HTML comments |
 
 ## C. Text
@@ -64,11 +65,12 @@ architecture can be designed for all of it — even features we build later.
 | Blockquotes | T1 | |
 | Plain-text paste (strip Word/Docs formatting) | T1 | Paste-with-formatting as explicit alternative (T2) |
 | Text alignment per block (left/center/right) | T1 | Inline `text-align` |
-| Text color & highlight color | T2 | Inline styles; design-system tokens as swatches — via action system ([TOOLBARS.md](TOOLBARS.md) P2) |
-| Font size per block (steps + free input) | T2 | Inline `font-size` in em — via action system P2 |
-| Font family override per block | T2 | Families detected from deck CSS + generic stacks — via action system P2 (was T3; unblocked by toolbar refactor) |
-| `r-fit-text` toggle (auto-fit headline) | T2 | Rendered at natural size in canvas with badge; true size in preview |
-| Text inside shapes | T2 | See Shapes |
+| Text color & highlight color | T2 | Shipped — both; highlight styles the selected range (`background-color` span) |
+| Font size per block (classic point scale) | T2 | Shipped — inline `font-size` in px (8–96); legacy em values stay selectable |
+| Font family override per block | T2 | Shipped — families from deck CSS + generic stacks; theme entry shows the actual face |
+| `r-fit-text` toggle (auto-fit headline) | T2 | Shipped — inspector toggle; dashed-underline marker in canvas, true size in preview |
+| Text inside shapes | T2 | Shipped — see Shapes |
+| Text-box box styling: background, padding, border, radius | T2 | Shipped — Inspector "Box" section, inline styles; makes a text box a diagram node (docs/DIAGRAMMING.md phase 3) |
 | Find & replace across deck | T3 | |
 
 ## D. Images & media
@@ -81,10 +83,10 @@ architecture can be designed for all of it — even features we build later.
 | Rounded corners / border / shadow presets | T2 | Inline styles |
 | Crop (visual, via wrapper with `overflow:hidden`) | T3 | Must round-trip as plain HTML/CSS |
 | Object-fit control for sized images | T2 | |
-| Video: local file or URL, autoplay/loop/muted/controls | T2 | `<video>` attrs; reveal auto-pauses off-slide |
-| Background video / iframe backgrounds per slide | T2 | `data-background-video`, `data-background-iframe` |
+| Video: local file or URL, autoplay/loop/muted/controls | T2 | Descoped 2026-07 (owner) — revisit on request |
+| Background video / iframe backgrounds per slide | T2 | Descoped 2026-07 (owner) — revisit on request |
 | Audio embed | T3 | |
-| iframe embeds (YouTube, maps, live sites) | T2 | `<iframe>` with size; sandbox hint in Inspector |
+| iframe embeds (YouTube, maps, live sites) | T2 | Descoped 2026-07 (owner) — revisit on request |
 | SVG file insert (as `<img>` or inline) | T2 | Inline preserves CSS targetability |
 | Asset manager (list/reuse/delete uploaded assets, orphan detection) | T3 | |
 
@@ -99,11 +101,11 @@ architecture can be designed for all of it — even features we build later.
 | Header row / header column toggle | T1 | `<thead>` / `<th scope>` |
 | Cell alignment (h/v) per cell/column | T1 | Inline styles or col-level classes |
 | Table style presets: borders, striped rows, minimal, theme-accent | T1 | Class-based, backed by the editor-managed style block (see Architecture) |
-| Cell fill color, text color | T2 | Inline styles |
-| Column width adjustment by drag | T2 | `<colgroup>` widths in % |
-| Merge / split cells (colspan/rowspan) | T2 | Structural ops must keep the grid consistent |
+| Cell fill color, text color | T2 | Shipped — inspector cell colors |
+| Column width adjustment by drag | T2 | Shipped — boundary grips; measured colgroup % + fixed layout on first drag |
+| Merge / split cells (colspan/rowspan) | T2 | Shipped — logical-grid model; merges only along aligned rects |
 | Sort rows by column (one-time authoring action) | T3 | |
-| Paste table from TSV/CSV/Excel/Sheets clipboard | T2 | Parse `text/html` table or TSV on paste |
+| Paste table from TSV/CSV/Excel/Sheets clipboard | T2 | Shipped — new table from stage paste; in-cell TSV distributes and grows rows |
 | Convert table → chart | T3 | Feeds the chart data editor |
 
 ## F. Charts
@@ -119,11 +121,11 @@ element itself (`data-re-chart` attribute), so reopening the deck restores full 
 | Paste data from CSV/TSV/Sheets into the grid | T1 | |
 | Titles, axis labels, legend position, value labels toggle | T1 | |
 | Color palette: theme-derived defaults + manual per-series override | T1 | Palette generated from the active reveal theme's colors |
-| Number formatting (decimals, %, thousands) | T2 | |
-| Horizontal bar, combo (bar+line) | T2 | |
+| Number formatting (decimals, %, thousands) | T2 | Shipped — auto / 0–2 decimals / percent / compact, applied to ticks + value labels |
+| Horizontal bar, combo (bar+line) | T2 | Shipped — `hbar` type; `combo` with per-series bar/line mark |
 | Animate chart in with fragments (per-series reveal) | T3 | Series as separate fragment groups within the SVG |
 | Live-data charts (fetch at present time) | T3 | Violates standalone-by-default; explicit opt-in only |
-| Edit chart spec as raw JSON (escape hatch) | T2 | |
+| Edit chart spec as raw JSON (escape hatch) | T2 | Shipped — validated editor in the chart modal |
 
 ## G. Shapes & drawing
 
@@ -132,14 +134,17 @@ parameters stored as JSON (`data-re-shape`) for re-editing. They render everywhe
 
 | Feature | Tier | Notes |
 |---|---|---|
-| Rectangle (w/ corner radius), ellipse, line, arrow | T1 | |
+| Rectangle (w/ corner radius), ellipse, line, arrow | T1 | Draw group on the ribbon |
 | Fill, stroke color/width/dash, opacity | T1 | Inspector |
-| Text label inside shape (centered, editable) | T2 | `<foreignObject>` or positioned overlay div — decide in implementation |
-| Callout / speech bubble, triangle, star, chevron | T2 | |
-| Connector arrows that stay attached to two elements | T3 | Requires element identity across edits |
+| Two-point lines/arrows: draggable endpoints, heads at either end | T1 | Shipped — normalized endpoints in the spec (docs/DIAGRAMMING.md) |
+| Endpoint snapping to box anchors (8 per element) + optional snap gap | T2 | Shipped — drag-time; persistent attachment is the T3 connector item |
+| Text label inside shape (centered, editable) | T2 | Shipped — `<foreignObject>` label preserved across re-bakes; click a selected shape and type |
+| Shapes gallery: 10 base shapes + 22 flowchart shapes | T2 | Shipped — Google Slides-style grid popover; icons drawn by the shape renderer itself |
+| Callout / speech bubble, star, chevron | T2 | Shipped — gallery base section |
+| Connector arrows that stay attached to two elements | T3 | Shipped — `data-re-id` refs + pre-commit reconcile (docs/DIAGRAMMING.md phase 4) |
 | Freehand / pen | T3 | |
-| Flip / rotate | T2 | SVG transform |
-| Duplicate with Alt-drag | T2 | |
+| Rotate + flip — ALL elements (text, images, shapes, charts) | T2 | Shipped incl. rotated local-frame resize — docs/DIAGRAMMING.md "Rotation (editor-wide)" |
+| Duplicate with Alt-drag | T2 | Shipped |
 
 ## H. Code blocks
 
@@ -157,8 +162,8 @@ parameters stored as JSON (`data-re-shape`) for re-editing. They render everywhe
 |---|---|---|
 | Preserve existing MathJax/KaTeX markup untouched | T1 | Generic-element passthrough guarantee |
 | Insert/edit LaTeX formula with rendered preview | T3 | Requires math plugin in deck; opt-in |
-| Emoji / special character picker | T2 | Plain text insert |
-| Icon library (e.g. inline SVG icons) | T2 | Inserted as inline SVG, no font dependency |
+| Emoji / special character picker | T2 | Shipped — searchable popover in the text toolbar, inserts at the caret |
+| Icon library (e.g. inline SVG icons) | T2 | Shipped — curated tabler set as inline SVG (currentColor strokes follow the theme) |
 
 ## J. Layout & positioning
 
@@ -171,9 +176,9 @@ parameters stored as JSON (`data-re-shape`) for re-editing. They render everywhe
 | Arrow-key nudge (1px / 10px) | T1 | |
 | "Return to flow" (strip positioning) | T1 | |
 | Z-order: bring forward/backward/front/back | T1 | `z-index` |
-| Align & distribute selected elements (left/center/right/top/middle/bottom, equal spacing) | T2 | Multi-select required |
-| Group / ungroup elements | T2 | Wrapper `<div>` with position |
-| Layers panel (element tree of current slide) | T2 | Doubles as selection aid for overlapping elements |
+| Align & distribute selected elements (left/center/right/top/middle/bottom, equal spacing) | T2 | Shipped |
+| Group / ungroup elements | T2 | Shipped — `div.re-group` wrapper |
+| Layers panel (element tree of current slide) | T2 | Shipped |
 | Layout helpers: columns (`r-hstack`/`r-vstack`), stack (`r-stack`) | T2 | Reveal's own utility classes |
 | Configurable slide grid overlay (editor-only) | T2 | Never serialized |
 | Smart layout suggestions / auto-layout | T3 | |
@@ -189,7 +194,7 @@ parameters stored as JSON (`data-re-shape`) for re-editing. They render everywhe
 | Edit deck-level custom CSS in a code editor panel | T2 | CodeMirror on the user's own `<style>` block |
 | Theme color/font token overrides (reveal's `--r-*` custom properties) | T2 | Written into the managed style block |
 | Custom theme files in workspace | T2 | Any `.css` in workspace selectable as theme |
-| Design-system component palette | T3 | V2 headline feature — see §O |
+| Design-system component palette | T3 | Shipped — see §O |
 | Per-deck default text styles ("make all H2s look like this") | T3 | Managed style block rules |
 
 ## L. Animations
@@ -203,9 +208,9 @@ parameters stored as JSON (`data-re-shape`) for re-editing. They render everywhe
 | Group fragments (multiple elements appear together = same index) | T1 | Falls out of explicit indices |
 | Nested fragments (two-stage effects on one element) | T2 | e.g. fade-in then highlight |
 | Slide transitions per deck & per slide (+speed) | T1 | `data-transition`, none/fade/slide/convex/concave/zoom |
-| Background transitions | T2 | `data-background-transition` |
-| **Auto-Animate**: toggle per slide pair, automatic element matching preview, manual `data-id` pairing UI, per-element easing/duration/delay | T2 | Reveal's most impressive animation feature; editor shows matched pairs between consecutive slides |
-| "Duplicate slide for auto-animate step" helper | T2 | The core auto-animate authoring workflow |
+| Background transitions | T2 | Shipped — `data-background-transition` select in the Slide inspector |
+| **Auto-Animate**: toggle per slide pair, automatic element matching preview, manual `data-id` pairing UI, per-element easing/duration/delay | T2 | Partly shipped — per-slide toggle done; matching preview + `data-id` UI + per-element timing remain (ROADMAP §1 c/d/e) |
+| "Duplicate slide for auto-animate step" helper | T2 | Shipped — sorter action flags both slides with `data-auto-animate` |
 | CSS animation presets on elements (attention effects) | T3 | Must serialize as plain CSS in managed block |
 
 ## M. Presenting & speaker workflow
@@ -217,7 +222,7 @@ parameters stored as JSON (`data-re-shape`) for re-editing. They render everywhe
 | Present mode (opens the real file, exactly what the audience sees) | T1 | |
 | Speaker view (reveal notes plugin window) works from Present mode | T1 | Comes free if notes plugin present; ensure template includes it |
 | Fragment/step preview inside the preview pane | T1 | |
-| PDF export (reveal's `?print-pdf` flow, headless print to file) | T2 | Server-side via headless Chromium or documented manual flow (T1: documented manual, T2: one-click) |
+| PDF export (reveal's `?print-pdf` flow, headless print to file) | T2 | Shipped — see §N |
 | Presentation timer/rehearsal | T3 | Reveal plugin territory |
 
 ## N. Import / export / publishing
@@ -225,21 +230,42 @@ parameters stored as JSON (`data-re-shape`) for re-editing. They render everywhe
 | Feature | Tier | Notes |
 |---|---|---|
 | Deck is always a standalone HTML file (that IS the export) | T1 | |
-| Export deck + assets as zip | T2 | |
-| One-click "bundle offline" (inline/vendor the CDN reveal.js into the deck folder) | T2 | For airgapped presenting |
+| Export / save to PDF | T2 | Shipped — one-click server render (optional playwright dep) with guided-print fallback |
+| Export deck + assets as zip | T2 | Shipped — `GET /api/deck/zip` bundles the deck + its referenced local assets (paths preserved); toolbar "ZIP" button. Dependency-free store-only zip writer |
+| One-click "bundle offline" (inline/vendor the CDN reveal.js into the deck folder) | T2 | Shipped — `POST /api/deck/bundle` vendors remote `<link>`/`<script>` into `<deckdir>/vendor/` + byte-surgical href rewrite; toolbar "Offline" button. Non-recursive (CSS-internal `url()` not followed) |
 | Import from Markdown (file → one slide per `---`) | T2 | Reveal's own markdown conventions |
 | Export deck to Markdown (lossy, where possible) | T3 | |
 | Publish to GitHub Pages / static host | T3 | |
 | Import from PowerPoint/Google Slides | T3 | Explicitly best-effort if ever |
 
+### PDF export plan
+
+reveal.js has first-class print support: loading a deck with `?print-pdf`
+switches it to a paginated print layout, and the browser's "Save as PDF"
+does the rest. Build on that instead of reinventing pagination:
+
+1. **Phase 1 — guided print (no new dependencies). SHIPPED.** The toolbar
+   PDF button saves the deck if dirty, opens `/files/<deck>.html?print-pdf`
+   in a new tab, and invokes `window.print()` once reveal's `.pdf-page`
+   layout exists (10s timeout fallback). The user picks "Save as PDF" in
+   the native dialog; the tooltip reminds about margins: None.
+2. **Phase 2 — one-click server-side render (optional dependency).
+   SHIPPED.** `POST /api/deck/pdf` drives headless Chromium (playwright,
+   resolved at runtime) against the same `?print-pdf` URL and streams back a
+   real `.pdf` sized to the deck. Without the dependency the endpoint
+   answers 501 and the toolbar button falls back to Phase 1 transparently.
+
+Decks stay standalone throughout — PDF is a render artifact, never a source
+format.
+
 ## O. Design system (V2 headline)
 
 | Feature | Tier | Notes |
 |---|---|---|
-| Point editor at design-system folder (`system.css` + `components.html`) | T3 | Components = `<template data-component>` snippets |
-| Apply design-system stylesheet to a deck (one click) | T3 | Adds `<link>` via head splice |
-| Component palette with live mini-renders; insert = generic snippet insert | T3 | |
-| Component instances remain plain HTML (detachable, editable) | T3 | No runtime binding — copies, not references |
+| Point editor at design-system folder (`system.css` + `components.html`) | T3 | Shipped |
+| Apply design-system stylesheet to a deck (one click) | T3 | Shipped — linked on first component insert |
+| Component palette with live mini-renders; insert = generic snippet insert | T3 | Shipped |
+| Component instances remain plain HTML (detachable, editable) | T3 | Shipped — copies, not references |
 | Brand color/font tokens surfaced in all color/font pickers | T3 | Parsed from system CSS custom properties |
 | Slide layout templates from the design system | T3 | Full-slide `<template data-layout>` |
 
@@ -259,10 +285,10 @@ parameters stored as JSON (`data-re-shape`) for re-editing. They render everywhe
 | Undo/redo across all edit types (text, structure, style, slide ops) | T1 | Single app-level history |
 | Element clipboard: copy/cut/paste elements within & across slides | T1 | Duplicate = Ctrl+D / Alt-drag |
 | Keyboard shortcuts (save, undo, delete, nudge, duplicate, navigation) | T1 | |
-| Context menus (right-click on element / slide / sorter) | T2 | Canvas menu in [TOOLBARS.md](TOOLBARS.md) P3; sorter later |
-| Configurable toolbar/command system (top panel + floating + context + keyboard from one action registry) | T2 | Design: [TOOLBARS.md](TOOLBARS.md) |
+| Context menus (right-click on element / slide / sorter) | T2 | Canvas menu shipped; sorter menu open (ROADMAP §6) |
+| Configurable toolbar/command system (top panel + floating + context + keyboard from one action registry) | T2 | Shipped — action registry + `.revealeditor.json` overrides ([TOOLBARS.md](TOOLBARS.md)) |
 | Raw HTML view/edit of current slide (escape hatch, CodeMirror) | T2 | Power-user trust feature: see & edit exactly what will be saved |
-| Multi-select (shift-click, marquee) | T2 | Marquee T2; shift-click T1 |
+| Multi-select (shift-click, marquee) | T2 | Shipped — both |
 | Accessibility of the editor itself (keyboard operability, focus management) | T2 | |
 | Warnings panel (broken image links, invalid fragment indices, oversized slides) | T3 | |
 

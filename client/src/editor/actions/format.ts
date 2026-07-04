@@ -22,7 +22,7 @@ import { applyStyle } from '../geometry';
 import { useEditorStore } from '../editorStore';
 import { buildEditorContext } from './context';
 import { fontOptions, FONT_SIZES } from './fonts';
-import { LinkControl } from './customControls';
+import { EmojiControl, LinkControl } from './customControls';
 
 const inTextSession = (ctx: EditorContext) => ctx.session === 'text' && !!ctx.stage;
 
@@ -38,6 +38,14 @@ const stylable = (ctx: EditorContext) =>
 
 function styleValue(ctx: EditorContext, prop: string): string {
   return formatTarget(ctx)?.style.getPropertyValue(prop) ?? '';
+}
+
+/** The rendered (computed) value — what "theme default" actually IS for the
+ *  selected element, shown instead of a generic "Default" label. */
+function computedValue(ctx: EditorContext, prop: string): string {
+  const el = formatTarget(ctx);
+  if (!el || !ctx.stage) return '';
+  return ctx.stage.doc.defaultView?.getComputedStyle(el).getPropertyValue(prop) ?? '';
 }
 
 function setStyle(ctx: EditorContext, prop: string, value: string | undefined): void {
@@ -191,6 +199,9 @@ export const formatActions: Action[] = [
     value: (ctx) => styleValue(ctx, 'font-family') || '',
     options: (ctx) => {
       const opts = fontOptions(ctx.deck);
+      // The theme entry shows the ACTUAL family the element renders with.
+      const themed = computedValue(ctx, 'font-family').split(',')[0]?.replace(/['"]/g, '').trim();
+      if (themed) opts[0] = { value: '', label: themed };
       // Keep an unknown current value selectable rather than blanking it.
       const current = styleValue(ctx, 'font-family');
       if (current && !opts.some((o) => o.value === current)) {
@@ -208,7 +219,18 @@ export const formatActions: Action[] = [
     width: 86,
     when: stylable,
     value: (ctx) => styleValue(ctx, 'font-size') || '',
-    options: () => FONT_SIZES,
+    options: (ctx) => {
+      const opts = [...FONT_SIZES];
+      // The theme entry shows the ACTUAL rendered size, not "Default".
+      const themed = parseFloat(computedValue(ctx, 'font-size'));
+      if (themed) opts[0] = { value: '', label: String(Math.round(themed)) };
+      // Decks styled before the px scale (em values) stay selectable.
+      const current = styleValue(ctx, 'font-size');
+      if (current && !opts.some((o) => o.value === current)) {
+        opts.push({ value: current, label: current });
+      }
+      return opts;
+    },
     run: (ctx, value) => setStyle(ctx, 'font-size', value),
   },
   {
@@ -220,5 +242,26 @@ export const formatActions: Action[] = [
     when: stylable,
     value: (ctx) => styleValue(ctx, 'color') || '',
     run: (ctx, value) => setStyle(ctx, 'color', value),
+  },
+  {
+    // Highlight = background-color on the selected RANGE (marker-style);
+    // whole-box background lives in the inspector's Box section.
+    id: 'format.highlight',
+    title: 'Highlight color',
+    kind: 'color',
+    group: 'format',
+    width: 90,
+    when: inTextSession,
+    value: () => '',
+    run: (ctx, value) => setStyle(ctx, 'background-color', value),
+  },
+  {
+    id: 'format.emoji',
+    title: 'Emoji',
+    kind: 'custom',
+    group: 'format',
+    when: inTextSession,
+    run: () => undefined, // popover owns the insert
+    render: EmojiControl,
   },
 ];

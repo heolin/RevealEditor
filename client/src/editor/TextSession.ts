@@ -12,6 +12,9 @@ export interface TextSessionOptions {
   onExit(): void;
   /** Tab pressed (table cells navigate). Return true when handled. */
   onTab?(shift: boolean): boolean;
+  /** Pasted text — return true when consumed (e.g. TSV fills table cells)
+   *  to suppress the default plain-text insert. */
+  onPasteText?(text: string): boolean;
   /**
    * Blur whose focus destination should NOT end the session (toolbar and
    * dropdown interactions — the session survives so range formatting can
@@ -78,7 +81,9 @@ export class TextSession {
       if (type === 'insertFromPaste' || type === 'insertFromDrop') {
         e.preventDefault();
         const text = e.dataTransfer?.getData('text/plain');
-        if (text) doc.execCommand('insertText', false, text);
+        if (!text) return;
+        if (this.opts.onPasteText?.(text)) return; // consumed (TSV cell fill)
+        doc.execCommand('insertText', false, text);
         return;
       }
       if (!ALLOWED_INPUT_PREFIXES.some((p) => type.startsWith(p))) {

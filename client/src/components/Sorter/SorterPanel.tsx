@@ -1,20 +1,26 @@
-import { useState } from 'react';
-import { ActionIcon, Tooltip } from '@mantine/core';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActionIcon, CloseButton, TextInput, Tooltip } from '@mantine/core';
 import {
   IconArrowDown,
   IconArrowRight,
+  IconClipboard,
+  IconClipboardPlus,
   IconCopy,
   IconEyeOff,
   IconPlus,
+  IconSearch,
   IconTrash,
+  IconWand,
 } from '@tabler/icons-react';
 import {
   DndContext,
   PointerSensor,
+  pointerWithin,
   useSensor,
   useSensors,
   useDraggable,
   useDroppable,
+  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
@@ -31,12 +37,69 @@ import { SlideThumb } from './SlideThumb';
  *  - drag a slide onto a gap   → becomes its own new column there
  *  - drag a column (≡ handle) onto a gap → reorder columns
  */
+
+/**
+ * Pointer-driven hit testing. The default rectIntersection compares the whole
+ * dragged thumbnail against the drop strips, and the full-width column gaps
+ * beat the thin in-column slots on area — making it impossible to drop a
+ * slide *into* a stack. Instead: exact pointer hit first, then the strip
+ * nearest to the pointer, bounded so a drag released far from the sorter
+ * still cancels. Column drags only ever target gaps.
+ */
+const SNAP_RANGE = 64;
+
+const collideWithStrips: CollisionDetection = (args) => {
+  const containers = String(args.active.id).startsWith('col:')
+    ? args.droppableContainers.filter((c) => String(c.id).startsWith('gap:'))
+    : args.droppableContainers;
+
+  const hit = pointerWithin({ ...args, droppableContainers: containers });
+  if (hit.length > 0) return hit;
+
+  const pointer = args.pointerCoordinates;
+  if (!pointer) return [];
+  let best: { id: string | number; d: number } | null = null;
+  for (const c of containers) {
+    const rect = args.droppableRects.get(c.id);
+    if (!rect) continue;
+    const dx = Math.max(rect.left - pointer.x, 0, pointer.x - rect.right);
+    const dy = Math.max(rect.top - pointer.y, 0, pointer.y - rect.bottom);
+    const d = Math.hypot(dx, dy);
+    if (d < (best?.d ?? Infinity)) best = { id: c.id, d };
+  }
+  return best && best.d <= SNAP_RANGE ? [{ id: best.id }] : [];
+};
+
 export function SorterPanel() {
   const columns = useDeckStore((s) => s.columns);
   const [dragging, setDragging] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
+
+  // Jump-to-slide search: match against the slides' text content.
+  const hits = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return new Set<string>();
+    const ids = new Set<string>();
+    for (const col of columns) {
+      for (const slide of col.slides) {
+        const text = slide.source.replace(/<[^>]+>/g, ' ').toLowerCase();
+        if (text.includes(q)) ids.add(slide.id);
+      }
+    }
+    return ids;
+  }, [columns, query]);
+
+  function jumpToNextHit() {
+    const store = useDeckStore.getState();
+    const ordered = store.columns.flatMap((c) => c.slides.map((sl) => sl.id));
+    const matching = ordered.filter((id) => hits.has(id));
+    if (matching.length === 0) return;
+    const current = matching.indexOf(store.selectedSlideId ?? '');
+    store.select(matching[(current + 1) % matching.length]);
+  }
 
   function onDragStart(e: DragStartEvent) {
     setDragging(String(e.active.id));
@@ -66,11 +129,33 @@ export function SorterPanel() {
 
   return (
     <div className="sorter">
-      <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+      <TextInput
+        size="xs"
+        mb={6}
+        placeholder="Find slide…"
+        aria-label="Find slide"
+        leftSection={<IconSearch size={13} />}
+        rightSection={
+          query ? (
+            <CloseButton size="xs" aria-label="Clear search" onClick={() => setQuery('')} />
+          ) : null
+        }
+        value={query}
+        onChange={(e) => setQuery(e.currentTarget.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') jumpToNextHit();
+        }}
+      />
+      <DndContext
+        sensors={sensors}
+        collisionDetection={collideWithStrips}
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+      >
         <ColumnGap index={0} active={!!dragging} />
         {columns.map((col, i) => (
           <div key={col.id}>
-            <SorterColumn column={col} colIndex={i} dragging={dragging} />
+            <SorterColumn column={col} colIndex={i} dragging={dragging} hits={hits} />
             <ColumnGap index={i + 1} active={!!dragging} />
           </div>
         ))}
@@ -82,6 +167,19 @@ export function SorterPanel() {
         onClick={() => useDeckStore.getState().addSlideAtEnd()}
       >
         <IconPlus size={22} />
+      </button>
+      <button
+        type="button"
+        className="sorter-add-slide sorter-paste-slide"
+        title="Paste slide from clipboard (works across decks)"
+        onClick={() =>
+          void navigator.clipboard
+            .readText()
+            .then((t) => useDeckStore.getState().addSlideFromSource(t))
+            .catch(() => undefined)
+        }
+      >
+        <IconClipboardPlus size={18} />
       </button>
       {columns.length === 0 && (
         <div className="sorter-empty">
@@ -96,10 +194,12 @@ function SorterColumn({
   column,
   colIndex,
   dragging,
+  hits,
 }: {
   column: Column;
   colIndex: number;
   dragging: string | null;
+  hits: Set<string>;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `col:${column.id}`,
@@ -118,9 +218,12 @@ function SorterColumn({
       {slideDragActive && <SlideSlot columnId={column.id} index={0} />}
       {column.slides.map((slide, v) => (
         <div key={slide.id}>
-          <SorterSlide slide={slide} inStack={column.isStack} indexLabel={
-            column.isStack ? `${colIndex + 1}.${v + 1}` : ''
-          } />
+          <SorterSlide
+            slide={slide}
+            inStack={column.isStack}
+            hit={hits.has(slide.id)}
+            indexLabel={column.isStack ? `${colIndex + 1}.${v + 1}` : ''}
+          />
           {slideDragActive && <SlideSlot columnId={column.id} index={v + 1} />}
         </div>
       ))}
@@ -131,10 +234,12 @@ function SorterColumn({
 function SorterSlide({
   slide,
   inStack,
+  hit,
   indexLabel,
 }: {
   slide: Slide;
   inStack: boolean;
+  hit: boolean;
   indexLabel: string;
 }) {
   const selected = useDeckStore((s) => s.selectedSlideId === slide.id);
@@ -143,14 +248,23 @@ function SorterSlide({
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `slide:${slide.id}`,
   });
+  const nodeRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    // Search jumps (and any selection) keep the thumb in view.
+    if (selected) nodeRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [selected]);
 
   return (
     <div
-      ref={setNodeRef}
+      ref={(el) => {
+        setNodeRef(el);
+        nodeRef.current = el;
+      }}
       className={[
         'sorter-slide',
         inStack ? 'in-stack' : '',
         selected ? 'selected' : '',
+        hit ? 'search-hit' : '',
         isDragging ? 'drag-source' : '',
       ].join(' ')}
       onClick={() => select(slide.id)}
@@ -192,6 +306,18 @@ function SorterSlide({
             <IconArrowDown size={13} />
           </ActionIcon>
         </Tooltip>
+        <Tooltip label="Copy slide (paste into any deck)">
+          <ActionIcon
+            size="sm"
+            variant="default"
+            onClick={(e) => {
+              e.stopPropagation();
+              void navigator.clipboard.writeText(slide.source).catch(() => undefined);
+            }}
+          >
+            <IconClipboard size={13} />
+          </ActionIcon>
+        </Tooltip>
         <Tooltip label="Duplicate">
           <ActionIcon
             size="sm"
@@ -202,6 +328,18 @@ function SorterSlide({
             }}
           >
             <IconCopy size={13} />
+          </ActionIcon>
+        </Tooltip>
+        <Tooltip label="Duplicate for auto-animate step">
+          <ActionIcon
+            size="sm"
+            variant="default"
+            onClick={(e) => {
+              e.stopPropagation();
+              store.getState().duplicateSlideForAutoAnimate(slide.id);
+            }}
+          >
+            <IconWand size={13} />
           </ActionIcon>
         </Tooltip>
         <Tooltip label="Delete">

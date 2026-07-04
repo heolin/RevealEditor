@@ -148,6 +148,9 @@ html, body, #root { height: 100%; margin: 0; }
 }
 .sorter-slide.in-stack { margin-left: 10px; }
 .sorter-slide.selected { border-color: var(--re-accent); }
+.sorter-slide.search-hit { border-color: #f5b301; }
+.sorter-slide.search-hit.selected { border-color: var(--re-accent); }
+.sorter-paste-slide { aspect-ratio: auto; padding: 6px 0; }
 .sorter-slide.drag-source { opacity: 0.4; }
 .hidden-badge {
   position: absolute;
@@ -227,9 +230,11 @@ html, body, #root { height: 100%; margin: 0; }
 .column-gap.active { height: 14px; background: var(--re-raised); }
 .column-gap.over { background: var(--re-accent); }
 .slide-slot {
-  height: 5px;
+  /* Only mounted while a slide drag is active — always show the insertion strip. */
+  height: 8px;
   border-radius: 3px;
-  margin: 0 8px;
+  margin: 1px 8px;
+  background: var(--re-bg);
 }
 .slide-slot.over { background: var(--re-accent); }
 
@@ -297,6 +302,92 @@ html, body, #root { height: 100%; margin: 0; }
   border-radius: 4px;
 }
 
+/* ---------- Pickers (border width/style, colors) ---------- */
+
+.line-picker-target {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 30px;
+  padding: 4px 10px;
+  border: 1px solid var(--re-border);
+  border-radius: 4px;
+  background: var(--re-bg);
+}
+.line-sample {
+  flex: 1;
+  min-width: 40px;
+  height: 0;
+}
+.shapes-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 34px);
+  gap: 2px;
+}
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 30px);
+  gap: 2px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.emoji-btn {
+  width: 30px;
+  height: 30px;
+  font-size: 18px;
+  line-height: 1;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.emoji-btn:hover {
+  background: var(--re-raised);
+}
+.icon-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 44px);
+  gap: 2px;
+}
+.icon-picker-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 40px;
+  border-radius: 4px;
+}
+.icon-picker-btn:hover {
+  background: var(--re-raised);
+}
+.color-circle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  min-height: 30px;
+  border: 1px solid var(--re-border);
+  border-radius: 4px;
+  background: var(--re-bg);
+}
+.color-circle {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--re-border);
+}
+.color-circle[data-empty] {
+  /* "no color set" — diagonal slash over the theme background */
+  background: linear-gradient(
+    135deg,
+    transparent 44%,
+    #e03131 44%,
+    #e03131 56%,
+    transparent 56%
+  );
+}
+
 /* ---------- Editor overlay ---------- */
 
 .editor-overlay {
@@ -328,6 +419,13 @@ html, body, #root { height: 100%; margin: 0; }
   position: absolute;
   border: 1px solid var(--re-accent);
   background: rgba(79, 143, 247, 0.08);
+  z-index: 6;
+}
+/* Live line/arrow drag preview: the SVG fills this box; no chrome, no hit-testing. */
+.draw-line-preview {
+  position: absolute;
+  pointer-events: none;
+  overflow: visible;
   z-index: 6;
 }
 .drop-indicator {
@@ -367,6 +465,87 @@ html, body, #root { height: 100%; margin: 0; }
   border-radius: 2px;
   pointer-events: auto;
   z-index: 8;
+}
+.endpoint-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px; /* left/top denote the endpoint itself */
+  border-radius: 50%;
+  background: var(--re-panel);
+  border: 2px solid var(--re-accent);
+  cursor: move;
+  pointer-events: auto;
+  z-index: 8;
+}
+.endpoint-handle.attached {
+  background: var(--re-accent); /* filled = linked to an element */
+}
+.endpoint-handle.mid {
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 2px; /* square = route control, round = endpoints */
+  cursor: move;
+}
+.rotate-handle {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px; /* left/top denote the grip point */
+  border-radius: 50%;
+  background: var(--re-panel);
+  border: 1.5px solid var(--re-accent);
+  color: var(--re-accent);
+  cursor: grab;
+  pointer-events: auto;
+  z-index: 8;
+}
+.rotate-handle:active {
+  cursor: grabbing;
+}
+.col-resize-grip {
+  position: absolute;
+  width: 6px;
+  border-radius: 3px;
+  cursor: col-resize;
+  pointer-events: auto;
+  z-index: 7;
+}
+.col-resize-grip:hover {
+  background: var(--re-accent);
+  opacity: 0.5;
+}
+.rotate-badge {
+  position: absolute;
+  z-index: 9;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--re-accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  pointer-events: none;
+}
+.anchor-dot {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  border-radius: 50%;
+  background: var(--re-panel);
+  border: 1.5px solid var(--re-accent);
+  pointer-events: none;
+  z-index: 7;
+}
+.anchor-dot.active {
+  width: 11px;
+  height: 11px;
+  margin: -5.5px 0 0 -5.5px;
+  background: var(--re-accent);
 }
 .snap-guide {
   position: absolute;

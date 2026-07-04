@@ -112,6 +112,33 @@ test('text edit round-trips into the file', async ({ page }) => {
   expect(file).not.toContain('contenteditable');
 });
 
+test('PDF export saves the deck first, then downloads or opens print view', async ({
+  page,
+  context,
+}) => {
+  await createDeck(page, 'e2e-pdf');
+  // Dirty the deck — export must persist edits before printing the file.
+  await openInsertMenu(page);
+  await page.getByRole('menuitem', { name: 'Heading' }).click();
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
+
+  // Phase 2 (server render) downloads a .pdf; without the optional
+  // dependency the button falls back to the ?print-pdf tab (phase 1).
+  const outcome = Promise.race([
+    context.waitForEvent('page').then((p) => ({ kind: 'popup' as const, p })),
+    page.waitForEvent('download').then((d) => ({ kind: 'download' as const, d })),
+  ]);
+  await page.getByRole('button', { name: 'PDF', exact: true }).click();
+  const result = await outcome;
+  if (result.kind === 'popup') {
+    expect(result.p.url()).toContain('e2e-pdf.html?print-pdf');
+    await result.p.close();
+  } else {
+    expect(result.d.suggestedFilename()).toBe('e2e-pdf.pdf');
+  }
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+});
+
 test('drag converts to absolute positioning and snaps into the file', async ({ page }) => {
   await createDeck(page, 'e2e-drag');
   // A second flow element makes this the hard case: reveal.css tables carry
@@ -324,7 +351,7 @@ test('layout palette inserts columns; ratios round-trip; text bar is contextual'
   await h1.click();
   await h1.click();
   await expect(page.locator('.text-bar')).toBeVisible();
-  await expect(page.locator('.text-bar').getByRole('textbox').first()).toBeVisible(); // font select
+  await expect(page.locator('.text-bar').getByRole('combobox').first()).toBeVisible(); // font select
   await page.keyboard.press('Escape');
   await expect(page.locator('.text-bar')).toHaveCount(0);
 

@@ -118,3 +118,60 @@ describe('shapes', () => {
     expect(el.innerHTML).toContain('<path');
   });
 });
+
+describe('horizontal bar / combo / number formats', () => {
+  const base: ChartSpec = {
+    type: 'hbar',
+    labels: ['Alpha', 'Beta', 'Gamma'],
+    series: [
+      { name: 'A', values: [10, 25, 15] },
+      { name: 'B', values: [8, 12, 20] },
+    ],
+    options: {},
+  };
+
+  it('hbar renders deterministic horizontal bars with left category labels', () => {
+    const svg = renderChart(base, 640, 400, 'light');
+    expect(svg).toBe(renderChart(base, 640, 400, 'light')); // deterministic
+    expect(svg).toContain('Alpha');
+    // 6 bars = 2 series × 3 categories, drawn as paths after the gridlines.
+    expect(svg.match(/<path /g)!.length).toBe(6);
+    // Vertical gridlines: x1 === x2.
+    expect(svg).toMatch(/<line x1="([\d.]+)" y1="[\d.]+" x2="\1"/);
+  });
+
+  it('combo draws bars for bar series and a line for line series', () => {
+    const combo: ChartSpec = {
+      ...base,
+      type: 'combo',
+      series: [
+        { name: 'Revenue', values: [10, 25, 15] },
+        { name: 'Trend', values: [12, 18, 22], kind: 'line' },
+      ],
+    };
+    const svg = renderChart(combo, 640, 400, 'light');
+    expect(svg.match(/<path d="M[\d.]+,[\d.]+ L[\d.]+,[\d.]+ Q/g)!.length).toBe(3); // 3 bars
+    expect(svg).toContain('stroke-width="2" stroke-linejoin="round"'); // the line
+    expect(svg).toContain('<circle'); // line endpoint marker
+  });
+
+  it('number formats apply to ticks and value labels', () => {
+    const pct = renderChart(
+      { ...base, options: { valueLabels: true, format: 'percent' } },
+      640,
+      400,
+      'light',
+    );
+    expect(pct).toContain('25%');
+    const compact: ChartSpec = {
+      ...base,
+      type: 'bar',
+      series: [{ name: 'A', values: [1200, 2500, 1800] }],
+      options: { valueLabels: true, format: 'compact' },
+    };
+    expect(renderChart(compact, 640, 400, 'light')).toContain('2.5K');
+    // 'auto' output unchanged (legacy byte-compat).
+    const auto = renderChart({ ...base, type: 'bar', options: {} }, 640, 400, 'light');
+    expect(auto).toContain('>25<');
+  });
+});

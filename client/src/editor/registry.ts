@@ -45,7 +45,10 @@ export const textHandler: ElementHandler = {
     }
     return false;
   },
-  capabilities: { textEdit: true, delete: true, resize: 'width' },
+  // All 8 handles: text boxes size like boxes (n/s/corners write an explicit
+  // height). Height stays auto — reflowing with content — until a
+  // height-affecting handle is actually dragged.
+  capabilities: { textEdit: true, delete: true, resize: 'both' },
 };
 
 /** Charts: figure with data-re-chart spec + baked SVG; edited in the chart modal. */

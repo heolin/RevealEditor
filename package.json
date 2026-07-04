@@ -13,10 +13,12 @@
     "start": "npm run start -w server",
     "test": "npm run test -w server --if-present && npm run test -w client --if-present",
     "typecheck": "npm run typecheck -w server && npm run typecheck -w client",
-    "test:e2e": "npm run build && playwright test"
+    "test:e2e": "npm run build && playwright test",
+    "build:site": "node scripts/build-site.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
-    "concurrently": "^9.1.0"
+    "concurrently": "^9.1.0",
+    "marked": "^18.0.5"
   }
 }

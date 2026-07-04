@@ -16,16 +16,22 @@ export interface ChartSeries {
   name: string;
   values: number[];
   color?: string; // manual override; otherwise fixed slot order
+  /** Combo charts: which mark this series draws (default 'bar'). */
+  kind?: 'bar' | 'line';
 }
 
+export type ChartNumberFormat = 'auto' | '0' | '1' | '2' | 'percent' | 'compact';
+
 export interface ChartSpec {
-  type: 'bar' | 'stackedBar' | 'line' | 'area' | 'pie' | 'donut' | 'scatter';
+  type: 'bar' | 'stackedBar' | 'hbar' | 'line' | 'area' | 'combo' | 'pie' | 'donut' | 'scatter';
   labels: string[];
   series: ChartSeries[];
   options?: {
     title?: string;
     valueLabels?: boolean; // selective: caps / endpoints / big slices only
     legend?: boolean; // default: auto (≥2 series)
+    /** Tick + value-label number format (default 'auto'). */
+    format?: ChartNumberFormat;
   };
 }
 
@@ -65,8 +71,29 @@ const BAR_MAX = 24;
 
 const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-const fmt = (n: number) =>
+const fmtAuto = (n: number) =>
   Number.isInteger(n) ? n.toLocaleString('en-US') : n.toLocaleString('en-US', { maximumFractionDigits: 2 });
+
+/** Number formatter for ticks and value labels; 'auto' = legacy behavior. */
+export function chartFormatter(format?: ChartNumberFormat): (n: number) => string {
+  switch (format) {
+    case '0':
+      return (n) => Math.round(n).toLocaleString('en-US');
+    case '1':
+    case '2': {
+      const d = Number(format);
+      return (n) =>
+        n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+    }
+    case 'percent':
+      return (n) => `${n.toLocaleString('en-US', { maximumFractionDigits: 1 })}%`;
+    case 'compact':
+      return (n) =>
+        new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n);
+    default:
+      return fmtAuto;
+  }
+}
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 /** "Nice" tick steps: 1/2/5 × 10^k covering [0|min, max]. */
@@ -142,6 +169,7 @@ function cartesian(
   yPos: (v: number) => number;
   body: string[];
 } {
+  const fmt = chartFormatter(spec.options?.format);
   const ticks = niceTicks(yMin, yMax);
   const lo = ticks[0];
   const hi = ticks[ticks.length - 1];
@@ -194,6 +222,8 @@ export function renderChart(spec: ChartSpec, width: number, height: number, mode
 
   if (spec.type === 'pie' || spec.type === 'donut') {
     parts.push(...renderPie(spec, head, height, ink, mode));
+  } else if (spec.type === 'hbar') {
+    parts.push(...renderHBar(spec, head, height, ink, mode));
   } else {
     parts.push(...renderCartesian(spec, head, height, ink, mode));
   }
@@ -207,8 +237,19 @@ export function renderChart(spec: ChartSpec, width: number, height: number, mode
 }
 
 function renderCartesian(spec: ChartSpec, frame: Frame, h: number, ink: ChartInk, mode: 'light' | 'dark'): string[] {
+  const fmt = chartFormatter(spec.options?.format);
   const numeric = spec.series.flatMap((s) => s.values.filter((v) => Number.isFinite(v)));
   const stacked = spec.type === 'stackedBar';
+  const combo = spec.type === 'combo';
+  // Combo: each series declares its mark; everything else is single-mark.
+  const barIdx = spec.series
+    .map((s, i) => ({ s, i }))
+    .filter(({ s }) => (combo ? (s.kind ?? 'bar') === 'bar' : spec.type === 'bar' || stacked));
+  const lineIdx = spec.series
+    .map((s, i) => ({ s, i }))
+    .filter(({ s }) =>
+      combo ? s.kind === 'line' : spec.type === 'line' || spec.type === 'area',
+    );
   const sums = spec.labels.map((_, i) =>
     spec.series.reduce((acc, s) => acc + Math.max(0, s.values[i] ?? 0), 0),
   );
@@ -221,9 +262,9 @@ function renderCartesian(spec: ChartSpec, frame: Frame, h: number, ink: ChartInk
   const y0 = yPos(0);
   const labels = spec.options?.valueLabels ?? false;
 
-  if (spec.type === 'bar' || spec.type === 'stackedBar') {
+  if (spec.type === 'bar' || spec.type === 'stackedBar' || (combo && barIdx.length > 0)) {
     const groupW = Math.min(
-      stacked ? BAR_MAX : spec.series.length * BAR_MAX + (spec.series.length - 1) * GAP,
+      stacked ? BAR_MAX : barIdx.length * BAR_MAX + (barIdx.length - 1) * GAP,
       slot * 0.72,
     );
     spec.labels.forEach((_, i) => {
@@ -247,11 +288,11 @@ function renderCartesian(spec: ChartSpec, frame: Frame, h: number, ink: ChartInk
           );
         }
       } else {
-        const barW = (groupW - GAP * (spec.series.length - 1)) / spec.series.length;
-        spec.series.forEach((s, si) => {
+        const barW = (groupW - GAP * (barIdx.length - 1)) / barIdx.length;
+        barIdx.forEach(({ s, i: si }, slotIdx) => {
           const v = s.values[i] ?? 0;
           if (!Number.isFinite(v) || v === 0) return;
-          const x = groupX + si * (barW + GAP);
+          const x = groupX + slotIdx * (barW + GAP);
           const yv = yPos(v);
           const up = v >= 0;
           out.push(
@@ -265,8 +306,9 @@ function renderCartesian(spec: ChartSpec, frame: Frame, h: number, ink: ChartInk
         });
       }
     });
-  } else if (spec.type === 'line' || spec.type === 'area') {
-    spec.series.forEach((s, si) => {
+  }
+  if (spec.type === 'line' || spec.type === 'area' || (combo && lineIdx.length > 0)) {
+    lineIdx.forEach(({ s, i: si }) => {
       const color = seriesColor(spec, si, mode);
       const pts = spec.labels
         .map((_, i) => ({ i, v: s.values[i] }))
@@ -310,6 +352,74 @@ function renderCartesian(spec: ChartSpec, frame: Frame, h: number, ink: ChartInk
     });
   }
 
+  return out;
+}
+
+/** Bar with 4px rounded data-end (left/right), square at the baseline. */
+function hBarPath(x: number, y: number, w: number, h: number, right: boolean): string {
+  const r = Math.min(4, h / 2, w);
+  x = r2(x); y = r2(y); w = r2(w); h = r2(h);
+  if (w <= 0.5) return '';
+  if (right) {
+    return `M${x},${y} L${x + w - r},${y} Q${x + w},${y} ${x + w},${y + r} L${x + w},${y + h - r} Q${x + w},${y + h} ${x + w - r},${y + h} L${x},${y + h} Z`;
+  }
+  return `M${x + w},${y} L${x + r},${y} Q${x},${y} ${x},${y + r} L${x},${y + h - r} Q${x},${y + h} ${x + r},${y + h} L${x + w},${y + h} Z`;
+}
+
+/** Horizontal bars: categories on the y axis, the value scale along x. */
+function renderHBar(spec: ChartSpec, frame: Frame, h: number, ink: ChartInk, mode: 'light' | 'dark'): string[] {
+  const fmt = chartFormatter(spec.options?.format);
+  const numeric = spec.series.flatMap((s) => s.values.filter((v) => Number.isFinite(v)));
+  const ticks = niceTicks(Math.min(0, ...numeric), Math.max(0, ...numeric));
+  const lo = ticks[0];
+  const hi = ticks[ticks.length - 1];
+  const labelW = Math.max(0, ...spec.labels.map((l) => l.length)) * 6.6 + 12;
+  const plot = {
+    x: 8 + labelW,
+    y: frame.y + 8,
+    w: frame.w - labelW - 20,
+    h: h - frame.y - 8 - 22,
+  };
+  const xPos = (v: number) => plot.x + ((v - lo) / (hi - lo)) * plot.w;
+  const out: string[] = [];
+  for (const t of ticks) {
+    const x = r2(xPos(t));
+    out.push(
+      `<line x1="${x}" y1="${plot.y}" x2="${x}" y2="${plot.y + plot.h}" stroke="${t === 0 ? ink.baseline : ink.grid}" stroke-width="1"/>`,
+      `<text x="${x}" y="${plot.y + plot.h + 15}" text-anchor="middle" font-family='${FONT}' font-size="11" fill="${ink.muted}" style="font-variant-numeric: tabular-nums">${fmt(t)}</text>`,
+    );
+  }
+  const n = spec.labels.length;
+  const slot = plot.h / Math.max(1, n);
+  const x0 = xPos(0);
+  const labels = spec.options?.valueLabels ?? false;
+  const groupH = Math.min(
+    spec.series.length * BAR_MAX + (spec.series.length - 1) * GAP,
+    slot * 0.72,
+  );
+  spec.labels.forEach((label, i) => {
+    const cy = plot.y + slot * (i + 0.5);
+    out.push(
+      `<text x="${plot.x - 6}" y="${r2(cy + 3.5)}" text-anchor="end" font-family='${FONT}' font-size="11" fill="${ink.muted}">${esc(label)}</text>`,
+    );
+    const groupY = cy - groupH / 2;
+    const barH = (groupH - GAP * (spec.series.length - 1)) / spec.series.length;
+    spec.series.forEach((s, si) => {
+      const v = s.values[i] ?? 0;
+      if (!Number.isFinite(v) || v === 0) return;
+      const y = groupY + si * (barH + GAP);
+      const xv = xPos(v);
+      const right = v >= 0;
+      out.push(
+        `<path d="${hBarPath(right ? x0 : xv, y, Math.abs(xv - x0), barH, right)}" fill="${seriesColor(spec, si, mode)}"/>`,
+      );
+      if (labels) {
+        out.push(
+          `<text x="${r2(right ? xv + 5 : xv - 5)}" y="${r2(y + barH / 2 + 3.5)}"${right ? '' : ' text-anchor="end"'} font-family='${FONT}' font-size="11" fill="${ink.text}">${fmt(v)}</text>`,
+        );
+      }
+    });
+  });
   return out;
 }
 

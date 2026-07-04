@@ -18,7 +18,20 @@ export interface StageCtx {
   markClean(source: string): void;
 }
 
+/**
+ * Pre-commit reconcile pass, registered by shapes.ts (connector attachments
+ * re-derive their endpoints from moved/resized targets). A registration
+ * hook, not an import — shapes.ts already imports this module, and the
+ * funnel must stay dependency-free of content modules. The hook must never
+ * call commit() itself.
+ */
+let preCommitHook: ((ctx: StageCtx) => void) | null = null;
+export function setPreCommitHook(fn: (ctx: StageCtx) => void): void {
+  preCommitHook = fn;
+}
+
 export function commit(ctx: StageCtx): void {
+  preCommitHook?.(ctx);
   // Newly inserted/pasted code blocks get raw-text recording + display
   // highlighting before serialization restores raw text into the clone.
   hydrateCodeBlocks(ctx.section);
@@ -26,6 +39,13 @@ export function commit(ctx: StageCtx): void {
   ctx.markClean(source);
   useDeckStore.getState().updateSlideSource(ctx.slideId, source);
   useEditorStore.getState().bump();
+  // Parent-side getBoundingClientRect on iframe content serves the PREVIOUS
+  // layout when measured in the same task as the mutation — the overlay
+  // chrome would freeze one step behind. One more pass after the stage's
+  // next frame measures settled layout.
+  ctx.doc.defaultView?.requestAnimationFrame(() =>
+    ctx.doc.defaultView?.requestAnimationFrame(() => useEditorStore.getState().bump()),
+  );
 }
 
 /* ---------- inline formatting (within a text session) ---------- */

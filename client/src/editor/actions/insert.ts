@@ -1,17 +1,14 @@
 import {
   IconBlockquote,
   IconChartBar,
-  IconCircle,
   IconCode,
+  IconIcons,
   IconColumns2,
   IconColumns3,
   IconComponents,
   IconHeading,
   IconLetterT,
-  IconLine,
   IconList,
-  IconArrowUpRight,
-  IconRectangle,
   IconSquare,
   IconTable,
 } from '@tabler/icons-react';
@@ -19,10 +16,10 @@ import type { Action, EditorContext } from './types';
 import { insertHtmlSnippet } from '../commands';
 import { ensureManagedBlock } from '../managedCss';
 import { insertTable } from '../table';
-import { insertShape, type ShapeKind } from '../shapes';
+import { SHAPE_KINDS } from '../shapes';
 import { insertChart } from '../chart/chart';
 import { useEditorStore } from '../editorStore';
-import { ImageInsertControl } from './customControls';
+import { ImageInsertControl, SHAPE_META, ShapeMenuControl } from './customControls';
 
 const canInsert = (ctx: EditorContext) => !!ctx.stage && !!ctx.slide && ctx.session !== 'text';
 
@@ -79,12 +76,8 @@ const cellAction: Action = {
   },
 };
 
-const SHAPE_ICONS: Record<ShapeKind, Action['icon']> = {
-  rect: IconRectangle,
-  ellipse: IconCircle,
-  line: IconLine,
-  arrow: IconArrowUpRight,
-};
+// Kind → icon/title lives in SHAPE_META (customControls.tsx) — shared with
+// the ribbon's flowchart-shapes dropdown.
 
 export const insertActions: Action[] = [
   snippetAction('insert.heading', 'Heading', IconHeading, '<h2>Heading</h2>'),
@@ -147,17 +140,37 @@ export const insertActions: Action[] = [
       if (el) useEditorStore.getState().setChartEditEl(el);
     },
   },
-  ...(Object.keys(SHAPE_ICONS) as ShapeKind[]).map(
+  ...SHAPE_KINDS.map(
     (kind): Action => ({
       id: `insert.shape.${kind}`,
-      title: `${kind[0].toUpperCase()}${kind.slice(1)}`,
-      icon: SHAPE_ICONS[kind],
+      title: SHAPE_META[kind].title,
+      icon: SHAPE_META[kind].icon,
       kind: 'button',
       group: 'insert',
       when: canInsert,
-      run: (ctx) => ctx.stage && insertShape(ctx.stage, kind),
+      // Arms draw mode: the next canvas click places the default size at
+      // that point; a drag draws the shape at the dragged rect (Esc cancels).
+      run: () => useEditorStore.getState().setPendingShapeKind(kind),
     }),
   ),
+  {
+    id: 'insert.shapes',
+    title: 'Shapes',
+    kind: 'custom',
+    group: 'insert',
+    when: canInsert,
+    run: () => undefined, // the gallery owns the kind choice
+    render: ShapeMenuControl,
+  },
+  {
+    id: 'insert.icon',
+    title: 'Icon…',
+    icon: IconIcons,
+    kind: 'button',
+    group: 'insert',
+    when: canInsert,
+    run: () => useEditorStore.getState().setIconPickerOpen(true),
+  },
   {
     id: 'insert.component',
     title: 'Component…',

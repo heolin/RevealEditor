@@ -29,8 +29,15 @@ afterAll(() => {
 });
 import {
   alignElements,
+  anchorPoints,
   distributeElements,
+  elementAnchorPoint,
+  flipState,
   groupElements,
+  nearestAnchor,
+  rotation,
+  setRotation,
+  toggleFlip,
   snapValue,
   ungroupElements,
 } from './geometry';
@@ -136,5 +143,88 @@ describe('snapValue (resize edge snapping)', () => {
   it('picks the nearest candidate (ties go to the first)', () => {
     expect(snapValue(482, [480, 484], 6).v).toBe(480);
     expect(snapValue(483, [480, 484], 6).v).toBe(484);
+  });
+});
+
+describe('anchor points (connector snapping)', () => {
+  const rect = { left: 100, top: 50, width: 200, height: 100 };
+
+  it('a box has 8 named anchors: 4 corners + 4 edge midpoints, no center', () => {
+    const pts = anchorPoints(rect);
+    expect(pts).toHaveLength(8);
+    expect(pts).toContainEqual({ x: 100, y: 50, id: 'nw' });
+    expect(pts).toContainEqual({ x: 200, y: 50, id: 'n' });
+    expect(pts).toContainEqual({ x: 300, y: 100, id: 'e' });
+    expect(pts).toContainEqual({ x: 300, y: 150, id: 'se' });
+    expect(pts.some((p) => p.x === 200 && p.y === 100)).toBe(false); // center excluded
+  });
+
+  it('nearestAnchor picks by 2-D distance within threshold', () => {
+    const el = document.createElement('div');
+    const sets = [{ el, rect, points: anchorPoints(rect) }];
+    expect(nearestAnchor({ x: 305, y: 96 }, sets, 8)).toEqual({ x: 300, y: 100, id: 'e', el });
+    // 2-D distance matters: 6px in x + 6px in y is ~8.49px away → no snap at 8.
+    expect(nearestAnchor({ x: 306, y: 106 }, sets, 8)).toBeNull();
+    expect(nearestAnchor({ x: 500, y: 500 }, sets, 8)).toBeNull();
+  });
+});
+
+describe('rotation', () => {
+  it('parses and writes only the editor-managed rotate() form', () => {
+    const el = document.createElement('div');
+    expect(rotation(el)).toBe(0);
+    setRotation(el, 30);
+    expect(el.style.transform).toBe('rotate(30deg)');
+    expect(rotation(el)).toBe(30);
+    setRotation(el, 380.4); // normalized + rounded
+    expect(rotation(el)).toBe(20);
+    setRotation(el, -190);
+    expect(rotation(el)).toBe(170);
+    setRotation(el, 0); // cleared, style attr dropped
+    expect(el.getAttribute('style')).toBeNull();
+    // Foreign transforms are opaque — never parsed, never rewritten.
+    el.style.transform = 'scale(2) rotate(10deg)';
+    expect(rotation(el)).toBeNull();
+  });
+
+  it('elementAnchorPoint rotates anchors around the element center', () => {
+    const section = document.createElement('section');
+    document.body.appendChild(section);
+    const ctx = { doc: document, section, slideId: 't', markClean: () => undefined };
+    const el = box(section, 500, 100, 100, 100);
+    // Square rotated 90°: the 'e' anchor lands where 's' was.
+    el.style.transform = 'rotate(90deg)';
+    const p = elementAnchorPoint(ctx, el, 'e');
+    expect(p.x).toBeCloseTo(550, 5);
+    expect(p.y).toBeCloseTo(200, 5);
+    // nw corner → ne position.
+    const c = elementAnchorPoint(ctx, el, 'nw');
+    expect(c.x).toBeCloseTo(600, 5);
+    expect(c.y).toBeCloseTo(100, 5);
+  });
+});
+
+describe('flip (managed transform)', () => {
+  it('toggles axes and composes with rotation', () => {
+    const el = document.createElement('div');
+    expect(flipState(el)).toEqual({ x: false, y: false });
+    toggleFlip(el, 'x');
+    expect(el.style.transform).toBe('scale(-1, 1)');
+    setRotation(el, 45); // rotation write preserves the flip
+    expect(el.style.transform).toBe('rotate(45deg) scale(-1, 1)');
+    expect(rotation(el)).toBe(45);
+    expect(flipState(el)).toEqual({ x: true, y: false });
+    toggleFlip(el, 'y');
+    toggleFlip(el, 'x'); // back off x
+    expect(el.style.transform).toBe('rotate(45deg) scale(1, -1)');
+    setRotation(el, 0);
+    expect(el.style.transform).toBe('scale(1, -1)');
+    toggleFlip(el, 'y'); // all neutral → style cleared
+    expect(el.getAttribute('style')).toBeNull();
+    // Foreign transforms stay untouched.
+    el.style.transform = 'matrix(1,0,0,1,0,0)';
+    toggleFlip(el, 'x');
+    expect(el.style.transform).toBe('matrix(1,0,0,1,0,0)');
+    expect(flipState(el)).toBeNull();
   });
 });

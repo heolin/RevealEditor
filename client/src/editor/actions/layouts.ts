@@ -25,9 +25,12 @@ const DEFAULTS: Record<SurfaceId, SurfaceLayout> = {
       'insert.code',
       'insert.table',
       'insert.chart',
-      'insert.shape.rect',
+      'insert.icon',
       'insert.component',
     ],
+    /** Draw group: the Shapes gallery (base + flowchart grid) and the two
+     *  connector tools (docs/DIAGRAMMING.md). */
+    ['insert.shapes', 'insert.shape.line', 'insert.shape.arrow'],
     [
       'arrange.align.left',
       'arrange.align.hcenter',
@@ -47,7 +50,7 @@ const DEFAULTS: Record<SurfaceId, SurfaceLayout> = {
   textBar: [
     ['format.heading'],
     ['format.fontFamily', 'format.fontSize', 'format.textColor'],
-    ['format.bold', 'format.italic', 'format.strike', 'format.link'],
+    ['format.bold', 'format.italic', 'format.strike', 'format.link', 'format.highlight', 'format.emoji'],
     ['format.bulletList', 'format.numberedList'],
     ['format.align.left', 'format.align.center', 'format.align.right'],
   ],
@@ -65,7 +68,7 @@ const DEFAULTS: Record<SurfaceId, SurfaceLayout> = {
   insertMenu: [
     ['insert.heading', 'insert.text', 'insert.bulletList', 'insert.quote'],
     ['insert.columns2', 'insert.columns3'],
-    ['insert.image', 'insert.code', 'insert.table', 'insert.chart', 'insert.component'],
+    ['insert.image', 'insert.code', 'insert.table', 'insert.chart', 'insert.icon', 'insert.component'],
     ['insert.shape.rect', 'insert.shape.ellipse', 'insert.shape.line', 'insert.shape.arrow'],
   ],
 
@@ -79,6 +82,9 @@ const DEFAULTS: Record<SurfaceId, SurfaceLayout> = {
       'table.colRight',
       'table.deleteRow',
       'table.deleteCol',
+      'table.mergeRight',
+      'table.mergeDown',
+      'table.splitCell',
     ],
     ['arrange.duplicate', 'arrange.copy', 'arrange.cut', 'arrange.paste'],
     ['arrange.moveUp', 'arrange.moveDown'],
