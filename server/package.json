@@ -6,7 +6,7 @@
     "revealeditor": "dist/index.js"
   },
   "scripts": {
-    "dev": "tsx watch src/index.ts ../demo-workspace --port 4321",
+    "dev": "tsx watch src/index.ts --default-workspace ../demo-workspace --port 4321",
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "vitest run",
