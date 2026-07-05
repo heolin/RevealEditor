@@ -624,7 +624,17 @@ html, body, #root { height: 100%; margin: 0; }
   z-index: 8;
   background: var(--re-panel);
   border: 1px solid var(--re-accent);
-  opacity: 0.55;
+  opacity: 0.7;
+  /* spreadsheet-style A/B/C and 1/2/3 labels, centered */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--re-accent);
+  overflow: hidden;
+  user-select: none;
 }
 .table-sel-col:hover,
 .table-sel-row:hover,
@@ -633,6 +643,7 @@ html, body, #root { height: 100%; margin: 0; }
 .table-sel-row.active {
   background: var(--re-accent);
   opacity: 1;
+  color: #fff;
 }
 .rotate-badge {
   position: absolute;

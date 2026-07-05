@@ -874,7 +874,16 @@ function ColumnResizeGrips({ table, scale }: { table: HTMLTableElement; scale: n
   );
 }
 
-const SEL_STRIP = 13; // handle-strip thickness (slide px)
+const SEL_STRIP = 16; // handle-strip thickness (slide px)
+
+/** Spreadsheet column name: A, B, … Z, AA, AB, … */
+function colName(c: number): string {
+  let s = '';
+  for (let n = c + 1; n > 0; n = Math.floor((n - 1) / 26)) {
+    s = String.fromCharCode(65 + ((n - 1) % 26)) + s;
+  }
+  return s;
+}
 
 /**
  * Table selection chrome: header strips (top = columns, left = rows, corner =
@@ -932,7 +941,9 @@ function TableSelectHandles({ table, scale }: { table: HTMLTableElement; scale: 
             title="Select column"
             style={{ left: r.left * scale, top: (tRect.top - SEL_STRIP) * scale, width: r.width * scale, height: SEL_STRIP * scale }}
             onClick={() => select(colRect(table, c))}
-          />
+          >
+            {colName(c)}
+          </div>
         );
       })}
       {Array.from({ length: rows }, (_, r) => {
@@ -944,7 +955,9 @@ function TableSelectHandles({ table, scale }: { table: HTMLTableElement; scale: 
             title="Select row"
             style={{ left: (tRect.left - SEL_STRIP) * scale, top: rr.top * scale, width: SEL_STRIP * scale, height: rr.height * scale }}
             onClick={() => select(rowRect(table, r))}
-          />
+          >
+            {r + 1}
+          </div>
         );
       })}
     </>
