@@ -8,6 +8,8 @@ import {
   composeFilter,
   readFilterNum,
   hasFilter,
+  usesBoxShadow,
+  shadowToBoxShadow,
 } from './effects';
 import type { StageCtx } from './commands';
 
@@ -90,3 +92,24 @@ describe('effects — composable filters', () => {
     expect(readFilterNum(el, 'saturate')).toBeNull();
   });
 })
+
+describe('effects — table box-shadow', () => {
+  function tableEl(): HTMLElement {
+    return document.createElement('table');
+  }
+  it('tables use box-shadow, not drop-shadow', () => {
+    const el = tableEl();
+    expect(usesBoxShadow(el)).toBe(true);
+    const ctx = { doc: document, section: el, slideId: 's', markClean() {} } as unknown as import('./commands').StageCtx;
+    try { setShadow(ctx, el, { dx: 0, dy: 6, blur: 14, color: 'rgba(0,0,0,0.3)' }); } catch { /* commit */ }
+    expect(el.style.boxShadow).toBe(shadowToBoxShadow({ dx: 0, dy: 6, blur: 14, color: 'rgba(0,0,0,0.3)' }));
+    expect(el.style.filter).toBe('');
+    expect(readShadow(el)).toEqual({ dx: 0, dy: 6, blur: 14, color: 'rgba(0,0,0,0.3)' });
+    try { setShadow(ctx, el, null); } catch { /* commit */ }
+    expect(el.style.boxShadow).toBe('');
+  });
+  it('non-tables keep using drop-shadow', () => {
+    const img = document.createElement('img');
+    expect(usesBoxShadow(img)).toBe(false);
+  });
+});

@@ -4,6 +4,9 @@ import {
   IconAlignRight,
   IconBold,
   IconItalic,
+  IconLayoutAlignBottom,
+  IconLayoutAlignMiddle,
+  IconLayoutAlignTop,
   IconList,
   IconListNumbers,
   IconStrikethrough,
@@ -65,6 +68,37 @@ function setStyle(ctx: EditorContext, prop: string, value: string | undefined): 
   // Interacting with a dropdown (font/size/color) blurs the iframe and ends
   // the session — bring it back so the text toolbar stays put.
   if (wasSession && target?.isConnected && !buildEditorContext().session) {
+    useEditorStore.getState().startSession(target);
+  }
+}
+
+type VAlign = 'top' | 'middle' | 'bottom';
+
+/** Current vertical alignment of the text box (from its flexbox justify). */
+function vAlignOf(ctx: EditorContext): VAlign {
+  const jc = formatTarget(ctx)?.style.justifyContent;
+  return jc === 'center' ? 'middle' : jc === 'flex-end' ? 'bottom' : 'top';
+}
+
+/** Vertically align the text within its box via flexbox. "Top" is default
+ *  block flow (props removed). Applies to the element, then restores a session. */
+function setVAlign(ctx: EditorContext, v: VAlign): void {
+  if (!ctx.stage) return;
+  const target = formatTarget(ctx);
+  if (!target) return;
+  const wasSession = ctx.session === 'text';
+  applyStyle(
+    target,
+    v === 'top'
+      ? { display: null, 'flex-direction': null, 'justify-content': null }
+      : {
+          display: 'flex',
+          'flex-direction': 'column',
+          'justify-content': v === 'middle' ? 'center' : 'flex-end',
+        },
+  );
+  commit(ctx.stage);
+  if (wasSession && target.isConnected && !buildEditorContext().session) {
     useEditorStore.getState().startSession(target);
   }
 }
@@ -187,6 +221,25 @@ export const formatActions: Action[] = [
       active: (ctx) => styleValue(ctx, 'text-align') === align,
       run: (ctx) =>
         setStyle(ctx, 'text-align', styleValue(ctx, 'text-align') === align ? undefined : align),
+    }),
+  ),
+  ...(
+    [
+      ['top', IconLayoutAlignTop],
+      ['middle', IconLayoutAlignMiddle],
+      ['bottom', IconLayoutAlignBottom],
+    ] as const
+  ).map(
+    ([v, icon]): Action => ({
+      id: `format.valign.${v}`,
+      title: `Vertical align ${v}`,
+      icon,
+      kind: 'toggle',
+      group: 'format',
+      // Vertical align is a box property; tables have their own per-cell one.
+      when: (ctx) => stylable(ctx) && ctx.handler?.type !== 'table',
+      active: (ctx) => vAlignOf(ctx) === v,
+      run: (ctx) => setVAlign(ctx, v),
     }),
   ),
   {

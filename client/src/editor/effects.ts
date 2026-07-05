@@ -5,13 +5,16 @@
  * rewrite ONE named function while preserving the others, so effects can be
  * mixed and future ones added without clobbering.
  *
- * We use `filter: drop-shadow(...)` (not box-shadow) so the shadow follows the
- * element's real shape/alpha: a circle-masked image casts a circular shadow, an
- * SVG shape's shadow hugs its outline, and text shadows the glyphs. One
- * primitive works for images, shapes, text, charts and tables alike.
+ * We use `filter: drop-shadow(...)` so the shadow follows the element's real
+ * shape/alpha: a circle-masked image casts a circular shadow, an SVG shape's
+ * shadow hugs its outline, and text shadows the glyphs. The exception is
+ * box-like elements such as tables — there `drop-shadow` would trace every
+ * cell's text and borders, so we use a rectangular `box-shadow` on the whole
+ * box instead.
  */
 import type { StageCtx } from './commands';
-import { setElementStyleProp } from './commands';
+import { commit, setElementStyleProp } from './commands';
+import { applyStyle } from './geometry';
 
 export interface Shadow {
   dx: number;
@@ -40,6 +43,16 @@ export function shadowToFilter(s: Shadow): string {
   return `drop-shadow(${s.dx}px ${s.dy}px ${s.blur}px ${s.color})`;
 }
 
+export function shadowToBoxShadow(s: Shadow): string {
+  return `${s.dx}px ${s.dy}px ${s.blur}px ${s.color}`;
+}
+
+/** Box-like elements get a rectangular box-shadow (whole box) rather than a
+ *  content-tracing drop-shadow — otherwise a table shadows every cell's text. */
+export function usesBoxShadow(el: HTMLElement): boolean {
+  return el.tagName === 'TABLE';
+}
+
 // A single filter function token, tolerant of one level of nested parens
 // (e.g. an rgba()/hsla() color), regardless of where the color sits.
 const fnRe = (name: string) => new RegExp(`${name}\\((?:[^()]|\\([^()]*\\))*\\)`, 'g');
@@ -53,16 +66,30 @@ function parseShadowArgs(a: string): Shadow {
   return { dx, dy, blur, color };
 }
 
-/** Read the element's current drop-shadow, or null if none. */
+/** Read the element's current shadow (box-shadow for tables, else drop-shadow). */
 export function readShadow(el: HTMLElement): Shadow | null {
+  if (usesBoxShadow(el)) {
+    const bs = el.style.boxShadow;
+    return bs && bs !== 'none' ? parseShadowArgs(bs) : null;
+  }
   const m = (el.style.filter || '').match(fnRe('drop-shadow'));
   if (!m) return null;
-  const inner = m[0].slice('drop-shadow('.length, -1);
-  return parseShadowArgs(inner);
+  return parseShadowArgs(m[0].slice('drop-shadow('.length, -1));
 }
 
-/** Set/replace/remove the drop-shadow, keeping any other filter functions. */
+/** Set/replace/remove the shadow. Tables get a rectangular `box-shadow` on the
+ *  whole box; everything else a `drop-shadow` filter (other filters preserved). */
 export function setShadow(ctx: StageCtx, el: HTMLElement, shadow: Shadow | null): void {
+  if (usesBoxShadow(el)) {
+    // Drop any stray drop-shadow so the two don't stack, and set box-shadow.
+    const filter = (el.style.filter || '').replace(fnRe('drop-shadow'), '').replace(/\s+/g, ' ').trim();
+    applyStyle(el, {
+      'box-shadow': shadow ? shadowToBoxShadow(shadow) : null,
+      filter: filter || null,
+    });
+    commit(ctx);
+    return;
+  }
   const others = (el.style.filter || '').replace(fnRe('drop-shadow'), '').replace(/\s+/g, ' ').trim();
   const next = [others, shadow ? shadowToFilter(shadow) : ''].filter(Boolean).join(' ');
   setElementStyleProp(ctx, el, 'filter', next || null);

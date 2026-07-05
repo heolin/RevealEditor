@@ -612,6 +612,9 @@ const TEXT_ROW_2 = [
   'format.align.left',
   'format.align.center',
   'format.align.right',
+  'format.valign.top',
+  'format.valign.middle',
+  'format.valign.bottom',
 ];
 
 /**

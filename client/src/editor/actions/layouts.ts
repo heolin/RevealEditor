@@ -53,6 +53,7 @@ const DEFAULTS: Record<SurfaceId, SurfaceLayout> = {
     ['format.bold', 'format.italic', 'format.strike', 'format.link', 'format.highlight', 'format.emoji'],
     ['format.bulletList', 'format.numberedList'],
     ['format.align.left', 'format.align.center', 'format.align.right'],
+    ['format.valign.top', 'format.valign.middle', 'format.valign.bottom'],
   ],
 
   /** Floating toolbar: quick non-text ops that follow the selection.
