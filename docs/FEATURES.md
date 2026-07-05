@@ -80,14 +80,16 @@ Execution plans for everything still open live in [ROADMAP.md](ROADMAP.md).
 | Insert image: upload, paste from clipboard, URL | T1 | Uploads land in `assets/` beside the deck |
 | Resize (aspect-locked), reposition | T1 | |
 | Alt text, title | T1 | Inspector fields |
-| Rounded corners / border / shadow presets | T2 | Inline styles |
-| Crop (visual, via wrapper with `overflow:hidden`) | T3 | Must round-trip as plain HTML/CSS |
-| Object-fit control for sized images | T2 | |
+| Rounded corners / border presets | T2 | Inline styles |
+| Effects (shadow, opacity, blur, color adjust) | ✅ | "Effects" tab (any selection): **shadow** presets + color (inline `filter: drop-shadow(...)`, follows the element's shape — masked images, SVG shapes, text glyphs); **opacity** slider; **blur** slider; **adjust** — grayscale/sepia/invert toggles + brightness/saturation sliders. All compose in one inline `filter` (a filter-aware util replaces one function while preserving others) + `opacity`; round-trip clean, render standalone. `editor/effects.ts`, `Inspector/EffectsPanel.tsx` |
+| Shape mask (circle/ellipse/rounded/rect/polygon) | ✅ | Inline `clip-path` on the `<img>`. **Visual editing**: an "Image" tab (unlocks on image select) with a clip-preview shape picker; double-click or opening the tab enters *mask mode* — drag handles on the image (circle radius/center, ellipse radii, inset edges+round, polygon vertices). `editor/mask.ts`, `overlay` MaskOverlay, `Inspector/ImagePanel.tsx` |
+| Crop (reframe, pan) | ✅ | Inline `object-fit:cover` + `object-position` + box size (no wrapper); overlay crop gesture, `image.crop`; `editor/crop.ts`. Pan only (no zoom below cover) |
+| Object-fit control for sized images | ✅ | Image tab "Fit" (Fill/Cover/Contain); cover/contain auto-set a height so they bite. Plus border + corner-radius presets in the Image tab |
 | Video: local file or URL, autoplay/loop/muted/controls | T2 | Descoped 2026-07 (owner) — revisit on request |
 | Background video / iframe backgrounds per slide | T2 | Descoped 2026-07 (owner) — revisit on request |
 | Audio embed | T3 | |
 | iframe embeds (YouTube, maps, live sites) | T2 | Descoped 2026-07 (owner) — revisit on request |
-| SVG file insert (as `<img>` or inline) | T2 | Inline preserves CSS targetability |
+| SVG file insert (as `<img>` or inline) | ✅ | `.svg` uploads insert as sanitised inline `<svg>` (drops script/on*/external refs) for CSS targetability; raster stays `<img>`. `actions/customControls.tsx` |
 | Asset manager (list/reuse/delete uploaded assets, orphan detection) | T3 | |
 
 ## E. Tables
@@ -101,12 +103,13 @@ Execution plans for everything still open live in [ROADMAP.md](ROADMAP.md).
 | Header row / header column toggle | T1 | `<thead>` / `<th scope>` |
 | Cell alignment (h/v) per cell/column | T1 | Inline styles or col-level classes |
 | Table style presets: borders, striped rows, minimal, theme-accent | T1 | Class-based, backed by the editor-managed style block (see Architecture) |
-| Cell fill color, text color | T2 | Shipped — inspector cell colors |
+| Cell fill color, text color | ✅ | Now scope-aware — see below |
+| Cell / row / column / table selection + bulk styling | ✅ | Rectangular cell selection (`cellSel`); overlay header strips select a row/column/whole table, shift-click extends a range, highlight over selected cells. A **"Table" tab** applies fill, text color, bold/italic, h/v align, font-size, and borders to the selected scope as inline `<td>` styles. `editor/table.ts` (`cellsInRect`/`applyCellStyle`), `Inspector/TablePanel.tsx`, overlay `TableSelectHandles` |
 | Column width adjustment by drag | T2 | Shipped — boundary grips; measured colgroup % + fixed layout on first drag |
 | Merge / split cells (colspan/rowspan) | T2 | Shipped — logical-grid model; merges only along aligned rects |
 | Sort rows by column (one-time authoring action) | T3 | |
 | Paste table from TSV/CSV/Excel/Sheets clipboard | T2 | Shipped — new table from stage paste; in-cell TSV distributes and grows rows |
-| Convert table → chart | T3 | Feeds the chart data editor |
+| Convert table → chart | ✅ | Cell context menu "Convert to chart": header row → series, first column → labels, cells → values; replaces the table with an editable chart. `chart/chart.ts` `tableToChart` |
 
 ## F. Charts
 

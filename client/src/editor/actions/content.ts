@@ -25,6 +25,7 @@ import {
   mergeCells,
   splitCell,
 } from '../table';
+import { tableToChart } from '../chart/chart';
 import { useEditorStore } from '../editorStore';
 
 const inCell = (ctx: EditorContext) => !!ctx.stage && !!ctx.cell && ctx.session !== 'code';
@@ -74,6 +75,20 @@ export const contentActions: Action[] = [
       splitCell(ctx.stage!, ctx.cell!),
     ),
     when: (ctx) => inCell(ctx) && canSplit(ctx.cell!),
+  },
+  {
+    id: 'table.toChart',
+    title: 'Convert to chart',
+    icon: IconChartBar,
+    kind: 'button',
+    group: 'table',
+    when: inCell,
+    run: (ctx) => {
+      const table = ctx.cell?.closest('table');
+      if (!ctx.stage || !table) return;
+      const fig = tableToChart(ctx.stage, table as HTMLTableElement);
+      if (fig) useEditorStore.getState().select(fig);
+    },
   },
   {
     id: 'chart.edit',

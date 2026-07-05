@@ -3,6 +3,7 @@ import { useEditorStore } from '../editorStore';
 import { useDeckStore } from '../../state/deckStore';
 import { handlerFor } from '../registry';
 import { isAbsolute } from '../geometry';
+import { selectedCells } from '../table';
 import type { EditorContext } from './types';
 
 /** Build the context snapshot — the ONLY place that inspects selection state. */
@@ -15,14 +16,27 @@ export function buildEditorContext(): EditorContext {
   );
   const slide =
     d.columns.flatMap((c) => c.slides).find((s) => s.id === d.selectedSlideId) ?? null;
+  const cell = (selection?.closest('td, th') as HTMLTableCellElement | null) ?? null;
+  const table = (selection?.closest('table') as HTMLTableElement | null) ?? null;
   return {
     stage: e.ctx,
     selection,
     selections,
     handler: selection ? handlerFor(selection) : null,
-    session: e.sessionEl ? 'text' : e.codeEditEl ? 'code' : e.chartEditEl ? 'chart' : null,
+    session: e.sessionEl
+      ? 'text'
+      : e.codeEditEl
+        ? 'code'
+        : e.chartEditEl
+          ? 'chart'
+          : e.cropEl
+            ? 'crop'
+            : e.maskEl
+              ? 'mask'
+              : null,
     isAbsolute: selection ? isAbsolute(selection) : false,
-    cell: (selection?.closest('td, th') as HTMLTableCellElement | null) ?? null,
+    cell,
+    cells: table ? selectedCells(table, e.cellSel, cell) : [],
     slide,
     deck: d.meta,
   };

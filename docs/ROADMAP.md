@@ -63,7 +63,7 @@ timing remain) → **Import/export (Markdown, zip, offline bundle)** →
 | SVG file insert | Extend the image insert control: `.svg` files offer "as `<img>`" (default) or "inline" (fetch + sanitize + insert markup; keeps CSS targetability). |
 | Image border/radius/shadow presets | The BoxFields treatment for `<img>`: reuse the exact same inspector group (border pickers + radius) plus 2–3 shadow presets as inline styles. Small. |
 | Object-fit control | Select (cover/contain/fill) writing `object-fit` + explicit height. Small. |
-| Crop | Wrapper `<div style="overflow:hidden">` + negative-margin/size on the img; needs its own overlay gesture (crop handles). Medium; design the wrapper round-trip carefully (undo of the wrapper must restore the bare img). |
+| ~~Crop~~ ✅ Mask + reframe crop | DONE. Superseded the wrapper sketch: masks are inline `clip-path` presets (`editor/mask.ts`, inspector + `image.mask`); reframe crop is inline `object-fit:cover` + `object-position` + box size with an overlay crop gesture (`editor/crop.ts`, `image.crop`, `CropOverlay`). No wrapper → stays a plain `<img>`, round-trips as inline CSS, undo restores the bare image trivially. Both combine (circular avatar = square crop + `circle` mask). Known limit: pan only, no zoom below cover — wrapper-based zoom is a possible future add. |
 | Audio embed | `<audio controls>` insert + inspector attrs. Tiny, low demand. |
 | Asset manager | Panel listing `assets/` with usage counts (scan deck sources for references), delete-unused. Server: list endpoint; client: modal. |
 

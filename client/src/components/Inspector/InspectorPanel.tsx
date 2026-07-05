@@ -54,23 +54,6 @@ import {
   toggleFlip,
 } from '../../editor/geometry';
 import { commit as commitCommand } from '../../editor/commands';
-import {
-  TABLE_PRESETS,
-  type TablePreset,
-  addColumn,
-  addRow,
-  canMerge,
-  canSplit,
-  deleteColumn,
-  deleteRow,
-  hasHeaderRow,
-  mergeCells,
-  setColumnAlignment,
-  setTablePreset,
-  splitCell,
-  tablePreset,
-  toggleHeaderRow,
-} from '../../editor/table';
 import { api } from '../../api/client';
 
 const TRANSITIONS = ['none', 'fade', 'slide', 'convex', 'concave', 'zoom'];
@@ -403,12 +386,6 @@ function ElementSection({ el }: { el: HTMLElement }) {
           <BoxFields el={el} />
         </>
       )}
-      {table && ctx.section.contains(table) && (
-        <>
-          <Divider />
-          <TableFields table={table as HTMLTableElement} el={el} />
-        </>
-      )}
       {isAbsolute(el) && (
         <>
           <Divider />
@@ -492,128 +469,6 @@ function PositionFields({ el }: { el: HTMLElement }) {
   );
 }
 
-function TableFields({ table, el }: { table: HTMLTableElement; el: HTMLElement }) {
-  const ctx = useEditorStore((s) => s.ctx)!;
-  const cell = (el.closest('td, th') as HTMLTableCellElement | null) ?? null;
-  const alignments = ['left', 'center', 'right'] as const;
-  const currentAlign = cell?.style.textAlign || '';
-
-  return (
-    <>
-      <Text size="xs" fw={700} c="dimmed" tt="uppercase">
-        Table
-      </Text>
-      <Select
-        label="Style"
-        size="xs"
-        value={tablePreset(table)}
-        placeholder="theme default"
-        clearable
-        data={TABLE_PRESETS.map((p) => ({ value: p, label: p }))}
-        onChange={(v) => setTablePreset(ctx, table, (v as TablePreset) ?? null)}
-      />
-      <Switch
-        label="Header row"
-        size="xs"
-        checked={hasHeaderRow(table)}
-        onChange={() => toggleHeaderRow(ctx, table)}
-      />
-      {cell ? (
-        <>
-          <Group gap={4}>
-            <Button size="compact-xs" variant="default" onClick={() => addRow(ctx, cell, 'above')}>
-              + Row ↑
-            </Button>
-            <Button size="compact-xs" variant="default" onClick={() => addRow(ctx, cell, 'below')}>
-              + Row ↓
-            </Button>
-            <Button size="compact-xs" variant="default" onClick={() => addColumn(ctx, cell, 'left')}>
-              + Col ←
-            </Button>
-            <Button size="compact-xs" variant="default" onClick={() => addColumn(ctx, cell, 'right')}>
-              + Col →
-            </Button>
-          </Group>
-          <Group gap={4}>
-            <Button size="compact-xs" color="red" variant="light" onClick={() => deleteRow(ctx, cell)}>
-              Delete row
-            </Button>
-            <Button size="compact-xs" color="red" variant="light" onClick={() => deleteColumn(ctx, cell)}>
-              Delete column
-            </Button>
-          </Group>
-          <Group gap={4}>
-            <Button
-              size="compact-xs"
-              variant="default"
-              disabled={!canMerge(cell, 'right')}
-              onClick={() => mergeCells(ctx, cell, 'right')}
-            >
-              Merge →
-            </Button>
-            <Button
-              size="compact-xs"
-              variant="default"
-              disabled={!canMerge(cell, 'down')}
-              onClick={() => mergeCells(ctx, cell, 'down')}
-            >
-              Merge ↓
-            </Button>
-            <Button
-              size="compact-xs"
-              variant="default"
-              disabled={!canSplit(cell)}
-              onClick={() => splitCell(ctx, cell)}
-            >
-              Split
-            </Button>
-          </Group>
-          <Group gap={6} wrap="nowrap">
-            <ReColorInput
-              key={`cf-${cell.style.backgroundColor}`}
-              label="Cell fill"
-              defaultValue={cell.style.backgroundColor}
-              placeholder="none"
-              onChangeEnd={(v) => {
-                applyStyle(cell, { 'background-color': v || null });
-                commitCommand(ctx);
-              }}
-            />
-            <ReColorInput
-              key={`ct-${cell.style.color}`}
-              label="Cell text"
-              defaultValue={cell.style.color}
-              placeholder="theme"
-              onChangeEnd={(v) => {
-                applyStyle(cell, { color: v || null });
-                commitCommand(ctx);
-              }}
-            />
-          </Group>
-          <Text size="xs" c="dimmed">
-            Column alignment
-          </Text>
-          <Button.Group>
-            {alignments.map((a) => (
-              <Button
-                key={a}
-                size="compact-xs"
-                variant={currentAlign === a ? 'filled' : 'default'}
-                onClick={() => setColumnAlignment(ctx, cell, currentAlign === a ? null : a)}
-              >
-                {a}
-              </Button>
-            ))}
-          </Button.Group>
-        </>
-      ) : (
-        <Text size="xs" c="dimmed">
-          Click into a cell for row/column operations. Tab / Shift+Tab moves between cells.
-        </Text>
-      )}
-    </>
-  );
-}
 
 function FragmentFields({ el }: { el: HTMLElement }) {
   const ctx = useEditorStore((s) => s.ctx)!;

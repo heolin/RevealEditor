@@ -323,6 +323,32 @@ export function EmojiControl({ ctx, variant }: { ctx: EditorContext; variant: Su
   );
 }
 
+/**
+ * Sanitise an uploaded SVG for inline insertion: drop <script>, event-handler
+ * attributes, and external/js references, keeping the vector markup (which
+ * stays CSS-targetable, unlike an <img>). Returns null if it isn't valid SVG.
+ */
+function sanitizeSvg(text: string): string | null {
+  const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
+  const svg = doc.querySelector('svg');
+  if (!svg || doc.querySelector('parsererror')) return null;
+  for (const el of svg.querySelectorAll('script, foreignObject')) el.remove();
+  for (const el of [svg, ...svg.querySelectorAll('*')]) {
+    for (const attr of [...el.attributes]) {
+      const name = attr.name.toLowerCase();
+      const val = attr.value.trim().toLowerCase();
+      if (name.startsWith('on')) el.removeAttribute(attr.name);
+      else if (
+        (name === 'href' || name === 'xlink:href') &&
+        !val.startsWith('#') &&
+        !val.startsWith('data:image')
+      )
+        el.removeAttribute(attr.name);
+    }
+  }
+  return svg.outerHTML;
+}
+
 /** Image insertion — needs a hidden file input for uploads. */
 export function ImageInsertControl({ ctx, variant }: { ctx: EditorContext; variant: SurfaceVariant }) {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -340,6 +366,15 @@ export function ImageInsertControl({ ctx, variant }: { ctx: EditorContext; varia
       onChange={async (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
+        // SVG → inline vector markup (CSS-targetable); everything else → <img>.
+        if (file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')) {
+          const svg = sanitizeSvg(await file.text());
+          if (svg) {
+            insertHtmlSnippet(stage, svg, after);
+            e.target.value = '';
+            return;
+          }
+        }
         const { url } = await api.uploadAsset(deckPath, file);
         insertHtmlSnippet(stage, `<img src="${url}" alt="">`, after);
         e.target.value = '';

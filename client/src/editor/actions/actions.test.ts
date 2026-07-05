@@ -18,6 +18,7 @@ function fakeCtx(overrides: Partial<EditorContext> = {}): EditorContext {
     session: null,
     isAbsolute: false,
     cell: null,
+    cells: [],
     slide: { id: 's1', attrsText: '', source: '<section></section>', leading: '\n' },
     deck: null,
     ...overrides,

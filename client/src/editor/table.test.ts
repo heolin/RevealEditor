@@ -4,19 +4,27 @@ import {
   addColumn,
   addRow,
   allCells,
+  allRect,
+  applyCellStyle,
   canMerge,
   canSplit,
+  cellsInRect,
+  colRect,
   deleteColumn,
   deleteRow,
+  gridCoordOf,
   hasHeaderRow,
   mergeCells,
   nextCell,
   parseClipboardTable,
   parseTsv,
   pasteFillCells,
+  rowRect,
+  selectedCells,
   setColumnAlignment,
   splitCell,
   tableGrid,
+  toggleCellStyle,
   toggleHeaderRow,
 } from './table';
 
@@ -213,5 +221,58 @@ describe('merge with a thead present', () => {
     expect(canMerge(cell(0, 0), 'down')).toBe(true); // now aligned
     mergeCells(ctx, cell(0, 0), 'down');
     expect(cell(0, 0).getAttribute('rowspan')).toBe('2');
+  });
+});
+
+describe('cell selection + bulk styling', () => {
+  // 3 rows (A,B header; 1,2; 3,4) x 2 cols
+  function setup() {
+    const { ctx, table } = makeCtx(BASIC);
+    const grid = tableGrid(table);
+    return { ctx, table, grid };
+  }
+
+  it('gridCoordOf finds a cell', () => {
+    const { table, grid } = setup();
+    expect(gridCoordOf(table, grid[0][0])).toEqual([0, 0]);
+    expect(gridCoordOf(table, grid[2][1])).toEqual([2, 1]);
+  });
+
+  it('colRect/rowRect/allRect resolve the right cell sets', () => {
+    const { table, grid } = setup();
+    expect(cellsInRect(table, colRect(table, 0))).toEqual([grid[0][0], grid[1][0], grid[2][0]]);
+    expect(cellsInRect(table, rowRect(table, 1))).toEqual([grid[1][0], grid[1][1]]);
+    expect(cellsInRect(table, allRect(table)).length).toBe(6);
+  });
+
+  it('selectedCells falls back to the active cell when no rect', () => {
+    const { table, grid } = setup();
+    expect(selectedCells(table, null, grid[1][1])).toEqual([grid[1][1]]);
+    expect(selectedCells(table, null, null)).toEqual([]);
+    expect(selectedCells(table, colRect(table, 1), null)).toEqual([grid[0][1], grid[1][1], grid[2][1]]);
+  });
+
+  it('applyCellStyle writes inline styles across a column and cleans empties', () => {
+    const { ctx, table, grid } = setup();
+    const col = cellsInRect(table, colRect(table, 0));
+    applyCellStyle(ctx, col, { 'background-color': '#eee', 'text-align': 'center' });
+    for (const c of col) {
+      expect(c.style.backgroundColor).toBe('rgb(238, 238, 238)');
+      expect(c.style.textAlign).toBe('center');
+    }
+    // untouched column has no style
+    expect(grid[0][1].getAttribute('style')).toBeNull();
+    // clearing removes the properties and the empty style attr
+    applyCellStyle(ctx, col, { 'background-color': null, 'text-align': null });
+    for (const c of col) expect(c.getAttribute('style')).toBeNull();
+  });
+
+  it('toggleCellStyle flips bold across the set', () => {
+    const { ctx, table } = setup();
+    const row = cellsInRect(table, rowRect(table, 1));
+    toggleCellStyle(ctx, row, 'font-weight', 'bold');
+    expect(row.every((c) => c.style.fontWeight === 'bold')).toBe(true);
+    toggleCellStyle(ctx, row, 'font-weight', 'bold');
+    expect(row.every((c) => !c.style.fontWeight)).toBe(true);
   });
 });

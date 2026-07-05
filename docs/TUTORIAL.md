@@ -1,13 +1,27 @@
-# Tutorial: your first deck
+# Tutorials
 
-A hands-on walkthrough. By the end you'll have opened a deck, edited its text,
-added a table, a chart and a shape, positioned things, and exported the result —
-the whole loop. Budget about fifteen minutes. For a reference-style rundown of
-every feature, see the [user guide](USAGE.md).
+Two kinds of walkthrough on one page:
+
+- **[Getting started: your first deck](#getting-started-your-first-deck)** — the
+  whole loop end to end (open, edit, insert, position, export) in about fifteen
+  minutes.
+- **Feature tutorials** — short, focused, step-by-step guides for specific core
+  features: [masking & cropping images](#masking--cropping-images),
+  [shadows & effects](#adding-shadows--effects), and
+  [styling tables](#styling-tables). More will be added over time.
+
+For a reference-style rundown of every feature, see the [user guide](USAGE.md).
 
 > **Setup:** if the app isn't running yet, do `npm install` then `npm run dev`
 > and open <http://localhost:5173>. To edit your own folder of talks, see
 > [Choosing a workspace folder](USAGE.md#choosing-a-workspace-folder).
+
+---
+
+# Getting started: your first deck
+
+A hands-on walkthrough. By the end you'll have opened a deck, edited its text,
+added a table, a chart and a shape, positioned things, and exported the result.
 
 ## 1. Pick a deck
 
@@ -34,7 +48,8 @@ The editor has four areas:
 - **Toolbar** (top) — the formatting ribbon plus deck actions (PDF, ZIP,
   Offline, Present, Save).
 - **Inspector** (right) — properties for whatever is selected, or for the slide
-  itself when nothing is.
+  itself when nothing is. Extra tabs (**Image**, **Table**, **Effects**) appear
+  here when the selection has them.
 
 Two clicks are worth remembering: **one click selects** an element, a **second
 click edits** it.
@@ -68,9 +83,9 @@ the table; click again to type. **Tab** and the arrow keys move between cells.
 
 ![Editing a table cell, with table options in the inspector](images/table-editing.png)
 
-The inspector's **Table** section switches style presets (bordered, striped,
-minimal…), and you can add or remove rows and columns, merge cells, and set
-per-cell colors. Paste from a spreadsheet to fill a table instantly.
+For full styling — selecting rows/columns and setting colors, alignment and
+borders in bulk — see [Styling tables](#styling-tables) below. Paste from a
+spreadsheet to fill a table instantly.
 
 ## 6. Add a chart
 
@@ -82,7 +97,8 @@ preview beside it.
 
 When you click **Save chart** it's baked into the slide as a plain SVG, so your
 deck stays standalone with no chart library. The data stays editable — reopen
-the chart any time to change it.
+the chart any time to change it. (You can also right-click a table and
+**Convert to chart** to turn its numbers into one.)
 
 ## 7. Draw a shape or diagram
 
@@ -133,6 +149,79 @@ Hit **Save** (Ctrl/Cmd+S). RevealEditor writes clean HTML back to the same file
 — slides you didn't touch stay byte-for-byte identical, so your version history
 only shows what actually changed.
 
-That's the whole loop. From here, the [user guide](USAGE.md) covers each area in
-more depth, and [publishing](USAGE.md#exporting-and-publishing) shows how to get
-a finished deck online.
+That's the whole loop. The focused tutorials below go deeper on specific
+features; the [user guide](USAGE.md) covers every area in reference form.
+
+---
+
+# Feature tutorials
+
+## Masking & cropping images
+
+Shape a photo into a circle (or any shape) and crop it to just the region you
+want — all non-destructive, all plain CSS. The original file is never altered.
+
+1. **Select an image.** An **Image** tab appears at the top of the inspector.
+   Open it — or just **double-click the image** to jump straight into mask mode.
+2. **Pick a shape** from the **Mask** grid: Circle, Ellipse, Rounded, Rectangle,
+   Triangle, Diamond or Hexagon. The photo clips to it immediately, and drag
+   handles appear on the canvas.
+
+   ![Masking an image to a circle from the Image tab](images/image-mask.png)
+
+3. **Fine-tune on the canvas.** Drag the handles to reshape the mask — a circle's
+   radius, an ellipse's two radii, a rectangle's edges, a polygon's corners. Move
+   the center handle to reposition it. Press **Done** (or Esc) when you're happy.
+4. **Crop instead** by clicking **Crop image**. Drag the frame edges to set the
+   crop rectangle and drag the photo to pan what shows through; **Done** applies
+   it. The **Fit** control (Fill / Cover / Contain) sets how the image fills its
+   box.
+
+   ![Cropping an image with the on-canvas frame](images/image-crop.png)
+
+5. **Corners and border** live in the same tab — round the corners or add a
+   border in one click.
+
+> Masks and crops are written as inline `clip-path` / `object-fit` — the deck
+> stays standalone and the shadow of a masked image follows its shape.
+
+## Adding shadows & effects
+
+The **Effects** tab works on *any* element — image, shape, or text box — and its
+effects stack.
+
+1. **Select an element** and open the **Effects** tab.
+2. **Shadow** — pick a preset (Soft → Long) and a color. The shadow follows the
+   element's real shape, so a circle-masked photo casts a *circular* shadow and
+   text shadows its glyphs.
+
+   ![The Effects tab: shadow, opacity, blur and adjustments](images/effects.png)
+
+3. **Opacity** and **Blur** — drag the sliders for a live preview on the canvas.
+4. **Adjust** — toggle **Grayscale / Sepia / Invert**, or drag **Brightness** and
+   **Saturation**. Combine them freely: a subtle shadow, grayscale, and a touch
+   of blur all at once, as in the shot above.
+
+> Effects are plain inline CSS (`filter`, `opacity`) and compose into a single
+> value, so they render anywhere with no runtime and round-trip cleanly.
+
+## Styling tables
+
+Style a single cell, a whole row or column, or the entire table in one move.
+
+1. **Click a cell.** A **Table** tab appears — open it.
+2. **Choose a scope.** Use the strips along the table's top and left edges to
+   select a whole **column** or **row** (the corner selects the whole table), or
+   **shift-click / drag across cells** for a custom range. Selected cells
+   highlight, and the **Scope** buttons mirror your choice.
+
+   ![Selecting a column and the Table tab's styling controls](images/table-styling.png)
+
+3. **Restyle in bulk.** In the Table tab set **Fill** and **Text** color, toggle
+   **Bold / Italic**, set horizontal and vertical **alignment**, **font size**,
+   and **borders** — every cell in your selection updates together.
+4. **Change structure.** Switch a style preset (bordered / striped / minimal),
+   toggle the **header row**, and add, delete, merge or split cells.
+
+> Tip: paste a range from Excel or Google Sheets onto a slide to create a table
+> from it instantly — or onto an existing cell to fill from there.

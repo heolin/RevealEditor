@@ -33,7 +33,14 @@ import {
   isLineKind,
   reconcileConnectors,
 } from './shapes';
-import { insertTableFromData, nextCell, parseClipboardTable, parseTsv, pasteFillCells } from './table';
+import {
+  gridCoordOf,
+  insertTableFromData,
+  nextCell,
+  parseClipboardTable,
+  parseTsv,
+  pasteFillCells,
+} from './table';
 import { type StageCtx, commit } from './commands';
 import { dispatchShortcut } from './actions/dispatcher';
 
@@ -235,6 +242,15 @@ ${stageHead(meta)}
     /** Marquee rubber-band selection, started from empty canvas. */
     let marquee: { x0: number; y0: number; active: boolean } | null = null;
 
+    /** Drag across table cells to select a rectangular range. */
+    let cellDrag: {
+      table: HTMLTableElement;
+      anchor: [number, number];
+      pointerId: number;
+      x0: number;
+      y0: number;
+    } | null = null;
+
     /** Armed shape being drawn (draw mode): click places, drag sizes. */
     let draw: { x0: number; y0: number; kind: import('./shapes').ShapeKind; active: boolean } | null =
       null;
@@ -315,6 +331,7 @@ ${stageHead(meta)}
     function finalizePress() {
       const p = press;
       press = null;
+      cellDrag = null;
       if (marquee) {
         marquee = null;
         useEditorStore.getState().setMarquee(null);
@@ -421,6 +438,22 @@ ${stageHead(meta)}
       const el = withinSelected ? selected! : childOf(section, target);
       if (!el) return;
 
+      // Shift-click inside a table extends the rectangular cell selection from
+      // the current cell (anchor) to the clicked cell (focus).
+      if (e.shiftKey) {
+        const focusCell = (target as Element).closest('td, th') as HTMLTableCellElement | null;
+        const anchorCell = editor.selectedEl?.closest('td, th') as HTMLTableCellElement | null;
+        const table = focusCell?.closest('table') as HTMLTableElement | null;
+        if (focusCell && anchorCell && table && anchorCell.closest('table') === table) {
+          const a = gridCoordOf(table, anchorCell);
+          const b = gridCoordOf(table, focusCell);
+          if (a && b) {
+            editor.setCellSel({ r0: a[0], c0: a[1], r1: b[0], c1: b[1] });
+            return;
+          }
+        }
+      }
+
       // Shift/Ctrl/Cmd-click toggles set membership — no drag, no activation.
       if (e.shiftKey || e.ctrlKey || e.metaKey) {
         editor.toggleSelect(withinSelected ? selected! : el);
@@ -431,6 +464,22 @@ ${stageHead(meta)}
         const inSet = editor.extraSelected.includes(el);
         if (!inSet) editor.select(el);
         else editor.toggleSelect(el), editor.toggleSelect(el); // promote to primary
+      }
+
+      // Arm a cell drag-select: a drag crossing into another cell selects the
+      // rectangle instead of moving the table (a same-cell drag still moves).
+      const downCell = (target as Element).closest('td, th') as HTMLTableCellElement | null;
+      const downTable = downCell?.closest('table') as HTMLTableElement | null;
+      if (downCell && downTable && section.contains(downTable)) {
+        const a = gridCoordOf(downTable, downCell);
+        if (a) {
+          cellDrag = { table: downTable, anchor: a, pointerId: e.pointerId, x0: e.clientX, y0: e.clientY };
+          try {
+            (target as HTMLElement).setPointerCapture?.(e.pointerId);
+          } catch {
+            /* best-effort */
+          }
+        }
       }
 
       const ctx = ctxRef.current!;
@@ -490,6 +539,28 @@ ${stageHead(meta)}
           marquee.active = true;
         }
         if (marquee.active) applyMarquee(e.clientX, e.clientY);
+        return;
+      }
+      // Cell drag-select owns the gesture once past the drag threshold: it
+      // selects the rectangle from the anchor cell to the cell under the
+      // pointer and never moves the table. A tiny jitter stays a plain click.
+      if (cellDrag && ctx) {
+        if (Math.hypot(e.clientX - cellDrag.x0, e.clientY - cellDrag.y0) < DRAG_THRESHOLD) return;
+        press = null;
+        const over = (doc.elementFromPoint(e.clientX, e.clientY) as Element | null)?.closest(
+          'td, th',
+        ) as HTMLTableCellElement | null;
+        if (over && over.closest('table') === cellDrag.table) {
+          const b = gridCoordOf(cellDrag.table, over);
+          if (b) {
+            useEditorStore.getState().setCellSel({
+              r0: cellDrag.anchor[0],
+              c0: cellDrag.anchor[1],
+              r1: b[0],
+              c1: b[1],
+            });
+          }
+        }
         return;
       }
       // Drag tracking (iframe coordinates ARE slide-space px — no scale math).
@@ -603,6 +674,7 @@ ${stageHead(meta)}
 
     doc.addEventListener('pointerup', (e) => {
       const ctx = ctxRef.current;
+      cellDrag = null;
       if (draw) {
         const gesture = draw;
         draw = null;
@@ -668,6 +740,16 @@ ${stageHead(meta)}
     doc.addEventListener('dblclick', (e) => {
       const target = e.target as Element;
       if (!section.contains(target)) return;
+      // Double-click an image → open the Image tab and enter mask mode.
+      const img = target.closest('img');
+      if (img && section.contains(img)) {
+        e.preventDefault();
+        const store = useEditorStore.getState();
+        store.select(img as HTMLElement);
+        store.setRightTab('image');
+        store.setMaskEl(img as HTMLElement);
+        return;
+      }
       const pre = target.closest('pre');
       if (pre && section.contains(pre) && pre !== section) {
         e.preventDefault();
