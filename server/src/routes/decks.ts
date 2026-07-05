@@ -112,6 +112,7 @@ export function decksRouter(ws: Workspace): Router {
       }
       const template = await fs.readFile(TEMPLATE_PATH, 'utf8');
       const content = template
+        .replace(/^<!-- re:template[^>]*-->\r?\n/m, '') // drop the template marker
         .replaceAll('{{title}}', escapeHtml(title || 'New presentation'))
         .replaceAll('{{theme}}', /^[\w-]+$/.test(theme || '') ? theme! : 'black')
         .replaceAll('{{width}}', String(Number.isFinite(width) && width! > 0 ? width : 1280))

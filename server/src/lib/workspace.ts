@@ -86,6 +86,9 @@ export class Workspace {
       const stat = await fs.stat(abs);
       if (stat.size > MAX_DECK_BYTES) return null;
       const src = await fs.readFile(abs, 'utf8');
+      // App-internal templates (e.g. the "New presentation" skeleton) mark
+      // themselves so they never surface as — or get deleted like — a deck.
+      if (src.includes('re:template')) return null;
       if (!/class\s*=\s*["'][^"']*\breveal\b/.test(src)) return null;
       if (!/class\s*=\s*["'][^"']*\bslides\b/.test(src)) return null;
       const info = parseDeck(src);
