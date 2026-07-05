@@ -439,16 +439,15 @@ ${stageHead(meta)}
       if (!el) return;
 
       // Shift-click inside a table extends the rectangular cell selection from
-      // the current cell (anchor) to the clicked cell (focus).
+      // its current anchor (cellSel top-left) to the clicked cell.
       if (e.shiftKey) {
         const focusCell = (target as Element).closest('td, th') as HTMLTableCellElement | null;
-        const anchorCell = editor.selectedEl?.closest('td, th') as HTMLTableCellElement | null;
         const table = focusCell?.closest('table') as HTMLTableElement | null;
-        if (focusCell && anchorCell && table && anchorCell.closest('table') === table) {
-          const a = gridCoordOf(table, anchorCell);
+        const cs = editor.cellSel;
+        if (focusCell && table && cs) {
           const b = gridCoordOf(table, focusCell);
-          if (a && b) {
-            editor.setCellSel({ r0: a[0], c0: a[1], r1: b[0], c1: b[1] });
+          if (b) {
+            editor.setCellSel({ r0: cs.r0, c0: cs.c0, r1: b[0], c1: b[1] });
             return;
           }
         }
@@ -474,6 +473,10 @@ ${stageHead(meta)}
         const a = gridCoordOf(downTable, downCell);
         if (a) {
           cellDrag = { table: downTable, anchor: a, pointerId: e.pointerId, x0: e.clientX, y0: e.clientY };
+          // The clicked cell IS the selection (1×1) — clicking a cell selects
+          // the whole <table> as the element, so this is how the active cell is
+          // tracked for the Table tab / scope buttons / single-cell styling.
+          editor.setCellSel({ r0: a[0], c0: a[1], r1: a[0], c1: a[1] });
           try {
             (target as HTMLElement).setPointerCapture?.(e.pointerId);
           } catch {

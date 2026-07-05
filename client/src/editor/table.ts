@@ -545,6 +545,16 @@ export function allRect(table: HTMLTableElement): CellRect {
   return { r0: 0, r1: rows - 1, c0: 0, c1: cols - 1 };
 }
 
+/** The cell at a selection's anchor (its top-left slot), or null. */
+export function anchorCell(
+  table: HTMLTableElement,
+  rect: CellRect | null,
+): HTMLTableCellElement | null {
+  if (!rect) return null;
+  const { r0, c0 } = normalizeRect(table, rect);
+  return tableGrid(table)[r0]?.[c0] ?? null;
+}
+
 /** The cells a style write should target: the rect if set, else the active cell. */
 export function selectedCells(
   table: HTMLTableElement,

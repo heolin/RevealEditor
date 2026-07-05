@@ -3,7 +3,7 @@ import { useEditorStore } from '../editorStore';
 import { useDeckStore } from '../../state/deckStore';
 import { handlerFor } from '../registry';
 import { isAbsolute } from '../geometry';
-import { selectedCells } from '../table';
+import { anchorCell, selectedCells } from '../table';
 import type { EditorContext } from './types';
 
 /** Build the context snapshot — the ONLY place that inspects selection state. */
@@ -16,8 +16,11 @@ export function buildEditorContext(): EditorContext {
   );
   const slide =
     d.columns.flatMap((c) => c.slides).find((s) => s.id === d.selectedSlideId) ?? null;
-  const cell = (selection?.closest('td, th') as HTMLTableCellElement | null) ?? null;
   const table = (selection?.closest('table') as HTMLTableElement | null) ?? null;
+  // A cell click selects the whole table; the active cell is cellSel's anchor.
+  const cell =
+    (selection?.closest('td, th') as HTMLTableCellElement | null) ??
+    (table ? anchorCell(table, e.cellSel) : null);
   return {
     stage: e.ctx,
     selection,

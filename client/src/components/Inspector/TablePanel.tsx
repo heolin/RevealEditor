@@ -32,6 +32,7 @@ import {
   addColumn,
   addRow,
   allRect,
+  anchorCell,
   applyCellStyle,
   canMerge,
   canSplit,
@@ -42,6 +43,7 @@ import {
   gridSize,
   hasHeaderRow,
   mergeCells,
+  normalizeRect,
   rowRect,
   selectedCells,
   setTablePreset,
@@ -59,9 +61,11 @@ type Scope = 'cell' | 'row' | 'column' | 'table' | 'cells';
 function scopeOf(table: HTMLTableElement, rect: CellRect | null): Scope {
   if (!rect) return 'cell';
   const { rows, cols } = gridSize(table);
-  if (rect.r0 === 0 && rect.r1 === rows - 1 && rect.c0 === 0 && rect.c1 === cols - 1) return 'table';
-  if (rect.r0 === rect.r1 && rect.c0 === 0 && rect.c1 === cols - 1) return 'row';
-  if (rect.c0 === rect.c1 && rect.r0 === 0 && rect.r1 === rows - 1) return 'column';
+  const n = normalizeRect(table, rect);
+  if (n.r0 === 0 && n.r1 === rows - 1 && n.c0 === 0 && n.c1 === cols - 1) return 'table';
+  if (n.r0 === n.r1 && n.c0 === 0 && n.c1 === cols - 1) return 'row';
+  if (n.c0 === n.c1 && n.r0 === 0 && n.r1 === rows - 1) return 'column';
+  if (n.r0 === n.r1 && n.c0 === n.c1) return 'cell';
   return 'cells';
 }
 
@@ -80,16 +84,23 @@ export function TablePanel() {
     );
   }
 
-  const active = (sel?.closest('td, th') as HTMLTableCellElement | null) ?? null;
+  // Clicking a cell selects the whole <table> as the element, so the active
+  // cell comes from cellSel's anchor (falling back to a real cell selection).
+  const active =
+    anchorCell(table, cellSel) ?? (sel?.closest('td, th') as HTMLTableCellElement | null) ?? null;
   const cells = selectedCells(table, cellSel, active);
   const rep = cells[0] ?? active; // representative for reading current values
   const scope = scopeOf(table, cellSel);
-  const rc = active ? gridCoordOf(table, active) : null;
+  const rc: [number, number] | null = cellSel
+    ? [normalizeRect(table, cellSel).r0, normalizeRect(table, cellSel).c0]
+    : active
+      ? gridCoordOf(table, active)
+      : null;
 
   const setScope = (s: Scope) => {
     if (!rc && s !== 'table') return;
     const store = useEditorStore.getState();
-    if (s === 'cell') store.setCellSel(null);
+    if (s === 'cell') store.setCellSel(rc ? { r0: rc[0], c0: rc[1], r1: rc[0], c1: rc[1] } : null);
     else if (s === 'row') store.setCellSel(rowRect(table, rc![0]));
     else if (s === 'column') store.setCellSel(colRect(table, rc![1]));
     else if (s === 'table') store.setCellSel(allRect(table));
