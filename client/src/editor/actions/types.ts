@@ -17,9 +17,12 @@ export interface EditorContext {
   /** Full selection set: [.., primary last]; empty when nothing selected. */
   selections: HTMLElement[];
   handler: ElementHandler | null;
-  session: 'text' | 'code' | 'chart' | null;
+  session: 'text' | 'code' | 'chart' | 'crop' | 'mask' | null;
   isAbsolute: boolean;
   cell: HTMLTableCellElement | null;
+  /** The table cells a bulk style write should target (rect selection, else
+   *  the single active cell). Empty when the selection isn't in a table. */
+  cells: HTMLTableCellElement[];
   slide: Slide | null;
   deck: DeckMeta | null;
 }

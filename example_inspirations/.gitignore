@@ -1,0 +1,5 @@
+# Source decks (inputs) and generated reveal decks (build outputs) are heavy;
+# the converter (reveal/odp2reveal.py) is tracked — regenerate the rest with it.
+*.odp
+/reveal/*/
+/reveal/index.html

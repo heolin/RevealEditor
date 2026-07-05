@@ -209,6 +209,18 @@ export function setElementAttr(ctx: StageCtx, el: HTMLElement, name: string, val
   commit(ctx);
 }
 
+/** Set/remove a single inline style property (kebab-case name); null/'' removes it. */
+export function setElementStyleProp(
+  ctx: StageCtx,
+  el: HTMLElement,
+  prop: string,
+  value: string | null,
+): void {
+  if (value === null || value === '') el.style.removeProperty(prop);
+  else el.style.setProperty(prop, value);
+  commit(ctx);
+}
+
 /** Mirror data-background-* onto the static stage (the runtime isn't there to). */
 export function paintStageBackground(ctx: StageCtx): void {
   const color =

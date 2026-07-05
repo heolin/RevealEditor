@@ -13,6 +13,9 @@ import { ConflictDialog } from './components/ConflictDialog';
 import { Tabs } from '@mantine/core';
 import { InspectorPanel } from './components/Inspector/InspectorPanel';
 import { LayersPanel } from './components/Inspector/LayersPanel';
+import { ImagePanel } from './components/Inspector/ImagePanel';
+import { EffectsPanel } from './components/Inspector/EffectsPanel';
+import { TablePanel } from './components/Inspector/TablePanel';
 import { NotesDrawer } from './components/Notes/NotesDrawer';
 import { CodeModal } from './editor/CodeModal';
 import { ChartModal } from './editor/chart/ChartModal';
@@ -22,6 +25,27 @@ import { IconPicker } from './components/IconPicker';
 export function App() {
   const meta = useDeckStore((s) => s.meta);
   const conflict = useDeckStore((s) => s.conflict);
+  const selectedEl = useEditorStore((s) => s.selectedEl);
+  const rightTab = useEditorStore((s) => s.rightTab);
+  const maskEl = useEditorStore((s) => s.maskEl);
+  const hasSelection = !!selectedEl && selectedEl.isConnected;
+  const isImage = hasSelection && selectedEl.tagName === 'IMG';
+  const isTable = hasSelection && !!selectedEl.closest('table');
+
+  // Image/Effects are contextual tabs. Image exists only for images; Effects
+  // for any selection. Losing the relevant selection falls back to Design;
+  // changing selection while in mask mode retargets (image) or exits.
+  useEffect(() => {
+    const s = useEditorStore.getState();
+    if (!isImage && rightTab === 'image') {
+      s.setRightTab('design');
+      s.setMaskEl(null);
+    } else if (maskEl && maskEl !== selectedEl) {
+      s.setMaskEl(isImage ? selectedEl : null);
+    }
+    if (!hasSelection && rightTab === 'effects') s.setRightTab('design');
+    if (!isTable && rightTab === 'table') s.setRightTab('design');
+  }, [isImage, isTable, hasSelection, rightTab, selectedEl, maskEl]);
 
   // A session that survived a toolbar interaction (ignoreBlur) has no second
   // blur to end it — parent clicks OUTSIDE editor chrome close it explicitly.
@@ -91,16 +115,39 @@ export function App() {
           <NotesDrawer />
         </div>
         <div className="right-col">
-          <Tabs defaultValue="design" className="right-tabs">
+          <Tabs
+            value={rightTab}
+            onChange={(v) => {
+              const tab = (v ?? 'design') as 'design' | 'layers' | 'image' | 'effects';
+              useEditorStore.getState().setRightTab(tab);
+              // Opening the Image tab enters mask mode; leaving it exits.
+              useEditorStore
+                .getState()
+                .setMaskEl(tab === 'image' && isImage ? selectedEl : null);
+            }}
+            className="right-tabs"
+          >
             <Tabs.List>
               <Tabs.Tab value="design">Design</Tabs.Tab>
               <Tabs.Tab value="layers">Layers</Tabs.Tab>
+              {isImage && <Tabs.Tab value="image">Image</Tabs.Tab>}
+              {isTable && <Tabs.Tab value="table">Table</Tabs.Tab>}
+              {hasSelection && <Tabs.Tab value="effects">Effects</Tabs.Tab>}
             </Tabs.List>
             <Tabs.Panel value="design" className="right-tab-panel">
               <InspectorPanel />
             </Tabs.Panel>
             <Tabs.Panel value="layers" className="right-tab-panel">
               <LayersPanel />
+            </Tabs.Panel>
+            <Tabs.Panel value="image" className="right-tab-panel">
+              <ImagePanel />
+            </Tabs.Panel>
+            <Tabs.Panel value="table" className="right-tab-panel">
+              <TablePanel />
+            </Tabs.Panel>
+            <Tabs.Panel value="effects" className="right-tab-panel">
+              <EffectsPanel />
             </Tabs.Panel>
           </Tabs>
           <PreviewPane />

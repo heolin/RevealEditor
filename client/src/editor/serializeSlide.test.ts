@@ -38,6 +38,19 @@ describe('serializeSlide', () => {
     expect(out).not.toContain('style=""');
   });
 
+  it('preserves image mask/crop inline styles (clip-path, object-fit, object-position)', () => {
+    const html =
+      '<img src="a.png" alt="" ' +
+      'style="clip-path: circle(50%); object-fit: cover; object-position: 30% 20%;">';
+    const out = serializeSlide(stage(html));
+    expect(out).toContain('clip-path: circle(50%)');
+    expect(out).toContain('object-fit: cover');
+    expect(out).toContain('object-position: 30% 20%');
+    // A second pass over the serialized output is byte-identical (no drift).
+    const again = serializeSlide(stage(out.replace(/^<section>|<\/section>$/g, '')));
+    expect(again).toBe(out);
+  });
+
   it('keeps file-format data-re attrs: shape/chart specs, ids, free-layout marker', () => {
     const s = stage(
       '<svg data-re-shape=\'{"kind":"rect"}\' class="re-shape"></svg>' +

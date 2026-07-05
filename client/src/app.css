@@ -466,6 +466,94 @@ html, body, #root { height: 100%; margin: 0; }
   pointer-events: auto;
   z-index: 8;
 }
+/* Crop mode: full-source ghost, dimmed outside the crop frame. */
+.crop-ghost {
+  position: absolute;
+  pointer-events: none;
+  z-index: 6;
+}
+.crop-frame {
+  position: absolute;
+  border: 1.5px solid var(--re-accent);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
+  cursor: move;
+  pointer-events: auto;
+  z-index: 7;
+}
+.crop-done,
+.mask-done {
+  position: absolute;
+  pointer-events: auto;
+  z-index: 10;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 12px;
+  color: #fff;
+  background: var(--re-accent);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+/* Mask mode: dashed shape outline + per-vertex/param drag handles. */
+.mask-outline {
+  position: absolute;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 7;
+}
+.mask-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: var(--re-panel);
+  border: 2px solid var(--re-accent);
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 9;
+}
+.mask-handle.center {
+  cursor: move;
+  background: var(--re-accent);
+}
+/* Image-tab mask picker + Effects-tab effect swatches (live previews). */
+.mask-swatch,
+.effect-swatch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 2px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+}
+.mask-swatch:hover,
+.effect-swatch:hover {
+  background: rgba(128, 128, 128, 0.12);
+}
+.mask-swatch.active,
+.effect-swatch.active {
+  border-color: var(--re-accent);
+  background: rgba(128, 128, 128, 0.14);
+}
+.mask-swatch-fill,
+.effect-swatch-fill {
+  width: 34px;
+  height: 34px;
+  background: var(--re-accent);
+}
+.effect-swatch-fill {
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  margin: 4px 0;
+}
+.mask-swatch span,
+.effect-swatch span {
+  font-size: 10px;
+  opacity: 0.75;
+}
 .endpoint-handle {
   position: absolute;
   width: 12px;
@@ -518,6 +606,33 @@ html, body, #root { height: 100%; margin: 0; }
 .col-resize-grip:hover {
   background: var(--re-accent);
   opacity: 0.5;
+}
+/* Table cell selection: header strips + highlight. */
+.cell-highlight {
+  position: absolute;
+  pointer-events: none;
+  background: rgba(64, 120, 230, 0.16);
+  outline: 1px solid var(--re-accent);
+  z-index: 7;
+}
+.table-sel-col,
+.table-sel-row,
+.table-sel-corner {
+  position: absolute;
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 8;
+  background: var(--re-panel);
+  border: 1px solid var(--re-accent);
+  opacity: 0.55;
+}
+.table-sel-col:hover,
+.table-sel-row:hover,
+.table-sel-corner:hover,
+.table-sel-col.active,
+.table-sel-row.active {
+  background: var(--re-accent);
+  opacity: 1;
 }
 .rotate-badge {
   position: absolute;

@@ -58,7 +58,7 @@ const DEFAULTS: Record<SurfaceId, SurfaceLayout> = {
   /** Floating toolbar: quick non-text ops that follow the selection.
    *  Hidden entirely during text sessions (the textBar takes over). */
   floating: [
-    ['code.edit', 'chart.edit'],
+    ['code.edit', 'chart.edit', 'image.editMask', 'image.crop'],
     ['arrange.moveUp', 'arrange.moveDown'],
     ['arrange.front', 'arrange.back', 'arrange.unpin'],
     ['arrange.duplicate', 'arrange.delete'],
@@ -74,7 +74,7 @@ const DEFAULTS: Record<SurfaceId, SurfaceLayout> = {
 
   /** Right-click context menu — unavailable actions hidden (menu convention). */
   context: [
-    ['code.edit', 'chart.edit'],
+    ['code.edit', 'chart.edit', 'image.editMask', 'image.crop'],
     [
       'table.rowAbove',
       'table.rowBelow',
@@ -85,6 +85,7 @@ const DEFAULTS: Record<SurfaceId, SurfaceLayout> = {
       'table.mergeRight',
       'table.mergeDown',
       'table.splitCell',
+      'table.toChart',
     ],
     ['arrange.duplicate', 'arrange.copy', 'arrange.cut', 'arrange.paste'],
     ['arrange.moveUp', 'arrange.moveDown'],

@@ -8,6 +8,7 @@ import type { StageCtx } from '../commands';
 import { commit, insertHtmlSnippet } from '../commands';
 import { useDeckStore } from '../../state/deckStore';
 import { themeColors } from '../../model/themeColors';
+import { tableGrid } from '../table';
 import { type ChartSpec, renderChart } from './renderChart';
 
 export const CHART_ATTR = 'data-re-chart';
@@ -103,6 +104,44 @@ export function insertChart(ctx: StageCtx, after: HTMLElement | null): HTMLEleme
     commit(ctx);
   }
   return el;
+}
+
+const numeric = (s: string) => {
+  const n = parseFloat(s.replace(/[^0-9.\-]/g, ''));
+  return Number.isFinite(n) ? n : 0;
+};
+
+/**
+ * Build a chart from a table: first row = series names (first cell is the
+ * category header), first column = category labels, the rest = numeric values.
+ * Inserts the chart after the table and removes the table (one undo step). The
+ * chart's spec is fully editable afterwards in the chart modal.
+ */
+export function tableToChart(ctx: StageCtx, table: HTMLTableElement): HTMLElement | null {
+  const grid = tableGrid(table);
+  const cols = grid[0]?.length ?? 0;
+  if (grid.length < 2 || cols < 2) return null;
+  const labels = grid.slice(1).map((row) => row[0]?.textContent?.trim() ?? '');
+  const series = [];
+  for (let c = 1; c < cols; c++) {
+    series.push({
+      name: grid[0][c]?.textContent?.trim() || `Series ${c}`,
+      values: grid.slice(1).map((row) => numeric(row[c]?.textContent ?? '')),
+    });
+  }
+  const spec: ChartSpec = { type: 'bar', labels, series, options: { legend: series.length > 1 } };
+  const fig = insertHtmlSnippet(
+    ctx,
+    `<figure class="re-chart" style="width: 640px; height: 400px; margin: 0 auto;"></figure>`,
+    table,
+    false,
+  );
+  if (!fig) return null;
+  fig.setAttribute(CHART_ATTR, JSON.stringify(spec));
+  refreshChart(ctx, fig);
+  table.remove();
+  commit(ctx);
+  return fig;
 }
 
 const CHART_TYPES_SET = new Set([

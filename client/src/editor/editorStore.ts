@@ -9,6 +9,7 @@
 import { create } from 'zustand';
 import type { StageCtx } from './commands';
 import type { ShapeKind } from './shapes';
+import type { CellRect } from './table';
 
 interface EditorState {
   /** Live stage context for commands/toolbars; null when no stage mounted. */
@@ -32,6 +33,15 @@ interface EditorState {
   codeEditEl: HTMLElement | null;
   /** Chart figure open in the chart editor modal. */
   chartEditEl: HTMLElement | null;
+  /** <img> being reframed in crop mode (overlay crop gesture active). */
+  cropEl: HTMLElement | null;
+  /** <img> whose mask is being edited visually (overlay mask handles active). */
+  maskEl: HTMLElement | null;
+  /** Active right-panel tab; controlled so the stage can switch it. */
+  rightTab: 'design' | 'layers' | 'image' | 'effects' | 'table';
+  /** Rectangular cell selection within the selected table (grid coords), or
+   *  null → the single active cell. Cleared on any element-selection change. */
+  cellSel: CellRect | null;
   /** Active snap guide lines during a drag, in slide-space px. */
   snapGuides: { x: number | null; y: number | null } | null;
   /** Anchor dots shown during a connector-endpoint drag: the hovered
@@ -78,6 +88,10 @@ interface EditorState {
   setSessionEl(el: HTMLElement | null): void;
   setCodeEditEl(el: HTMLElement | null): void;
   setChartEditEl(el: HTMLElement | null): void;
+  setCropEl(el: HTMLElement | null): void;
+  setMaskEl(el: HTMLElement | null): void;
+  setRightTab(tab: 'design' | 'layers' | 'image' | 'effects' | 'table'): void;
+  setCellSel(rect: CellRect | null): void;
   setSnapGuides(g: { x: number | null; y: number | null } | null): void;
   setAnchorDots(
     d: { points: { x: number; y: number }[]; active: { x: number; y: number } | null } | null,
@@ -105,6 +119,10 @@ export const useEditorStore = create<EditorState>()((set) => ({
   sessionEl: null,
   codeEditEl: null,
   chartEditEl: null,
+  cropEl: null,
+  maskEl: null,
+  rightTab: 'design',
+  cellSel: null,
   snapGuides: null,
   anchorDots: null,
   dragRect: null,
@@ -122,7 +140,7 @@ export const useEditorStore = create<EditorState>()((set) => ({
   setStartSession: (fn) => set({ startSession: fn }),
   setEndSession: (fn) => set({ endSession: fn }),
   select: (el) =>
-    set((s) => ({ selectedEl: el, extraSelected: [], docVersion: s.docVersion + 1 })),
+    set((s) => ({ selectedEl: el, extraSelected: [], cellSel: null, docVersion: s.docVersion + 1 })),
   toggleSelect: (el) =>
     set((s) => {
       const all = [s.selectedEl, ...s.extraSelected].filter(
@@ -132,6 +150,7 @@ export const useEditorStore = create<EditorState>()((set) => ({
       return {
         selectedEl: next[next.length - 1] ?? null,
         extraSelected: next.slice(0, -1),
+        cellSel: null,
         docVersion: s.docVersion + 1,
       };
     }),
@@ -139,8 +158,10 @@ export const useEditorStore = create<EditorState>()((set) => ({
     set((s) => ({
       selectedEl: els[els.length - 1] ?? null,
       extraSelected: els.slice(0, -1),
+      cellSel: null,
       docVersion: s.docVersion + 1,
     })),
+  setCellSel: (rect) => set((s) => ({ cellSel: rect, docVersion: s.docVersion + 1 })),
   setMarquee: (rect) => set((s) => ({ marquee: rect, docVersion: s.docVersion + 1 })),
   setDrawLine: (line) => set((s) => ({ drawLine: line, docVersion: s.docVersion + 1 })),
   setLayoutMode: (on) => set((s) => ({ layoutMode: on, docVersion: s.docVersion + 1 })),
@@ -149,6 +170,9 @@ export const useEditorStore = create<EditorState>()((set) => ({
   setSessionEl: (el) => set((s) => ({ sessionEl: el, docVersion: s.docVersion + 1 })),
   setCodeEditEl: (el) => set((s) => ({ codeEditEl: el, docVersion: s.docVersion + 1 })),
   setChartEditEl: (el) => set((s) => ({ chartEditEl: el, docVersion: s.docVersion + 1 })),
+  setCropEl: (el) => set((s) => ({ cropEl: el, docVersion: s.docVersion + 1 })),
+  setMaskEl: (el) => set((s) => ({ maskEl: el, docVersion: s.docVersion + 1 })),
+  setRightTab: (tab) => set((s) => ({ rightTab: tab, docVersion: s.docVersion + 1 })),
   setSnapGuides: (g) => set((s) => ({ snapGuides: g, docVersion: s.docVersion + 1 })),
   setAnchorDots: (d) => set((s) => ({ anchorDots: d, docVersion: s.docVersion + 1 })),
   setDragRect: (r) => set((s) => ({ dragRect: r, docVersion: s.docVersion + 1 })),
@@ -169,6 +193,9 @@ export const useEditorStore = create<EditorState>()((set) => ({
       sessionEl: null,
       codeEditEl: null,
       chartEditEl: null,
+      cropEl: null,
+      maskEl: null,
+      cellSel: null,
       snapGuides: null,
       anchorDots: null,
       dragRect: null,

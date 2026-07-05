@@ -3,6 +3,7 @@ import { formatActions } from './format';
 import { insertActions } from './insert';
 import { arrangeActions, historyActions, viewActions } from './arrange';
 import { contentActions } from './content';
+import { imageActions } from './image';
 
 const ALL: Action[] = [
   ...formatActions,
@@ -11,6 +12,7 @@ const ALL: Action[] = [
   ...historyActions,
   ...viewActions,
   ...contentActions,
+  ...imageActions,
 ];
 const BY_ID = new Map(ALL.map((a) => [a.id, a]));
 

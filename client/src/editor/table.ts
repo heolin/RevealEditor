@@ -476,3 +476,114 @@ export function setColumnAlignment(
   }
   commit(ctx);
 }
+
+/* ---------- cell selection (rectangular, span-aware) ---------- */
+
+export interface CellRect {
+  r0: number;
+  c0: number;
+  r1: number;
+  c1: number;
+}
+
+export function gridSize(table: HTMLTableElement): { rows: number; cols: number } {
+  const grid = tableGrid(table);
+  return { rows: grid.length, cols: grid[0]?.length ?? 0 };
+}
+
+/** Grid coords of the slot a cell's top-left occupies (span-aware). */
+export function gridCoordOf(
+  table: HTMLTableElement,
+  cell: HTMLTableCellElement,
+): [number, number] | null {
+  const grid = tableGrid(table);
+  for (let r = 0; r < grid.length; r++) {
+    for (let c = 0; c < grid[r].length; c++) {
+      if (grid[r][c] === cell) return [r, c];
+    }
+  }
+  return null;
+}
+
+/** Normalize a rect to min/max and clamp to the grid. */
+export function normalizeRect(table: HTMLTableElement, rect: CellRect): CellRect {
+  const { rows, cols } = gridSize(table);
+  return {
+    r0: Math.max(0, Math.min(rect.r0, rect.r1)),
+    r1: Math.min(rows - 1, Math.max(rect.r0, rect.r1)),
+    c0: Math.max(0, Math.min(rect.c0, rect.c1)),
+    c1: Math.min(cols - 1, Math.max(rect.c0, rect.c1)),
+  };
+}
+
+/** Unique cells covered by a grid rect (spanning cells counted once). */
+export function cellsInRect(table: HTMLTableElement, rect: CellRect): HTMLTableCellElement[] {
+  const grid = tableGrid(table);
+  const { r0, c0, r1, c1 } = normalizeRect(table, rect);
+  const seen = new Set<HTMLTableCellElement>();
+  const out: HTMLTableCellElement[] = [];
+  for (let r = r0; r <= r1; r++) {
+    for (let c = c0; c <= c1; c++) {
+      const cell = grid[r]?.[c];
+      if (cell && !seen.has(cell)) {
+        seen.add(cell);
+        out.push(cell);
+      }
+    }
+  }
+  return out;
+}
+
+export function rowRect(table: HTMLTableElement, r: number): CellRect {
+  return { r0: r, r1: r, c0: 0, c1: gridSize(table).cols - 1 };
+}
+export function colRect(table: HTMLTableElement, c: number): CellRect {
+  return { r0: 0, r1: gridSize(table).rows - 1, c0: c, c1: c };
+}
+export function allRect(table: HTMLTableElement): CellRect {
+  const { rows, cols } = gridSize(table);
+  return { r0: 0, r1: rows - 1, c0: 0, c1: cols - 1 };
+}
+
+/** The cells a style write should target: the rect if set, else the active cell. */
+export function selectedCells(
+  table: HTMLTableElement,
+  rect: CellRect | null,
+  active: HTMLTableCellElement | null,
+): HTMLTableCellElement[] {
+  if (rect) return cellsInRect(table, rect);
+  return active ? [active] : [];
+}
+
+/* ---------- bulk cell styling (inline styles on td/th) ---------- */
+
+export type CellStylePatch = Record<string, string | null>;
+
+/** Merge a style patch across a set of cells (inline), cleaning empty style
+ *  attributes; commits once. Inline td/th styles round-trip verbatim. */
+export function applyCellStyle(
+  ctx: StageCtx,
+  cells: HTMLTableCellElement[],
+  patch: CellStylePatch,
+): void {
+  for (const cell of cells) {
+    for (const [prop, value] of Object.entries(patch)) {
+      if (value === null || value === '') cell.style.removeProperty(prop);
+      else cell.style.setProperty(prop, value);
+    }
+    if (cell.getAttribute('style') === '') cell.removeAttribute('style');
+  }
+  commit(ctx);
+}
+
+/** Toggle a value (e.g. font-weight:bold) across cells: if every cell already
+ *  has it, clear it everywhere; otherwise set it on all. */
+export function toggleCellStyle(
+  ctx: StageCtx,
+  cells: HTMLTableCellElement[],
+  prop: string,
+  on: string,
+): void {
+  const allOn = cells.length > 0 && cells.every((c) => c.style.getPropertyValue(prop) === on);
+  applyCellStyle(ctx, cells, { [prop]: allOn ? null : on });
+}

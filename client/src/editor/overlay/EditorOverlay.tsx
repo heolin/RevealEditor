@@ -1,9 +1,10 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { ActionIcon, Divider, Group, Menu, Paper, Tooltip } from '@mantine/core';
 import { IconPlus, IconRotateClockwise } from '@tabler/icons-react';
 import { useEditorStore } from '../editorStore';
 import { useDeckStore } from '../../state/deckStore';
 import {
+  applyStyle,
   collectAnchorSets,
   isAbsolute,
   nearestAnchor,
@@ -33,7 +34,18 @@ import {
   writeConnectorEndpoints,
 } from '../shapes';
 import { isChartEl, refreshChart } from '../chart/chart';
-import { ensureColgroup, resizeColumnPair, tableGrid } from '../table';
+import { coverGeometry, panLive, readObjectPosition } from '../crop';
+import { clipPathOf, parseMaskShape, type MaskShape } from '../mask';
+import {
+  allRect,
+  cellsInRect,
+  colRect,
+  ensureColgroup,
+  gridSize,
+  resizeColumnPair,
+  rowRect,
+  tableGrid,
+} from '../table';
 import { commit } from '../commands';
 import { handlerFor } from '../registry';
 import { useEditorContext } from '../actions/context';
@@ -88,6 +100,8 @@ export function EditorOverlay({ scale }: { scale: number }) {
   const extraSelected = useEditorStore((s) => s.extraSelected);
   const hoveredEl = useEditorStore((s) => s.hoveredEl);
   const sessionEl = useEditorStore((s) => s.sessionEl);
+  const cropEl = useEditorStore((s) => s.cropEl);
+  const maskEl = useEditorStore((s) => s.maskEl);
   const snapGuides = useEditorStore((s) => s.snapGuides);
   const dragRect = useEditorStore((s) => s.dragRect);
   const marquee = useEditorStore((s) => s.marquee);
@@ -98,6 +112,14 @@ export function EditorOverlay({ scale }: { scale: number }) {
   const target = sessionEl ?? selectedEl;
   const connected = target?.isConnected ? target : null;
   const extras = extraSelected.filter((el) => el.isConnected);
+  // Crop mode belongs to exactly one image; leaving that selection ends it.
+  const cropping = !!cropEl && cropEl.isConnected && connected === cropEl;
+  const masking = !!maskEl && maskEl.isConnected && connected === maskEl;
+  useEffect(() => {
+    if (cropEl && (!cropEl.isConnected || cropEl !== selectedEl)) {
+      useEditorStore.getState().setCropEl(null);
+    }
+  }, [cropEl, selectedEl]);
 
   return (
     <div className="editor-overlay">
@@ -139,8 +161,13 @@ export function EditorOverlay({ scale }: { scale: number }) {
             />
           );
         })()}
-      {connected && (
-        <>
+      {connected &&
+        (masking ? (
+          <MaskOverlay el={connected as HTMLImageElement} scale={scale} />
+        ) : cropping ? (
+          <CropOverlay el={connected as HTMLImageElement} scale={scale} />
+        ) : (
+          <>
           {/* Connectors show only their endpoint grips — a box border around
               a line reads as a rectangle, which it is not. */}
           {!isConnectorEl(connected) && (
@@ -177,13 +204,19 @@ export function EditorOverlay({ scale }: { scale: number }) {
           {!sessionEl && <FloatingToolbar ctx={ctx} box={boxFor(connected, scale)} />}
           {!dragRect &&
             (() => {
-              // Column grips whenever the selection or session lives in a
-              // table (the cell session is exactly when you want them).
-              const table = connected.closest('table');
-              return table ? <ColumnResizeGrips table={table as HTMLTableElement} scale={scale} /> : null;
+              // Column grips + row/column/all select handles + selection
+              // highlight whenever the selection lives in a table.
+              const table = connected.closest('table') as HTMLTableElement | null;
+              if (!table) return null;
+              return (
+                <>
+                  <ColumnResizeGrips table={table} scale={scale} />
+                  <TableSelectHandles table={table} scale={scale} />
+                </>
+              );
             })()}
-        </>
-      )}
+          </>
+        ))}
       {dropIndicator && (
         <div
           className="drop-indicator"
@@ -492,6 +525,291 @@ function ResizeHandles({ el, scale }: { el: HTMLElement; scale: number }) {
   );
 }
 
+const CROP_HANDLES = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
+
+/**
+ * Reframe-crop overlay for an image (crop mode). The crop frame is the element
+ * box; a dimmed ghost of the full source shows what's cropped away. Drag the
+ * frame handles to resize the crop (free aspect), drag the interior to pan
+ * (object-position). Mirrors the ResizeHandles capture→write-live→commit
+ * recipe. Enter/Escape/Done exit. Encodes as inline object-fit/object-position.
+ */
+function CropOverlay({ el, scale }: { el: HTMLImageElement; scale: number }) {
+  const ctx = useEditorStore((s) => s.ctx);
+  const dragRect = useEditorStore((s) => s.dragRect);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === 'Escape') {
+        e.preventDefault();
+        useEditorStore.getState().setCropEl(null);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  if (!ctx) return null;
+
+  const box = dragRect
+    ? { left: dragRect.left * scale, top: dragRect.top * scale, width: dragRect.width * scale, height: dragRect.height * scale, rot: 0 }
+    : boxFor(el, scale);
+  const g = coverGeometry(el);
+  const pos = readObjectPosition(el);
+  const ghost = {
+    left: box.left - g.overflowX * (pos.x / 100) * scale,
+    top: box.top - g.overflowY * (pos.y / 100) * scale,
+    width: (g.boxW + g.overflowX) * scale,
+    height: (g.boxH + g.overflowY) * scale,
+  };
+
+  function startResize(handle: string, down: React.PointerEvent) {
+    down.preventDefault();
+    down.stopPropagation();
+    if (!ctx) return;
+    const grip = down.currentTarget as HTMLElement;
+    grip.setPointerCapture(down.pointerId);
+    const start = unrotatedRect(ctx, el);
+    const x0 = down.clientX;
+    const y0 = down.clientY;
+    function onMove(e: PointerEvent) {
+      const dx = (e.clientX - x0) / scale;
+      const dy = (e.clientY - y0) / scale;
+      let { left, top, width: w, height: h } = start;
+      if (handle.includes('e')) w = start.width + dx;
+      if (handle.includes('w')) {
+        left = start.left + dx;
+        w = start.width - dx;
+      }
+      if (handle.includes('s')) h = start.height + dy;
+      if (handle.includes('n')) {
+        top = start.top + dy;
+        h = start.height - dy;
+      }
+      w = Math.max(24, w);
+      h = Math.max(24, h);
+      writeStageRect(ctx!, el, { left, top, width: w, height: h });
+      useEditorStore.getState().setDragRect({ left, top, width: w, height: h });
+      useEditorStore.getState().bump();
+    }
+    function onUp() {
+      grip.removeEventListener('pointermove', onMove);
+      grip.removeEventListener('pointerup', onUp);
+      grip.removeEventListener('pointercancel', onUp);
+      useEditorStore.getState().setDragRect(null);
+      if (ctx) commit(ctx);
+    }
+    grip.addEventListener('pointermove', onMove);
+    grip.addEventListener('pointerup', onUp);
+    grip.addEventListener('pointercancel', onUp);
+  }
+
+  function startPan(down: React.PointerEvent) {
+    down.preventDefault();
+    down.stopPropagation();
+    if (!ctx) return;
+    const surf = down.currentTarget as HTMLElement;
+    surf.setPointerCapture(down.pointerId);
+    const startPos = readObjectPosition(el);
+    const x0 = down.clientX;
+    const y0 = down.clientY;
+    function onMove(e: PointerEvent) {
+      panLive(el, startPos, (e.clientX - x0) / scale, (e.clientY - y0) / scale);
+      useEditorStore.getState().bump();
+    }
+    function onUp() {
+      surf.removeEventListener('pointermove', onMove);
+      surf.removeEventListener('pointerup', onUp);
+      surf.removeEventListener('pointercancel', onUp);
+      if (ctx) commit(ctx);
+    }
+    surf.addEventListener('pointermove', onMove);
+    surf.addEventListener('pointerup', onUp);
+    surf.addEventListener('pointercancel', onUp);
+  }
+
+  const c = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+  return (
+    <>
+      <img className="crop-ghost" src={el.currentSrc || el.src} alt="" style={ghost} />
+      <div className="crop-frame" style={boxStyle(box)} onPointerDown={startPan} />
+      {CROP_HANDLES.map((h) => {
+        let px = c.x;
+        let py = c.y;
+        if (h.includes('n')) py = box.top;
+        else if (h.includes('s')) py = box.top + box.height;
+        if (h.includes('w')) px = box.left;
+        else if (h.includes('e')) px = box.left + box.width;
+        return (
+          <div
+            key={h}
+            className="resize-handle"
+            style={{ cursor: HANDLE_CURSORS[h], left: px - 4, top: py - 4, zIndex: 2 }}
+            onPointerDown={(e) => startResize(h, e)}
+          />
+        );
+      })}
+      <button
+        className="crop-done"
+        style={{ left: box.left, top: box.top + box.height + 8 }}
+        onClick={() => useEditorStore.getState().setCropEl(null)}
+      >
+        Done
+      </button>
+    </>
+  );
+}
+
+interface MaskHandle {
+  x: number; // % of box
+  y: number;
+  cls?: string;
+  apply: (s: MaskShape, dxp: number, dyp: number) => MaskShape;
+}
+
+/**
+ * Visual mask editor (mask mode). Draws the current clip-path as a dashed
+ * outline over the image and offers shape-specific drag handles (circle
+ * radius/center, ellipse radii, inset edges + corner-round, polygon vertices).
+ * Each drag re-emits the inline clip-path live (applyStyle) and commits on
+ * pointer-up — same recipe as ResizeHandles/CropOverlay. Enter/Escape/Done exit.
+ */
+function MaskOverlay({ el, scale }: { el: HTMLImageElement; scale: number }) {
+  const ctx = useEditorStore((s) => s.ctx);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === 'Escape') {
+        e.preventDefault();
+        useEditorStore.getState().setMaskEl(null);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  if (!ctx) return null;
+
+  const box = boxFor(el, scale); // overlay px
+  const W = box.width;
+  const Hh = box.height;
+  const rect = el.getBoundingClientRect(); // slide px
+  const bw = rect.width || 1;
+  const bh = rect.height || 1;
+  const refBox = Math.hypot(bw, bh) / Math.SQRT2; // CSS circle() % reference, slide px
+  const refOv = Math.hypot(W, Hh) / Math.SQRT2; // same, overlay px
+  const shape = parseMaskShape(el.style.clipPath);
+  const clamp = (v: number) => Math.max(0, Math.min(100, v));
+  const P = (xPct: number, yPct: number) => ({
+    left: box.left + (xPct / 100) * W,
+    top: box.top + (yPct / 100) * Hh,
+  });
+
+  function startDrag(down: React.PointerEvent, apply: MaskHandle['apply']) {
+    down.preventDefault();
+    down.stopPropagation();
+    if (!ctx) return;
+    const grip = down.currentTarget as HTMLElement;
+    grip.setPointerCapture(down.pointerId);
+    const x0 = down.clientX;
+    const y0 = down.clientY;
+    const start = parseMaskShape(el.style.clipPath);
+    function onMove(e: PointerEvent) {
+      const dxp = ((e.clientX - x0) / scale / bw) * 100;
+      const dyp = ((e.clientY - y0) / scale / bh) * 100;
+      const cp = clipPathOf(apply(start, dxp, dyp));
+      if (cp) applyStyle(el, { 'clip-path': cp });
+      useEditorStore.getState().bump();
+    }
+    function onUp() {
+      grip.removeEventListener('pointermove', onMove);
+      grip.removeEventListener('pointerup', onUp);
+      grip.removeEventListener('pointercancel', onUp);
+      if (ctx) commit(ctx);
+    }
+    grip.addEventListener('pointermove', onMove);
+    grip.addEventListener('pointerup', onUp);
+    grip.addEventListener('pointercancel', onUp);
+  }
+
+  const handles: MaskHandle[] = [];
+  let outline: React.ReactNode = null;
+
+  if (shape.kind === 'circle') {
+    const { cx, cy, r } = shape;
+    handles.push({
+      x: cx, y: cy, cls: 'center',
+      apply: (s, dx, dy) => (s.kind === 'circle' ? { ...s, cx: clamp(s.cx + dx), cy: clamp(s.cy + dy) } : s),
+    });
+    handles.push({
+      x: cx + (r * refBox) / bw, y: cy,
+      apply: (s, dx) => (s.kind === 'circle' ? { ...s, r: Math.max(1, Math.min(150, s.r + (dx * bw) / refBox)) } : s),
+    });
+    outline = <circle cx={(cx / 100) * W} cy={(cy / 100) * Hh} r={(r / 100) * refOv} />;
+  } else if (shape.kind === 'ellipse') {
+    const { cx, cy, rx, ry } = shape;
+    handles.push({
+      x: cx, y: cy, cls: 'center',
+      apply: (s, dx, dy) => (s.kind === 'ellipse' ? { ...s, cx: clamp(s.cx + dx), cy: clamp(s.cy + dy) } : s),
+    });
+    handles.push({ x: cx + rx, y: cy, apply: (s, dx) => (s.kind === 'ellipse' ? { ...s, rx: Math.max(1, Math.min(100, s.rx + dx)) } : s) });
+    handles.push({ x: cx, y: cy + ry, apply: (s, _dx, dy) => (s.kind === 'ellipse' ? { ...s, ry: Math.max(1, Math.min(100, s.ry + dy)) } : s) });
+    outline = <ellipse cx={(cx / 100) * W} cy={(cy / 100) * Hh} rx={(rx / 100) * W} ry={(ry / 100) * Hh} />;
+  } else if (shape.kind === 'inset') {
+    const { top, right, bottom, left, round } = shape;
+    handles.push({ x: 50, y: top, apply: (s, _dx, dy) => (s.kind === 'inset' ? { ...s, top: clamp(s.top + dy) } : s) });
+    handles.push({ x: 50, y: 100 - bottom, apply: (s, _dx, dy) => (s.kind === 'inset' ? { ...s, bottom: clamp(s.bottom - dy) } : s) });
+    handles.push({ x: left, y: 50, apply: (s, dx) => (s.kind === 'inset' ? { ...s, left: clamp(s.left + dx) } : s) });
+    handles.push({ x: 100 - right, y: 50, apply: (s, dx) => (s.kind === 'inset' ? { ...s, right: clamp(s.right - dx) } : s) });
+    handles.push({
+      x: Math.min(left + Math.max(round, 4), 100 - right), y: top, cls: 'center',
+      apply: (s, dx) => (s.kind === 'inset' ? { ...s, round: Math.max(0, Math.min(50, s.round + dx)) } : s),
+    });
+    const x = (left / 100) * W;
+    const y = (top / 100) * Hh;
+    const w = Math.max(0, ((100 - left - right) / 100) * W);
+    const h = Math.max(0, ((100 - top - bottom) / 100) * Hh);
+    outline = <rect x={x} y={y} width={w} height={h} rx={(round / 100) * Math.min(w, h)} />;
+  } else if (shape.kind === 'polygon') {
+    shape.points.forEach((pt, i) => {
+      handles.push({
+        x: pt[0], y: pt[1],
+        apply: (s, dx, dy) => {
+          if (s.kind !== 'polygon') return s;
+          const pts = s.points.map((p) => [...p] as [number, number]);
+          pts[i] = [clamp(pts[i][0] + dx), clamp(pts[i][1] + dy)];
+          return { ...s, points: pts };
+        },
+      });
+    });
+    outline = <polygon points={shape.points.map(([x, y]) => `${(x / 100) * W},${(y / 100) * Hh}`).join(' ')} />;
+  }
+
+  return (
+    <>
+      <svg className="mask-outline" width={W} height={Hh} style={{ left: box.left, top: box.top, width: W, height: Hh }}>
+        <g fill="none" stroke="var(--re-accent)" strokeWidth={1.5} strokeDasharray="5 4">
+          {outline}
+        </g>
+      </svg>
+      {handles.map((h, i) => {
+        const pos = P(h.x, h.y);
+        return (
+          <div
+            key={i}
+            className={`mask-handle${h.cls ? ` ${h.cls}` : ''}`}
+            style={{ left: pos.left, top: pos.top }}
+            onPointerDown={(e) => startDrag(e, h.apply)}
+          />
+        );
+      })}
+      <button
+        className="mask-done"
+        style={{ left: box.left, top: box.top + Hh + 8 }}
+        onClick={() => useEditorStore.getState().setMaskEl(null)}
+      >
+        Done
+      </button>
+    </>
+  );
+}
+
 /**
  * Column-boundary grips on the selected (or session-hosting) table: drag a
  * boundary to redistribute the neighboring pair of <colgroup> widths.
@@ -552,6 +870,83 @@ function ColumnResizeGrips({ table, scale }: { table: HTMLTableElement; scale: n
           onPointerDown={(e) => startDrag(i, e)}
         />
       ))}
+    </>
+  );
+}
+
+const SEL_STRIP = 13; // handle-strip thickness (slide px)
+
+/**
+ * Table selection chrome: header strips (top = columns, left = rows, corner =
+ * whole table) that set the rectangular cell selection on click, plus a
+ * translucent highlight over the currently selected cells. Geometry mirrors
+ * ColumnResizeGrips (tableGrid + stageRect × scale).
+ */
+function TableSelectHandles({ table, scale }: { table: HTMLTableElement; scale: number }) {
+  const ctx = useEditorStore((s) => s.ctx);
+  const cellSel = useEditorStore((s) => s.cellSel);
+  if (!ctx) return null;
+  const grid = tableGrid(table);
+  const { rows, cols } = gridSize(table);
+  if (rows === 0 || cols === 0) return null;
+  const tRect = stageRect(ctx, table);
+  const select = useEditorStore.getState().setCellSel;
+
+  const colSpan = (c: number) => stageRect(ctx, grid[0][c]);
+  const rowSpan = (r: number) => stageRect(ctx, grid[r][0]);
+  const activeCol =
+    cellSel && cellSel.c0 === cellSel.c1 && cellSel.r0 === 0 && cellSel.r1 === rows - 1 ? cellSel.c0 : -1;
+  const activeRow =
+    cellSel && cellSel.r0 === cellSel.r1 && cellSel.c0 === 0 && cellSel.c1 === cols - 1 ? cellSel.r0 : -1;
+
+  return (
+    <>
+      {cellSel &&
+        cellsInRect(table, cellSel).map((cell, i) => {
+          const r = stageRect(ctx, cell);
+          return (
+            <div
+              key={`h${i}`}
+              className="cell-highlight"
+              style={{ left: r.left * scale, top: r.top * scale, width: r.width * scale, height: r.height * scale }}
+            />
+          );
+        })}
+      <div
+        className="table-sel-corner"
+        title="Select whole table"
+        style={{
+          left: (tRect.left - SEL_STRIP) * scale,
+          top: (tRect.top - SEL_STRIP) * scale,
+          width: SEL_STRIP * scale,
+          height: SEL_STRIP * scale,
+        }}
+        onClick={() => select(allRect(table))}
+      />
+      {Array.from({ length: cols }, (_, c) => {
+        const r = colSpan(c);
+        return (
+          <div
+            key={`c${c}`}
+            className={`table-sel-col${activeCol === c ? ' active' : ''}`}
+            title="Select column"
+            style={{ left: r.left * scale, top: (tRect.top - SEL_STRIP) * scale, width: r.width * scale, height: SEL_STRIP * scale }}
+            onClick={() => select(colRect(table, c))}
+          />
+        );
+      })}
+      {Array.from({ length: rows }, (_, r) => {
+        const rr = rowSpan(r);
+        return (
+          <div
+            key={`r${r}`}
+            className={`table-sel-row${activeRow === r ? ' active' : ''}`}
+            title="Select row"
+            style={{ left: (tRect.left - SEL_STRIP) * scale, top: rr.top * scale, width: SEL_STRIP * scale, height: rr.height * scale }}
+            onClick={() => select(rowRect(table, r))}
+          />
+        );
+      })}
     </>
   );
 }
